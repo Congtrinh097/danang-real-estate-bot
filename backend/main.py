@@ -1,6 +1,11 @@
 import json
 import sys
 import io
+import os
+from dotenv import load_dotenv
+
+# Tự động nạp biến môi trường (.env) cho LangSmith
+load_dotenv()
 
 # Đảm bảo stdout / stderr hỗ trợ đầy đủ UTF-8 trên Windows console
 if sys.platform == "win32":
@@ -50,7 +55,11 @@ def health_check():
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
-    config = {"configurable": {"thread_id": req.thread_id}}
+    config = {
+        "configurable": {"thread_id": req.thread_id},
+        "metadata": {"thread_id": req.thread_id},
+        "tags": [req.thread_id]
+    }
     inputs = {"messages": [HumanMessage(content=req.message)]}
 
     async def event_generator():

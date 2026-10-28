@@ -57,8 +57,126 @@ body {
 }
 
 .quick-prompts {
-  margin-top: 24px;
+  margin-top: 20px;
+}
+
+/* Thread Management */
+.thread-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px;
   flex: 1;
+  min-height: 0;
+}
+
+.btn-new-thread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.btn-new-thread:hover {
+  background: #1d4ed8;
+}
+
+.threads-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.threads-header span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+.thread-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.thread-item:hover {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.thread-item.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.thread-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.thread-title {
+  font-size: 13px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-item.active .thread-title {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.btn-delete-thread {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-thread:hover {
+  opacity: 1;
+  color: #ef4444;
+  background: #fee2e2;
 }
 
 .quick-prompts h4 {

@@ -1,17 +1,100 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Building2, MapPin, Bed, Maximize2, CheckCircle2, X } from "lucide-react";
+import {
+  Send,
+  Building2,
+  MapPin,
+  Bed,
+  Maximize2,
+  CheckCircle2,
+  X,
+  Plus,
+  MessageSquare,
+  Trash2
+} from "lucide-react";
+
+const INITIAL_GREETING = {
+  sender: "bot",
+  text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản tại Đà Nẵng. Anh/chị đang có nhu cầu thuê hay mua nhà/căn hộ tại khu vực nào (Hải Châu, Sơn Trà, Ngũ Hành Sơn...) ạ?",
+  properties: []
+};
+
+const createNewThreadObject = () => {
+  const id = "session_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 6);
+  return {
+    id,
+    title: "Cuộc trò chuyện mới",
+    messages: [INITIAL_GREETING],
+    createdAt: Date.now()
+  };
+};
+
+const STORAGE_KEY = "danang_re_threads";
+const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
 
 export default function App() {
-  const [messages, setMessages] = useState([
-    {
-      sender: "bot",
-      text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản tại Đà Nẵng. Anh/chị đang có nhu cầu thuê hay mua nhà/căn hộ tại khu vực nào (Hải Châu, Sơn Trà, Ngũ Hành Sơn...) ạ?",
-      properties: []
+  // 1. Quản lý danh sách threads & thread đang active
+  const [threads, setThreads] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error("Lỗi đọc threads từ localStorage:", e);
     }
-  ]);
+    // Mặc định tự động tạo 1 thread mới khi lần đầu vào trang
+    return [createNewThreadObject()];
+  });
+
+  const [activeThreadId, setActiveThreadId] = useState(() => {
+    try {
+      const savedActive = localStorage.getItem(ACTIVE_THREAD_KEY);
+      if (savedActive) return savedActive;
+    } catch (e) {
+      console.error(e);
+    }
+    return "";
+  });
+
+  // Đảm bảo activeThreadId luôn hợp lệ với danh sách threads
+  useEffect(() => {
+    if (!threads.some((t) => t.id === activeThreadId)) {
+      if (threads.length > 0) {
+        setActiveThreadId(threads[0].id);
+      } else {
+        const newThread = createNewThreadObject();
+        setThreads([newThread]);
+        setActiveThreadId(newThread.id);
+      }
+    }
+  }, [threads, activeThreadId]);
+
+  // Lưu threads vào localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+    } catch (e) {
+      console.error("Lỗi lưu threads:", e);
+    }
+  }, [threads]);
+
+  // Lưu activeThreadId vào localStorage
+  useEffect(() => {
+    if (activeThreadId) {
+      try {
+        localStorage.setItem(ACTIVE_THREAD_KEY, activeThreadId);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [activeThreadId]);
+
+  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
+  const messages = activeThread?.messages || [];
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [threadId] = useState(() => "session_" + Math.random().toString(36).substring(7));
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", note: "" });
   const [leadSuccess, setLeadSuccess] = useState(false);
@@ -26,12 +109,59 @@ export default function App() {
     scrollToBottom();
   }, [messages]);
 
+  // Tạo thread mới
+  const handleCreateNewThread = () => {
+    const newThread = createNewThreadObject();
+    setThreads((prev) => [newThread, ...prev]);
+    setActiveThreadId(newThread.id);
+    setInput("");
+  };
+
+  // Xóa thread
+  const handleDeleteThread = (e, threadIdToDelete) => {
+    e.stopPropagation();
+    setThreads((prev) => {
+      const filtered = prev.filter((t) => t.id !== threadIdToDelete);
+      if (filtered.length === 0) {
+        const freshThread = createNewThreadObject();
+        setActiveThreadId(freshThread.id);
+        return [freshThread];
+      }
+      if (activeThreadId === threadIdToDelete) {
+        setActiveThreadId(filtered[0].id);
+      }
+      return filtered;
+    });
+  };
+
+  // Cập nhật messages cho thread đang chọn
+  const updateActiveThreadMessages = (updateFn) => {
+    setThreads((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeThreadId) return t;
+        const updatedMsgs = typeof updateFn === "function" ? updateFn(t.messages) : updateFn;
+        
+        // Cập nhật tiêu đề thread từ tin nhắn đầu tiên của user nếu tiêu đề còn là mặc định
+        let title = t.title;
+        if (t.title === "Cuộc trò chuyện mới") {
+          const firstUserMsg = updatedMsgs.find((m) => m.sender === "user");
+          if (firstUserMsg) {
+            title = firstUserMsg.text.length > 28
+              ? firstUserMsg.text.substring(0, 28) + "..."
+              : firstUserMsg.text;
+          }
+        }
+        return { ...t, title, messages: updatedMsgs };
+      })
+    );
+  };
+
   const handleSend = async (textToSend) => {
     const query = textToSend || input;
-    if (!query.trim() || loading) return;
+    if (!query.trim() || loading || !activeThreadId) return;
 
     const userMsg = { sender: "user", text: query, properties: [] };
-    setMessages((prev) => [...prev, userMsg]);
+    updateActiveThreadMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
@@ -39,7 +169,7 @@ export default function App() {
       const response = await fetch("http://localhost:8000/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query, thread_id: threadId }),
+        body: JSON.stringify({ message: query, thread_id: activeThreadId }),
       });
 
       if (!response.body) throw new Error("Không nhận được luồng stream");
@@ -48,7 +178,7 @@ export default function App() {
       const decoder = new TextDecoder("utf-8");
       let botMsg = { sender: "bot", text: "", properties: [] };
 
-      setMessages((prev) => [...prev, botMsg]);
+      updateActiveThreadMessages((prev) => [...prev, botMsg]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -66,13 +196,13 @@ export default function App() {
               const data = JSON.parse(raw);
               if (data.type === "token") {
                 botMsg.text += data.content;
-                setMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "properties") {
                 botMsg.properties = data.data;
-                setMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "error") {
                 botMsg.text = "Lỗi xử lý: " + data.content;
-                setMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               }
             } catch (err) {
               console.error("Parse JSON stream error:", err);
@@ -82,7 +212,7 @@ export default function App() {
       }
     } catch (error) {
       console.error("Lỗi gửi tin:", error);
-      setMessages((prev) => [
+      updateActiveThreadMessages((prev) => [
         ...prev,
         {
           sender: "bot",
@@ -138,6 +268,42 @@ export default function App() {
           </div>
         </div>
 
+        {/* Quản lý Thread */}
+        <div className="thread-section">
+          <button className="btn-new-thread" onClick={handleCreateNewThread}>
+            <Plus size={16} /> Tạo đoạn chat mới
+          </button>
+
+          <div className="threads-header">
+            <span>Lịch sử hội thoại</span>
+          </div>
+
+          <div className="thread-list">
+            {threads.map((t) => (
+              <div
+                key={t.id}
+                className={`thread-item ${t.id === activeThreadId ? "active" : ""}`}
+                onClick={() => setActiveThreadId(t.id)}
+              >
+                <div className="thread-info">
+                  <MessageSquare size={14} style={{ flexShrink: 0 }} />
+                  <span className="thread-title">{t.title}</span>
+                </div>
+                {threads.length > 1 && (
+                  <button
+                    className="btn-delete-thread"
+                    title="Xóa hội thoại"
+                    onClick={(e) => handleDeleteThread(e, t.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Gợi ý tìm nhanh */}
         <div className="quick-prompts">
           <h4>Gợi ý tìm nhanh</h4>
           <button
@@ -158,12 +324,6 @@ export default function App() {
           >
             🏡 Đất nền Nam Hòa Xuân sổ đỏ
           </button>
-          <button
-            className="prompt-btn"
-            onClick={() => handleSend("Biệt thự ven sông Hàn quận Sơn Trà")}
-          >
-            💎 Biệt thự Euro Village ven sông
-          </button>
         </div>
       </div>
 
@@ -171,8 +331,12 @@ export default function App() {
       <div className="chat-main">
         <div className="chat-header">
           <div>
-            <h3 style={{ fontSize: "16px", fontWeight: "700" }}>Trợ lý AI Nhà Đất Đà Nẵng</h3>
-            <p style={{ fontSize: "12px", color: "#64748b" }}>Powered by LangGraph, Qdrant & FastAPI</p>
+            <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
+              {activeThread?.title || "Trợ lý AI Nhà Đất Đà Nẵng"}
+            </h3>
+            <p style={{ fontSize: "12px", color: "#64748b" }}>
+              ID phiên: <code style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px" }}>{activeThreadId}</code>
+            </p>
           </div>
           <div className="status-badge">
             <div className="status-dot"></div> Sẵn sàng tư vấn
