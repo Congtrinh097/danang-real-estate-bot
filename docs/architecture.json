@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kiến trúc Chatbot Bất Động Sản Đà Nẵng",
+    "quality_profile": "showcase",
+    "viewBox": [1260, 700],
+    "views": [
+      {
+        "id": "full-flow",
+        "label": "Toàn bộ luồng",
+        "focus": ["user", "react_app", "fastapi_api", "langgraph_agent", "qdrant_db", "postgres_db", "langsmith_obs", "llm_provider"],
+        "note": "Luồng từ ReactJS qua FastAPI SSE đến LangGraph, Qdrant và PostgreSQL."
+      },
+      {
+        "id": "storage-layer",
+        "label": "Tầng lưu trữ & Giám sát",
+        "focus": ["langgraph_agent", "qdrant_db", "postgres_db", "langsmith_obs"],
+        "note": "Qdrant lưu vector BĐS, PostgreSQL lưu session checkpoints và LangSmith giám sát."
+      }
+    ]
+  },
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Client Environment",
+      "wraps": ["user", "react_app"]
+    },
+    {
+      "kind": "region",
+      "label": "Backend Services (Docker Host)",
+      "wraps": ["fastapi_api", "langgraph_agent"]
+    },
+    {
+      "kind": "region",
+      "label": "Database Storage (Docker Volumes)",
+      "wraps": ["qdrant_db", "postgres_db"]
+    },
+    {
+      "kind": "security-group",
+      "label": "External Cloud Services",
+      "wraps": ["llm_provider", "langsmith_obs"]
+    }
+  ],
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Người dùng",
+      "sublabel": "Khách tìm mua thuê",
+      "pos": [50, 190],
+      "size": [135, 70]
+    },
+    {
+      "id": "react_app",
+      "type": "frontend",
+      "label": "ReactJS App",
+      "sublabel": "UI Chat và Cards",
+      "brand": "react",
+      "pos": [50, 410],
+      "size": [135, 70]
+    },
+    {
+      "id": "fastapi_api",
+      "type": "backend",
+      "label": "FastAPI Gateway",
+      "sublabel": "SSE Streaming API",
+      "brand": "fastapi",
+      "pos": [290, 410],
+      "size": [155, 70]
+    },
+    {
+      "id": "langgraph_agent",
+      "type": "backend",
+      "label": "LangGraph Agent",
+      "sublabel": "Stateful Workflow",
+      "pos": [540, 410],
+      "size": [155, 70]
+    },
+    {
+      "id": "qdrant_db",
+      "type": "database",
+      "label": "Qdrant Vector DB",
+      "sublabel": "Hybrid Search",
+      "pos": [790, 190],
+      "size": [155, 70]
+    },
+    {
+      "id": "postgres_db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Checkpoints Leads",
+      "brand": "postgresql",
+      "pos": [790, 410],
+      "size": [155, 70]
+    },
+    {
+      "id": "llm_provider",
+      "type": "cloud",
+      "label": "LLM Service",
+      "sublabel": "Gemini OpenAI",
+      "pos": [1040, 190],
+      "size": [150, 70]
+    },
+    {
+      "id": "langsmith_obs",
+      "type": "cloud",
+      "label": "LangSmith",
+      "sublabel": "Tracing Metrics",
+      "pos": [1040, 410],
+      "size": [150, 70]
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn_user_react",
+      "from": "user",
+      "to": "react_app",
+      "label": "Tương tác chat",
+      "variant": "emphasis",
+      "labelAt": [117, 335]
+    },
+    {
+      "id": "conn_react_fastapi",
+      "from": "react_app",
+      "to": "fastapi_api",
+      "label": "POST /chat/stream",
+      "variant": "emphasis",
+      "labelAt": [237, 425]
+    },
+    {
+      "id": "conn_fastapi_agent",
+      "from": "fastapi_api",
+      "to": "langgraph_agent",
+      "label": "astream_events",
+      "labelAt": [492, 425]
+    },
+    {
+      "id": "conn_agent_qdrant",
+      "from": "langgraph_agent",
+      "to": "qdrant_db",
+      "label": "Vector filter search",
+      "fromSide": "top",
+      "toSide": "left",
+      "labelAt": [680, 210]
+    },
+    {
+      "id": "conn_agent_postgres",
+      "from": "langgraph_agent",
+      "to": "postgres_db",
+      "label": "Lưu state leads",
+      "labelAt": [742, 425]
+    },
+    {
+      "id": "conn_agent_llm",
+      "from": "langgraph_agent",
+      "to": "llm_provider",
+      "label": "Prompt Schema",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [[617.5, 130], [1115, 130]],
+      "labelAt": [865, 115]
+    },
+    {
+      "id": "conn_agent_langsmith",
+      "from": "langgraph_agent",
+      "to": "langsmith_obs",
+      "label": "Traces Metrics",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [[617.5, 540], [1115, 540]],
+      "labelAt": [865, 555]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Tối ưu tìm kiếm BĐS",
+      "items": [
+        "Qdrant kết hợp Semantic Search và Payload Filtering (quận, giá, loại BĐS).",
+        "ReactJS hiển thị Card tương tác và Stream phản hồi theo thời gian thực."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Bền bỉ & Giám sát chặt chẽ",
+      "items": [
+        "PostgreSQL quản lý stateful checkpoints và thông tin leads đặt lịch xem nhà.",
+        "LangSmith ghi nhận vết token, latency và debug chính xác luồng tool-calling."
+      ]
+    }
+  ]
+}
