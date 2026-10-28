@@ -57,8 +57,12 @@ async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
     config = {
         "configurable": {"thread_id": req.thread_id},
-        "metadata": {"thread_id": req.thread_id},
-        "tags": [req.thread_id]
+        "metadata": {
+            "thread_id": req.thread_id,
+            "session_type": "user_chat",
+        },
+        "tags": ["da-nang-real-estate", req.thread_id],
+        "run_name": f"ChatStream-{req.thread_id}"
     }
     inputs = {"messages": [HumanMessage(content=req.message)]}
 

@@ -64,14 +64,20 @@ E:\ProjectForLeaning\
 3. Ghép chuỗi ngữ cảnh: `title + description + ward + district`.
 4. Gọi `text-embedding-3-small` tạo vector 1536 chiều -> Upsert vào collection `danang_properties`.
 
-### 3.2. Luồng Xử lý Hội thoại (Chat Stream Flow)
+### 3.2. Luồng Xử lý Hội thoại & Phân loại Ý định (Chat Stream & Router Flow)
 ```mermaid
-flowchart LR
+flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]
-    API --> N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
+    API --> R0["Node 0: route_intent\n(Router Agent / Intent Classifier)"]
+    
+    R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM suy luận trả lời trực tiếp, không search Qdrant)"]
+    R0 -->|intent == 'search_property'| N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
+    
     N1 --> N2["Node 2: search_properties\n(Qdrant Hybrid Vector Search)"]
     N2 --> N3["Node 3: generate_response\n(LLM Context-Aware Generator)"]
-    N3 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Chữ: {'type': 'token'}\n3. [DONE]"]
+    
+    G1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Chữ: {'type': 'token'}\n3. [DONE]"]
+    N3 --> Stream
     Stream --> Client
 ```
 
