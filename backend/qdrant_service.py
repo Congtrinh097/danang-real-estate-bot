@@ -26,10 +26,33 @@ class QdrantService:
             os.makedirs(local_path, exist_ok=True)
             self.client = QdrantClient(path=local_path)
 
-        self.embeddings = OpenAIEmbeddings(
+        embeddings_kwargs = {
+            "model": settings.EMBEDDING_MODEL_NAME,
+            "api_key": settings.OPENAI_API_KEY or "dummy_key_if_mock"
+        }
+        if settings.OPENAI_BASE_URL:
+            embeddings_kwargs["base_url"] = settings.OPENAI_BASE_URL
+
+        self.embeddings = OpenAIEmbeddings(**embeddings_kwargs)
+        self.fallback_embeddings = OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL_NAME,
-            api_key=settings.OPENAI_API_KEY or "dummy_key_if_mock"
+            api_key=settings.OPENAI_API_KEY or "dummy_key_if_mock",
+            base_url=settings.FALLBACK_OPENAI_BASE_URL or "https://api.openai.com/v1"
         )
+
+    def embed_query_safe(self, text: str) -> List[float]:
+        """Tạo vector với cơ chế fallback tự động nếu base_url lỗi"""
+        try:
+            return self.embeddings.embed_query(text)
+        except Exception:
+            return self.fallback_embeddings.embed_query(text)
+
+    def embed_documents_safe(self, texts: List[str]) -> List[List[float]]:
+        """Tạo batch vector với cơ chế fallback tự động nếu base_url lỗi"""
+        try:
+            return self.embeddings.embed_documents(texts)
+        except Exception:
+            return self.fallback_embeddings.embed_documents(texts)
 
     def ensure_collection(self):
         """Khởi tạo collection nếu chưa tồn tại"""
@@ -52,7 +75,7 @@ class QdrantService:
             full_text = f"{item['title']}. {item['description']} Vi tri: {item.get('ward', '')}, {item.get('district', '')}, Da Nang."
             
             if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
-                vector = self.embeddings.embed_query(full_text)
+                vector = self.embed_query_safe(full_text)
             else:
                 import hashlib
                 import random
@@ -102,7 +125,7 @@ class QdrantService:
         qdrant_filter = Filter(must=must_conditions) if must_conditions else None
 
         if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
-            query_vector = self.embeddings.embed_query(query)
+            query_vector = self.embed_query_safe(query)
         else:
             import random
             rng = random.Random(42)

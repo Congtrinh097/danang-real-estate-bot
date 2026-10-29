@@ -49,12 +49,28 @@ class AgentState(TypedDict):
     found_properties: List[Dict[str, Any]]
     citations: Optional[List[Dict[str, Any]]]
 
-# Khởi tạo LLM
-llm = ChatOpenAI(
+# Khởi tạo LLM với cơ chế Fallback (ưu tiên custom OPENAI_BASE_URL, tự động fallback về endpoint OpenAI chính thức nếu lỗi)
+primary_llm_kwargs = {
+    "model": settings.OPENAI_MODEL_NAME,
+    "api_key": settings.OPENAI_API_KEY or "dummy_key_mock",
+    "temperature": 0.2
+}
+if settings.OPENAI_BASE_URL:
+    primary_llm_kwargs["base_url"] = settings.OPENAI_BASE_URL
+primary_llm = ChatOpenAI(**primary_llm_kwargs)
+
+fallback_llm = ChatOpenAI(
     model=settings.OPENAI_MODEL_NAME,
     api_key=settings.OPENAI_API_KEY or "dummy_key_mock",
+    base_url=settings.FALLBACK_OPENAI_BASE_URL or "https://api.openai.com/v1",
     temperature=0.2
 )
+
+# Nếu có OPENAI_BASE_URL khác fallback thì cấu hình with_fallbacks
+if settings.OPENAI_BASE_URL and settings.OPENAI_BASE_URL.rstrip('/') != (settings.FALLBACK_OPENAI_BASE_URL or "").rstrip('/'):
+    llm = primary_llm.with_fallbacks([fallback_llm])
+else:
+    llm = primary_llm
 
 # 3. Node 0: Router Agent điều phối ý định
 def route_intent_node(state: AgentState) -> Dict[str, Any]:

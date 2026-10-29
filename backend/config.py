@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
@@ -10,6 +11,8 @@ load_dotenv(dotenv_path=env_path)
 class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL_NAME: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
+    OPENAI_BASE_URL: Optional[str] = os.getenv("OPENAI_BASE_URL", None)
+    FALLBACK_OPENAI_BASE_URL: Optional[str] = os.getenv("FALLBACK_OPENAI_BASE_URL", "https://api.openai.com/v1")
     EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "text-embedding-3-small")
     
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")

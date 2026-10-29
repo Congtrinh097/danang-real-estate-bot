@@ -148,7 +148,7 @@ class LegalService:
 
             # Tính vector embedding
             if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
-                vector = self.embeddings.embed_query(chunk_text)
+                vector = qdrant_service.embed_query_safe(chunk_text)
             else:
                 import hashlib
                 import random
@@ -219,7 +219,7 @@ class LegalService:
         """Tìm kiếm các đoạn văn bản luật liên quan nhất tới câu hỏi"""
         self.ensure_collection()
         if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
-            query_vector = self.embeddings.embed_query(query)
+            query_vector = qdrant_service.embed_query_safe(query)
         else:
             # Deterministic mock fallback
             import hashlib
