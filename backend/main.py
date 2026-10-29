@@ -11,13 +11,15 @@ load_dotenv()
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 from agent import real_estate_agent
 from qdrant_service import qdrant_service
+from legal_service import legal_service
+from document_converter import DocumentConverter
 
 app = FastAPI(title="Da Nang Real Estate AI Agent API")
 
@@ -76,6 +78,11 @@ async def chat_stream(req: ChatRequest):
             if properties:
                 yield f"data: {json.dumps({'type': 'properties', 'data': properties})}\n\n"
 
+            # Gửi danh sách căn cứ trích dẫn pháp lý (nếu có) để ReactJS render badges / drawer
+            citations = final_state.get("citations", [])
+            if citations:
+                yield f"data: {json.dumps({'type': 'citations', 'data': citations})}\n\n"
+
             # Gửi phản hồi văn bản của Bot
             messages = final_state.get("messages", [])
             if messages:
@@ -101,6 +108,61 @@ def submit_lead(lead: LeadRequest):
         "success": True,
         "message": "Đã ghi nhận thông tin đặt lịch xem nhà thành công!"
     }
+
+# ==================== PHÂN HỆ QUẢN TRỊ TÀI LIỆU PHÁP LÝ ====================
+
+@app.post("/api/legal/upload")
+async def upload_legal_document(file: UploadFile = File(...)):
+    """Upload tài liệu (.pdf, .docx, .md) -> tự động convert sang Markdown và lưu bản thảo"""
+    try:
+        file_bytes = await file.read()
+        md_content = DocumentConverter.convert_to_markdown(file_bytes, file.filename)
+        doc_meta = legal_service.save_document(file.filename, md_content)
+        return {"success": True, "data": doc_meta}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
+
+@app.get("/api/legal/documents")
+def get_legal_documents():
+    """Lấy danh sách siêu dữ liệu các tài liệu pháp lý"""
+    return {"success": True, "data": legal_service.list_documents()}
+
+@app.get("/api/legal/documents/{doc_id}/preview")
+def get_legal_document_preview(doc_id: str):
+    """Xem trước toàn văn nội dung Markdown của tài liệu"""
+    try:
+        content = legal_service.get_document_preview(doc_id)
+        return {"success": True, "data": {"id": doc_id, "content": content}}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/legal/documents/{doc_id}/index")
+def index_legal_document(doc_id: str):
+    """Cắt chunk theo cấu trúc Điều/Khoản và nạp vector vào Qdrant"""
+    try:
+        chunks_count = legal_service.index_document(doc_id)
+        return {
+            "success": True,
+            "chunks_count": chunks_count,
+            "message": f"Đã nạp thành công {chunks_count} đoạn luật vào Qdrant"
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/legal/documents/{doc_id}")
+def delete_legal_document(doc_id: str):
+    """Xóa tài liệu và toàn bộ vector liên quan"""
+    try:
+        success = legal_service.delete_document(doc_id)
+        return {"success": success, "message": "Đã xóa tài liệu và vector liên quan"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
