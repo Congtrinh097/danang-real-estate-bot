@@ -291,34 +291,56 @@ export default function App() {
     setSelectedCitationIndex(index);
   };
 
-  // Render text có chèn các badge trích dẫn [1], [2] tương tác
+  // Helper render text hỗ trợ Markdown in đậm (**text**), in nghiêng (*text*) và badge citation ([1], [2])
+  const renderFormattedText = (text, citations) => {
+    if (!text) return null;
+
+    // Bước 1: Tách theo citations [1], [2]...
+    const citationParts = text.split(/(\[\d+\])/g);
+
+    return citationParts.map((part, i) => {
+      const match = part.match(/^\[(\d+)\]$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        return (
+          <button
+            key={i}
+            className="citation-badge"
+            onClick={() => handleOpenCitation(num, citations)}
+            title="Bấm để xem căn cứ pháp lý đối chiếu"
+          >
+            [{num}]
+          </button>
+        );
+      }
+
+      // Bước 2: Tách theo định dạng Markdown: **in đậm** hoặc *in nghiêng*
+      const inlineParts = part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+      return (
+        <React.Fragment key={i}>
+          {inlineParts.map((subPart, j) => {
+            if (subPart.startsWith("**") && subPart.endsWith("**") && subPart.length >= 4) {
+              return <strong key={j} style={{ fontWeight: "700" }}>{subPart.slice(2, -2)}</strong>;
+            }
+            if (subPart.startsWith("*") && subPart.endsWith("*") && subPart.length >= 2) {
+              return <em key={j}>{subPart.slice(1, -1)}</em>;
+            }
+            return subPart;
+          })}
+        </React.Fragment>
+      );
+    });
+  };
+
+  // Render text có chèn các badge trích dẫn [1], [2] tương tác và Markdown formatting
   const renderMessageContent = (msg) => {
     if (!msg.text) return null;
     const citations = msg.citations || [];
 
-    // Tách văn bản theo pattern [1], [2],...
-    const parts = msg.text.split(/(\[\d+\])/g);
-
     return (
       <div>
-        <div className="bubble">
-          {parts.map((part, i) => {
-            const match = part.match(/^\[(\d+)\]$/);
-            if (match) {
-              const num = parseInt(match[1], 10);
-              return (
-                <button
-                  key={i}
-                  className="citation-badge"
-                  onClick={() => handleOpenCitation(num, citations)}
-                  title="Bấm để xem căn cứ pháp lý đối chiếu"
-                >
-                  [{num}]
-                </button>
-              );
-            }
-            return <span key={i}>{part}</span>;
-          })}
+        <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>
+          {renderFormattedText(msg.text, citations)}
         </div>
 
         {/* Nút footer xem căn cứ pháp lý nếu câu trả lời có citations */}
@@ -549,7 +571,7 @@ export default function App() {
                   {msg.sender === "bot" ? <Building2 size={18} /> : "Bạn"}
                 </div>
                 <div className="message-content">
-                  {msg.sender === "bot" ? renderMessageContent(msg) : <div className="bubble">{msg.text}</div>}
+                  {msg.sender === "bot" ? renderMessageContent(msg) : <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>}
 
                   {/* Property Carousel Cards */}
                   {msg.properties && msg.properties.length > 0 && (
