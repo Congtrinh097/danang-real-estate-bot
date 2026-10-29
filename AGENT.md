@@ -70,16 +70,24 @@ flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]
     API --> R0["Node 0: route_intent\n(Router Agent / Intent Classifier)"]
     
-    R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM suy luận trả lời trực tiếp, không search Qdrant)"]
+    R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM chào hỏi, không search Qdrant)"]
     R0 -->|intent == 'search_property'| N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
+    R0 -->|intent == 'legal_consultation'| L1["Node Legal: legal_advisory_node\n(RAG Pháp lý từ danang_legal_docs\n& Trích dẫn [1], [2])"]
     
-    N1 --> N2["Node 2: search_properties\n(Qdrant Hybrid Vector Search)"]
+    N1 --> N2["Node 2: search_properties\n(Qdrant Search danang_properties)"]
     N2 --> N3["Node 3: generate_response\n(LLM Context-Aware Generator)"]
     
-    G1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Chữ: {'type': 'token'}\n3. [DONE]"]
+    G1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Căn cứ luật: {'type': 'citations'}\n3. Token chữ: {'type': 'token'}\n4. [DONE]"]
     N3 --> Stream
+    L1 --> Stream
     Stream --> Client
 ```
+
+### 3.3. Luồng Quản Trị & Nạp Tài Liệu Pháp Lý (Legal Ingestion Pipeline)
+1. **Nguồn tài liệu**: Hỗ trợ tập tin `.pdf`, `.docx` (Word), `.md` (Markdown), `.txt`.
+2. **Chuyển đổi**: `DocumentConverter` tự động chuẩn hóa văn bản về cấu trúc Markdown UTF-8 (`# Luật`, `## Chương`, `### Điều`).
+3. **Chunking & Indexing**: Dùng `MarkdownHeaderTextSplitter` cắt chunk theo cấu trúc Điều/Khoản luật, lưu vector vào collection riêng `danang_legal_docs` trong Qdrant.
+4. **Trích dẫn minh bạch**: Phản hồi pháp lý sinh các ký hiệu `[1]`, `[2]`, frontend cho phép click để trượt mở Right-side Drawer xem toàn văn văn bản luật đối chiếu.
 
 ---
 
