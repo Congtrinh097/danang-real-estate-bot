@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "danang_properties")
+    QDRANT_LEGAL_COLLECTION_NAME: str = os.getenv("QDRANT_LEGAL_COLLECTION_NAME", "danang_legal_docs")
     
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate")
 
