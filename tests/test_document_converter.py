@@ -28,20 +28,36 @@ def test_convert_docx():
     assert "### Điều 5: Quyền sở hữu" in result
     assert "Khoản 1: Công dân Việt Nam" in result
 
-def test_convert_pdf():
-    # Tạo một PDF đơn giản trong bộ nhớ
+def test_convert_empty_file():
+    with pytest.raises(ValueError, match="rỗng"):
+        DocumentConverter.convert_to_markdown(b"", "empty.pdf")
+
+def test_convert_pdf(monkeypatch):
     from pypdf import PageObject
     writer = PdfWriter()
-    page = writer.add_blank_page(width=200, height=200)
+    writer.add_blank_page(width=200, height=200)
     
-    # Do PdfWriter không render text trực tiếp không có font, ta test hàm đọc PDF qua mock hoặc file giả lập
     pdf_io = io.BytesIO()
     writer.write(pdf_io)
     pdf_bytes = pdf_io.getvalue()
     
-    # Converter xử lý pdf bytes mà không văng lỗi cấu trúc
+    monkeypatch.setattr(PageObject, "extract_text", lambda self: "Chương I: Quy Định Chung\nĐiều 1: Phạm vi áp dụng luật")
     result = DocumentConverter.convert_to_markdown(pdf_bytes, "sample.pdf")
-    assert isinstance(result, str)
+    assert "## Chương I: Quy Định Chung" in result
+    assert "### Điều 1: Phạm vi áp dụng luật" in result
+
+def test_convert_blank_pdf(monkeypatch):
+    from pypdf import PageObject
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    
+    pdf_io = io.BytesIO()
+    writer.write(pdf_io)
+    pdf_bytes = pdf_io.getvalue()
+
+    monkeypatch.setattr(PageObject, "extract_text", lambda self: "")
+    with pytest.raises(ValueError, match="Không trích xuất được nội dung"):
+        DocumentConverter.convert_to_markdown(pdf_bytes, "blank.pdf")
 
 def test_convert_unsupported_file_format():
     with pytest.raises(ValueError, match="Định dạng file không được hỗ trợ"):

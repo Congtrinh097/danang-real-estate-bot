@@ -9,6 +9,9 @@ class DocumentConverter:
 
     @staticmethod
     def convert_to_markdown(file_bytes: bytes, filename: str) -> str:
+        if not file_bytes or len(file_bytes) == 0:
+            raise ValueError("File tải lên rỗng (0 bytes). Vui lòng chọn file có nội dung.")
+
         ext = os.path.splitext(filename)[1].lower()
         
         if ext in [".md", ".markdown", ".txt"]:
@@ -62,15 +65,23 @@ class DocumentConverter:
 
     @staticmethod
     def _convert_pdf(file_bytes: bytes) -> str:
-        reader = PdfReader(io.BytesIO(file_bytes))
-        pages_text = []
+        try:
+            reader = PdfReader(io.BytesIO(file_bytes))
+        except Exception as e:
+            raise ValueError(f"Không thể đọc file PDF (file lỗi hoặc định dạng không hợp lệ): {str(e)}")
 
+        pages_text = []
         for idx, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text:
-                pages_text.append(text.strip())
+            try:
+                text = page.extract_text()
+                if text:
+                    pages_text.append(text.strip())
+            except Exception:
+                continue
 
         raw_text = "\n\n".join(pages_text)
+        if not raw_text.strip():
+            raise ValueError("Không trích xuất được nội dung văn bản từ file PDF (file scan dạng ảnh hoặc trang trắng). Vui lòng cung cấp file PDF chứa text hoặc định dạng Word/Markdown.")
         
         # Chuẩn hóa các dòng tiêu đề Điều / Chương nếu có
         lines = raw_text.split("\n")
