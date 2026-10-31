@@ -39,7 +39,8 @@ def test_index_and_search_legal_document(legal_service):
     
     doc_meta = legal_service.save_document(
         filename="sample_luat_nha_o.md",
-        content_md=content
+        content_md=content,
+        doc_id="sample_luat_nha_o_153ee6"
     )
     
     chunk_count = legal_service.index_document(doc_meta["id"])
@@ -56,3 +57,25 @@ def test_index_and_search_legal_document(legal_service):
     deposit_results = legal_service.search_legal_context("quy định về tiền đặt cọc mua nhà dự án", top_k=2)
     assert len(deposit_results) > 0
     assert any("đặt cọc" in r["content"].lower() or "165" in r["article"] for r in deposit_results)
+
+def test_save_document_deduplicates_filename(legal_service):
+    # Upload cùng 1 file 2 lần không được tạo 2 bản ghi riêng biệt
+    doc1 = legal_service.save_document("test_dup.md", "# Test Dup\n### Điều 1. Test\nNội dung 1")
+    doc2 = legal_service.save_document("test_dup.md", "# Test Dup Mới\n### Điều 1. Test\nNội dung mới")
+    
+    docs = legal_service.list_documents()
+    same_file_docs = [d for d in docs if d["filename"] == "test_dup.md"]
+    assert len(same_file_docs) == 1
+    assert same_file_docs[0]["id"] == doc1["id"]
+    
+    # Dọn dẹp
+    legal_service.delete_document(doc1["id"])
+
+def test_search_legal_context_deduplication(legal_service):
+    # Kết quả tìm kiếm pháp lý không được chứa các điều luật trùng nhau
+    results = legal_service.search_legal_context("thủ tục công chứng nhà đất", top_k=4)
+    assert len(results) > 0
+    
+    articles = [r.get("article") for r in results if r.get("article")]
+    # Kiểm tra không có article nào bị trùng lặp
+    assert len(articles) == len(set(articles))

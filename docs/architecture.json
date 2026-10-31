@@ -10,13 +10,13 @@
         "id": "full-flow",
         "label": "Toàn bộ luồng",
         "focus": ["user", "react_app", "fastapi_api", "langgraph_agent", "qdrant_db", "postgres_db", "langsmith_obs", "llm_provider"],
-        "note": "Luồng từ ReactJS qua FastAPI SSE đến LangGraph, Qdrant và PostgreSQL."
+        "note": "Luồng từ ReactJS qua FastAPI SSE đến LangGraph Router, Qdrant đa collection và PostgreSQL."
       },
       {
         "id": "storage-layer",
         "label": "Tầng lưu trữ & Giám sát",
         "focus": ["langgraph_agent", "qdrant_db", "postgres_db", "langsmith_obs"],
-        "note": "Qdrant lưu vector BĐS, PostgreSQL lưu session checkpoints và LangSmith giám sát."
+        "note": "Qdrant lưu BĐS và văn bản luật, PostgreSQL lưu session checkpoints và LangSmith giám sát."
       }
     ]
   },
@@ -73,7 +73,7 @@
       "id": "langgraph_agent",
       "type": "backend",
       "label": "LangGraph Agent",
-      "sublabel": "Stateful Workflow",
+      "sublabel": "Router & RAG StateGraph",
       "pos": [540, 410],
       "size": [155, 70]
     },
@@ -81,7 +81,7 @@
       "id": "qdrant_db",
       "type": "database",
       "label": "Qdrant Vector DB",
-      "sublabel": "Hybrid Search",
+      "sublabel": "BĐS & Legal Collections",
       "pos": [790, 190],
       "size": [155, 70]
     },
@@ -98,7 +98,7 @@
       "id": "llm_provider",
       "type": "cloud",
       "label": "LLM Service",
-      "sublabel": "Gemini OpenAI",
+      "sublabel": "Primary & Fallback LLM",
       "pos": [1040, 190],
       "size": [150, 70]
     },
@@ -176,18 +176,18 @@
   "cards": [
     {
       "dot": "cyan",
-      "title": "Tối ưu tìm kiếm BĐS",
+      "title": "Router Agent & RAG Pháp lý",
       "items": [
-        "Qdrant kết hợp Semantic Search và Payload Filtering (quận, giá, loại BĐS).",
-        "ReactJS hiển thị Card tương tác và Stream phản hồi theo thời gian thực."
+        "Router Agent phân loại 3 intent (tìm BĐS, tư vấn luật, chào hỏi) với fallback an toàn.",
+        "Qdrant danang_legal_docs trích dẫn số luật [1], [2] và stream trả lời kèm căn cứ."
       ]
     },
     {
       "dot": "amber",
-      "title": "Bền bỉ & Giám sát chặt chẽ",
+      "title": "Tìm kiếm BĐS & Độ bền bỉ",
       "items": [
-        "PostgreSQL quản lý stateful checkpoints và thông tin leads đặt lịch xem nhà.",
-        "LangSmith ghi nhận vết token, latency và debug chính xác luồng tool-calling."
+        "Qdrant danang_properties tìm kiếm đa tiêu chí; LangGraph MemorySaver lưu state thread.",
+        "Tự động fallback OpenAI endpoint chính thức nếu custom base URL xảy ra sự cố."
       ]
     }
   ]

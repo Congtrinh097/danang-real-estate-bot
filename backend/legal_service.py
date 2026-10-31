@@ -58,11 +58,17 @@ class LegalService:
             return []
 
     def save_document(self, filename: str, content_md: str, doc_id: Optional[str] = None) -> Dict[str, Any]:
-        """Lưu nội dung Markdown và cập nhật metadata"""
+        """Lưu nội dung Markdown và cập nhật metadata (tự động phát hiện trùng lặp để ghi đè)"""
+        docs = self.list_documents()
+
         if not doc_id:
-            # Tạo doc_id từ tên file hoặc uuid
-            clean_name = Path(filename).stem.lower().replace(" ", "_").replace("-", "_")
-            doc_id = f"{clean_name}_{uuid.uuid4().hex[:6]}"
+            # Kiểm tra xem tài liệu cùng tên file đã tồn tại chưa để tái sử dụng doc_id, tránh sinh rác Qdrant
+            existing_doc = next((d for d in docs if d.get("filename") == filename), None)
+            if existing_doc:
+                doc_id = existing_doc["id"]
+            else:
+                clean_name = Path(filename).stem.lower().replace(" ", "_").replace("-", "_")
+                doc_id = f"{clean_name}_{uuid.uuid4().hex[:6]}"
 
         file_path = self.storage_dir / f"{doc_id}.md"
         with open(file_path, "w", encoding="utf-8") as f:
@@ -86,9 +92,8 @@ class LegalService:
             "chunks_count": 0
         }
 
-        docs = self.list_documents()
-        # Cập nhật nếu đã có, hoặc thêm mới
-        docs = [d for d in docs if d.get("id") != doc_id]
+        # Loại bỏ các bản ghi cũ trùng id hoặc cùng filename để tránh rác danh sách
+        docs = [d for d in docs if d.get("id") != doc_id and d.get("filename") != filename]
         docs.insert(0, doc_meta)
 
         with open(self.meta_file, "w", encoding="utf-8") as f:
@@ -215,8 +220,57 @@ class LegalService:
 
         return True
 
+    def cleanup_orphans(self) -> Dict[str, Any]:
+        """Dọn dẹp các tài liệu trùng lặp trong metadata và xóa các vector mồ côi trong Qdrant"""
+        self.ensure_collection()
+        docs = self.list_documents()
+
+        # 1. Giữ lại duy nhất 1 bản ghi cho mỗi filename (ưu tiên indexed)
+        unique_docs: Dict[str, Dict[str, Any]] = {}
+        for d in docs:
+            fn = d.get("filename")
+            if fn not in unique_docs:
+                unique_docs[fn] = d
+            else:
+                if d.get("status") == "indexed" and unique_docs[fn].get("status") != "indexed":
+                    unique_docs[fn] = d
+
+        cleaned_docs = list(unique_docs.values())
+        valid_doc_ids = set(d["id"] for d in cleaned_docs)
+
+        # Cập nhật metadata
+        with open(self.meta_file, "w", encoding="utf-8") as f:
+            json.dump(cleaned_docs, f, ensure_ascii=False, indent=2)
+
+        # 2. Xóa các điểm vector trong Qdrant không thuộc valid_doc_ids
+        deleted_count = 0
+        try:
+            records, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=1000
+            )
+            points_to_delete = []
+            for r in records:
+                doc_id = (r.payload or {}).get("doc_id")
+                if not doc_id or doc_id not in valid_doc_ids:
+                    points_to_delete.append(r.id)
+
+            if points_to_delete:
+                self.client.delete(
+                    collection_name=self.collection_name,
+                    points_selector=points_to_delete
+                )
+                deleted_count = len(points_to_delete)
+        except Exception as e:
+            print(f"[WARN] Error cleaning up Qdrant points: {e}")
+
+        return {
+            "valid_docs": len(cleaned_docs),
+            "deleted_vectors": deleted_count
+        }
+
     def search_legal_context(self, query: str, top_k: int = 4) -> List[Dict[str, Any]]:
-        """Tìm kiếm các đoạn văn bản luật liên quan nhất tới câu hỏi"""
+        """Tìm kiếm các đoạn văn bản luật liên quan nhất tới câu hỏi, có deduplicate để không trùng lặp điều khoản"""
         self.ensure_collection()
         if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
             query_vector = qdrant_service.embed_query_safe(query)
@@ -228,25 +282,52 @@ class LegalService:
             rng = random.Random(seed)
             query_vector = [rng.uniform(-0.1, 0.1) for _ in range(self.vector_size)]
 
+        # Lấy số lượng ứng viên lớn hơn để deduplicate
+        fetch_limit = max(top_k * 3, 12)
         search_result = self.client.search(
             collection_name=self.collection_name,
             query_vector=query_vector,
-            limit=top_k
+            limit=fetch_limit
         )
 
         formatted = []
-        for idx, hit in enumerate(search_result):
+        seen_articles = set()
+        seen_content_hashes = set()
+
+        for hit in search_result:
             payload = hit.payload or {}
+            doc_title = payload.get("doc_title", "Văn bản Luật").strip()
+            article = payload.get("article", "").strip()
+            content = payload.get("content", "").strip()
+
+            # Khóa chống trùng: (tên tài liệu + điều luật) hoặc nội dung
+            article_key = f"{doc_title.lower()}::{article.lower()}" if article else None
+            # Băm nội dung vắn tắt (30 từ đầu)
+            content_key = " ".join(content.split()[:30]).lower()
+
+            if article_key and article_key in seen_articles:
+                continue
+            if content_key and content_key in seen_content_hashes:
+                continue
+
+            if article_key:
+                seen_articles.add(article_key)
+            if content_key:
+                seen_content_hashes.add(content_key)
+
             formatted.append({
-                "index": idx + 1,
+                "index": len(formatted) + 1,
                 "id": hit.id,
                 "doc_id": payload.get("doc_id", ""),
-                "doc_title": payload.get("doc_title", "Văn bản Luật"),
+                "doc_title": doc_title,
                 "chapter": payload.get("chapter", ""),
-                "article": payload.get("article", ""),
-                "content": payload.get("content", ""),
+                "article": article,
+                "content": content,
                 "score": round(float(hit.score), 4)
             })
+
+            if len(formatted) >= top_k:
+                break
 
         return formatted
 

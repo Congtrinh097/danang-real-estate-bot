@@ -1,0 +1,236 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Luồng Xử Lý LangGraph Agent Bất Động Sản Đà Nẵng",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "search-path",
+        "label": "Luồng Tìm kiếm BĐS",
+        "focus": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
+        "note": "Nhận diện nhu cầu tìm thuê/mua nhà, trích xuất tiêu chí và tra cứu Qdrant."
+      },
+      {
+        "id": "legal-rag-path",
+        "label": "Tư vấn Pháp lý RAG",
+        "focus": ["user", "fastapi", "router", "legal_advisory", "legal_rag_db", "sse_output"],
+        "note": "Tra cứu căn cứ pháp lý từ danang_legal_docs và trích dẫn số [1], [2]."
+      },
+      {
+        "id": "general-chat-path",
+        "label": "Giao tiếp Thông thường",
+        "focus": ["user", "fastapi", "router", "general_chat", "sse_output"],
+        "note": "Chào hỏi và giải đáp chung không qua cơ sở dữ liệu."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "client", "label": "Client & Web Gateway" },
+    { "id": "orchestrator", "label": "Router & State Dispatcher" },
+    { "id": "property_pipeline", "label": "Property Search Pipeline" },
+    { "id": "legal_pipeline", "label": "Legal Advisory RAG" }
+  ],
+  "phases": [
+    { "id": "phase_intake", "label": "1. Tiếp nhận & Định tuyến", "fromCol": 0, "toCol": 2 },
+    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Slot / RAG / Chat)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
+    { "id": "phase_output", "label": "3. Tổng hợp & Stream SSE", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
+  "nodes": [
+    {
+      "id": "user",
+      "lane": "client",
+      "col": 0,
+      "type": "external",
+      "label": "Khách hàng",
+      "sublabel": "Giao diện React",
+      "width": 115
+    },
+    {
+      "id": "fastapi",
+      "lane": "client",
+      "col": 1,
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "POST /chat/stream",
+      "brand": "fastapi",
+      "width": 120
+    },
+    {
+      "id": "router",
+      "lane": "orchestrator",
+      "col": 2,
+      "type": "backend",
+      "label": "Router Agent",
+      "sublabel": "route_intent_node",
+      "tag": "Intent Classifier",
+      "width": 120
+    },
+    {
+      "id": "general_chat",
+      "lane": "orchestrator",
+      "col": 3,
+      "type": "backend",
+      "label": "General Chat",
+      "sublabel": "general_chat_response",
+      "width": 120
+    },
+    {
+      "id": "extract_criteria",
+      "lane": "property_pipeline",
+      "col": 3,
+      "type": "backend",
+      "label": "Extract Criteria",
+      "sublabel": "extract_criteria_node",
+      "tag": "Slot Extractor",
+      "width": 120
+    },
+    {
+      "id": "search_props",
+      "lane": "property_pipeline",
+      "col": 4,
+      "type": "database",
+      "label": "Search Qdrant",
+      "sublabel": "danang_properties",
+      "width": 120
+    },
+    {
+      "id": "generate_resp",
+      "lane": "property_pipeline",
+      "col": 5,
+      "type": "backend",
+      "label": "Generate Response",
+      "sublabel": "generate_response_node",
+      "width": 120
+    },
+    {
+      "id": "legal_advisory",
+      "lane": "legal_pipeline",
+      "col": 3,
+      "type": "backend",
+      "label": "Legal Advisory",
+      "sublabel": "legal_advisory_node",
+      "tag": "Citations Generator",
+      "width": 120
+    },
+    {
+      "id": "legal_rag_db",
+      "lane": "legal_pipeline",
+      "col": 4,
+      "type": "database",
+      "label": "Legal Docs Qdrant",
+      "sublabel": "danang_legal_docs",
+      "width": 120
+    },
+    {
+      "id": "sse_output",
+      "lane": "client",
+      "col": 5,
+      "type": "frontend",
+      "label": "SSE Stream",
+      "sublabel": "Cards + Citations + Tokens",
+      "brand": "react",
+      "width": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_user_api",
+      "from": "user",
+      "to": "fastapi",
+      "label": "user query",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_api_router",
+      "from": "fastapi",
+      "to": "router",
+      "label": "astream",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_router_chat",
+      "from": "router",
+      "to": "general_chat",
+      "label": "general_chat",
+      "variant": "default"
+    },
+    {
+      "id": "edge_router_search",
+      "from": "router",
+      "to": "extract_criteria",
+      "label": "search_property",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_router_legal",
+      "from": "router",
+      "to": "legal_advisory",
+      "label": "legal_consultation",
+      "variant": "security"
+    },
+    {
+      "id": "edge_extract_search",
+      "from": "extract_criteria",
+      "to": "search_props",
+      "label": "filter slot",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_search_gen",
+      "from": "search_props",
+      "to": "generate_resp",
+      "label": "top BĐS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_legal_rag",
+      "from": "legal_advisory",
+      "to": "legal_rag_db",
+      "label": "tra cứu luật",
+      "variant": "security"
+    },
+    {
+      "id": "edge_gen_stream",
+      "from": "generate_resp",
+      "to": "sse_output",
+      "label": "cards & text",
+      "variant": "emphasis",
+      "role": "return"
+    },
+    {
+      "id": "edge_legal_stream",
+      "from": "legal_rag_db",
+      "to": "sse_output",
+      "label": "citations",
+      "variant": "security",
+      "role": "return",
+      "route": "outside-right"
+    },
+    {
+      "id": "edge_chat_stream",
+      "from": "general_chat",
+      "to": "sse_output",
+      "label": "tokens",
+      "variant": "default",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Phân loại Ý định (Router Agent)",
+      "items": [
+        "Phân luồng 3 nhánh: search_property, legal_consultation và general_chat kèm cơ chế fallback an toàn."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Dual Collection Qdrant RAG",
+      "items": [
+        "Tra cứu danang_properties (lọc metadata & vector) và danang_legal_docs (trích dẫn điều luật [1], [2])."
+      ]
+    }
+  ]
+}

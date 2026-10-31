@@ -347,7 +347,7 @@ export default function App() {
         {citations.length > 0 && (
           <button
             className="citations-footer-btn"
-            onClick={() => handleOpenCitation(1, citations)}
+            onClick={() => handleOpenCitation(citations[0]?.index || 1, citations)}
           >
             <Scale size={14} /> Xem {citations.length} căn cứ pháp lý đã trích dẫn
           </button>
@@ -867,10 +867,12 @@ export default function App() {
               <div className="citation-tabs">
                 {activeDrawerCitations.map((item, i) => {
                   const idx = item.index || i + 1;
+                  const isSelected = selectedCitationIndex === idx ||
+                    (!activeDrawerCitations.some((c) => (c.index || 0) === selectedCitationIndex) && i === 0);
                   return (
                     <button
                       key={idx}
-                      className={`citation-tab-pill ${selectedCitationIndex === idx ? "active" : ""}`}
+                      className={`citation-tab-pill ${isSelected ? "active" : ""}`}
                       onClick={() => setSelectedCitationIndex(idx)}
                     >
                       Trích dẫn [{idx}]

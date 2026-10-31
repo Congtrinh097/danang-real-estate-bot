@@ -1,8 +1,15 @@
 import io
+import os
+import sys
 import pytest
 from docx import Document
 from pypdf import PdfWriter
-from backend.document_converter import DocumentConverter
+
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+from document_converter import DocumentConverter
 
 def test_convert_markdown():
     sample_md = "# Luật Nhà Ở 2023\n## Chương I\n### Điều 1. Phạm vi điều chỉnh\nNội dung điều 1."

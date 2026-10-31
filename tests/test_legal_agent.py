@@ -55,3 +55,11 @@ def test_legal_consultation_intent_and_citations():
 
     bot_message = final_state["messages"][-1]
     assert "[1]" in bot_message.content or "Luật Nhà ở" in bot_message.content
+
+    # Kiểm tra số lượng citations trả về khớp với các số trích dẫn xuất hiện trong bot message
+    import re
+    cited_nums = set(int(n) for n in re.findall(r"\[(\d+)\]", bot_message.content))
+    if cited_nums:
+        assert len(citations) == len(cited_nums)
+        for c in citations:
+            assert c["index"] in cited_nums

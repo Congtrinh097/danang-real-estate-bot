@@ -1,5 +1,7 @@
 from typing import Annotated, Sequence, TypedDict, Optional, List, Dict, Any, Literal
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -72,25 +74,81 @@ if settings.OPENAI_BASE_URL and settings.OPENAI_BASE_URL.rstrip('/') != (setting
 else:
     llm = primary_llm
 
+# ==================== ĐỊNH NGHĨA CÁC LCEL CHAINS ====================
+
+# 1. LCEL Chain: Router phân loại ý định
+router_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Bạn là chuyên gia điều phối luồng trò chuyện cho trợ lý ảo Bất động sản Đà Nẵng.\n"
+     "Nhiệm vụ: Phân loại ý định của người dùng dựa trên tin nhắn gần nhất và lịch sử hội thoại thành 1 trong 3 loại:\n"
+     "1. 'search_property': người dùng muốn tìm kiếm, xem, hỏi thuê/mua nhà, căn hộ, đất đai, villa cụ thể.\n"
+     "2. 'legal_consultation': người dùng hỏi về pháp lý nhà đất, quy định pháp luật, thủ tục sang tên, sổ đỏ/sổ hồng, đặt cọc công chứng, tranh chấp, quyền sở hữu của người nước ngoài, thuế phí.\n"
+     "3. 'general_chat': người dùng chào hỏi, cảm ơn, hỏi thời tiết, hỏi bạn là ai, tán gẫu thông thường."
+    ),
+    MessagesPlaceholder(variable_name="messages"),
+])
+router_chain = router_prompt | llm.with_structured_output(IntentClassification)
+
+# 2. LCEL Chain: Phản hồi hội thoại chung
+general_chat_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Bạn là trợ lý AI chuyên gia tư vấn Bất động sản và am hiểu đời sống, du lịch, pháp lý tại TP. Đà Nẵng.\n"
+     "Hãy phản hồi người dùng một cách thân thiện, lịch sự, giải đáp tự nhiên câu hỏi hoặc lời chào của họ. "
+     "Nếu phù hợp, hãy khéo léo giới thiệu bạn có thể hỗ trợ tra cứu, tìm kiếm căn hộ, nhà phố hoặc biệt thự lý tưởng tại Đà Nẵng."
+    ),
+    MessagesPlaceholder(variable_name="messages"),
+])
+general_chat_chain = general_chat_prompt | llm | StrOutputParser()
+
+# 3. LCEL Chain: Tư vấn pháp lý kèm trích dẫn
+legal_advisory_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Bạn là chuyên gia tư vấn pháp lý bất động sản và nhà ở tại Việt Nam, đặc biệt am hiểu các quy định tại TP. Đà Nẵng.\n"
+     "Nhiệm vụ: Dựa vào các căn cứ pháp lý được cung cấp dưới đây, hãy giải đáp câu hỏi của người dùng một cách chính xác, minh bạch, rõ ràng và có căn cứ pháp luật.\n\n"
+     "CĂN CỨ PHÁP LÝ TỪ HỆ THỐNG:\n"
+     "{context_str}\n"
+     "QUY TẮC BẮT BUỘC:\n"
+     "1. Với mỗi kết luận hoặc điều kiện pháp lý bạn nêu ra, BẮT BUỘC phải trích dẫn nguồn bằng ký hiệu số như [1], [2] tương ứng ngay sau câu văn.\n"
+     "2. Không bịa đặt hoặc suy diễn vượt quá các quy định hiện hành.\n"
+     "3. Lời lẽ chuyên nghiệp, nhã nhặn, hướng dẫn người dùng các bước thực hiện tiếp theo (như liên hệ văn phòng công chứng hoặc cơ quan đăng ký đất đai TP Đà Nẵng nếu cần)."
+    ),
+    MessagesPlaceholder(variable_name="messages"),
+])
+legal_advisory_chain = legal_advisory_prompt | llm | StrOutputParser()
+
+# 4. LCEL Chain: Bóc tách tiêu chí BĐS
+criteria_extraction_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Bạn là chuyên gia tư vấn Bất động sản tại thành phố Đà Nẵng. "
+     "Hãy phân tích lịch sử hội thoại và trích xuất các tiêu chí tìm kiếm mới nhất theo JSON schema được cung cấp. "
+     "Các quận hợp lệ tại Đà Nẵng: Hải Châu, Thanh Khê, Sơn Trà, Ngũ Hành Sơn, Cẩm Lệ, Liên Chiểu, Hòa Vang. "
+     "Nếu người dùng bổ sung thêm tiêu chí (ví dụ: giá, số phòng), hãy trích xuất tiêu chí mới mà không làm mất thông tin cũ."
+    ),
+    MessagesPlaceholder(variable_name="messages"),
+])
+criteria_extraction_chain = criteria_extraction_prompt | llm.with_structured_output(PropertyCriteria)
+
+# 5. LCEL Chain: Sinh phản hồi gợi ý BĐS
+property_recommendation_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Bạn là tư vấn viên BĐS chuyên nghiệp tại Đà Nẵng.\n"
+     "Dưới đây là các căn nhà phù hợp nhất được tìm thấy từ hệ thống:\n"
+     "{context_desc}\n\n"
+     "Hãy đọc toàn bộ lịch sử trao đổi của khách hàng, viết phản hồi ngắn gọn, thân thiện, giải đáp đúng trọng tâm câu hỏi mới nhất, làm nổi bật ưu điểm của các căn và chủ động gợi ý khách đặt lịch xem nhà."
+    ),
+    MessagesPlaceholder(variable_name="messages"),
+])
+property_recommendation_chain = property_recommendation_prompt | llm | StrOutputParser()
+
+# ==================== ĐỊNH NGHĨA CÁC NODE WORKFLOW ====================
+
 # 3. Node 0: Router Agent điều phối ý định
 def route_intent_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     last_user_message = all_messages[-1].content if all_messages else ""
 
-    system_prompt = (
-        "Bạn là chuyên gia điều phối luồng trò chuyện cho trợ lý ảo Bất động sản Đà Nẵng.\n"
-        "Nhiệm vụ: Phân loại ý định của người dùng dựa trên tin nhắn gần nhất và lịch sử hội thoại thành 1 trong 3 loại:\n"
-        "1. 'search_property': người dùng muốn tìm kiếm, xem, hỏi thuê/mua nhà, căn hộ, đất đai, villa cụ thể.\n"
-        "2. 'legal_consultation': người dùng hỏi về pháp lý nhà đất, quy định pháp luật, thủ tục sang tên, sổ đỏ/sổ hồng, đặt cọc công chứng, tranh chấp, quyền sở hữu của người nước ngoài, thuế phí.\n"
-        "3. 'general_chat': người dùng chào hỏi, cảm ơn, hỏi thời tiết, hỏi bạn là ai, tán gẫu thông thường."
-    )
-
     try:
-        classifier = llm.with_structured_output(IntentClassification)
-        context_messages = [SystemMessage(content=system_prompt)]
-        for m in all_messages[-4:]:
-            context_messages.append(m)
-        result = classifier.invoke(context_messages)
+        result = router_chain.invoke({"messages": all_messages[-4:]})
         intent = result.intent
     except Exception:
         # Heuristic fallback an toàn
@@ -115,23 +173,13 @@ def decide_route(state: AgentState) -> str:
         return "legal_advisory"
     return "extract_criteria"
 
-# 4. Node General Chat Response (suy luận trả lời trực tiếp, không search Qdrant)
+# 4. Node General Chat Response (suy luận trả lời trực tiếp qua LCEL chain)
 def general_chat_response_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
-    
-    system_prompt = (
-        "Bạn là trợ lý AI chuyên gia tư vấn Bất động sản và am hiểu đời sống, du lịch, pháp lý tại TP. Đà Nẵng.\n"
-        "Hãy phản hồi người dùng một cách thân thiện, lịch sự, giải đáp tự nhiên câu hỏi hoặc lời chào của họ. "
-        "Nếu phù hợp, hãy khéo léo giới thiệu bạn có thể hỗ trợ tra cứu, tìm kiếm căn hộ, nhà phố hoặc biệt thự lý tưởng tại Đà Nẵng."
-    )
-
-    chat_prompt: List[BaseMessage] = [SystemMessage(content=system_prompt)]
-    for m in all_messages[-6:]:
-        chat_prompt.append(m)
 
     try:
-        response = llm.invoke(chat_prompt)
-        reply = AIMessage(content=response.content)
+        content = general_chat_chain.invoke({"messages": all_messages[-6:]})
+        reply = AIMessage(content=content)
     except Exception:
         reply = AIMessage(content="Xin chào anh/chị! Em là trợ lý AI tư vấn Bất động sản tại thành phố Đà Nẵng. Em có thể hỗ trợ anh/chị tìm thuê hoặc mua căn hộ, nhà phố, đất nền theo ngân sách và vị trí mong muốn ạ!")
 
@@ -140,7 +188,7 @@ def general_chat_response_node(state: AgentState) -> Dict[str, Any]:
         "found_properties": []
     }
 
-# 4.1. Node Legal Advisory Response (RAG Pháp lý & trích dẫn điều luật)
+# 4.1. Node Legal Advisory Response (RAG Pháp lý & trích dẫn điều luật qua LCEL chain)
 def legal_advisory_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     last_user_message = all_messages[-1].content if all_messages else ""
@@ -156,24 +204,12 @@ def legal_advisory_node(state: AgentState) -> Dict[str, Any]:
             f"Nội dung quy định: {item['content']}\n\n"
         )
 
-    system_prompt = (
-        "Bạn là chuyên gia tư vấn pháp lý bất động sản và nhà ở tại Việt Nam, đặc biệt am hiểu các quy định tại TP. Đà Nẵng.\n"
-        "Nhiệm vụ: Dựa vào các căn cứ pháp lý được cung cấp dưới đây, hãy giải đáp câu hỏi của người dùng một cách chính xác, minh bạch, rõ ràng và có căn cứ pháp luật.\n\n"
-        "CĂN CỨ PHÁP LÝ TỪ HỆ THỐNG:\n"
-        f"{context_str}\n"
-        "QUY TẮC BẮT BUỘC:\n"
-        "1. Với mỗi kết luận hoặc điều kiện pháp lý bạn nêu ra, BẮT BUỘC phải trích dẫn nguồn bằng ký hiệu số như [1], [2] tương ứng ngay sau câu văn.\n"
-        "2. Không bịa đặt hoặc suy diễn vượt quá các quy định hiện hành.\n"
-        "3. Lời lẽ chuyên nghiệp, nhã nhặn, hướng dẫn người dùng các bước thực hiện tiếp theo (như liên hệ văn phòng công chứng hoặc cơ quan đăng ký đất đai TP Đà Nẵng nếu cần)."
-    )
-
-    chat_prompt: List[BaseMessage] = [SystemMessage(content=system_prompt)]
-    for m in all_messages[-6:]:
-        chat_prompt.append(m)
-
     try:
-        response = llm.invoke(chat_prompt)
-        reply = AIMessage(content=response.content)
+        content = legal_advisory_chain.invoke({
+            "context_str": context_str,
+            "messages": all_messages[-6:]
+        })
+        reply = AIMessage(content=content)
     except Exception:
         if legal_context:
             ref = legal_context[0]
@@ -181,33 +217,38 @@ def legal_advisory_node(state: AgentState) -> Dict[str, Any]:
         else:
             reply = AIMessage(content="Dạ vấn đề pháp lý này em chưa tìm thấy điều khoản quy định cụ thể trong cơ sở dữ liệu pháp lý hiện tại. Anh/chị có thể liên hệ trực tiếp Văn phòng Đăng ký Đất đai Đà Nẵng để được hướng dẫn chính xác nhất.")
 
+    # 3. Lọc danh sách citations: chỉ giữ lại các căn cứ pháp lý THỰC SỰ được trích dẫn trong văn bản trả lời
+    import re
+    cited_nums = [int(n) for n in re.findall(r"\[(\d+)\]", reply.content)]
+    cited_order = []
+    for n in cited_nums:
+        if n not in cited_order:
+            cited_order.append(n)
+
+    if cited_order:
+        # Lấy theo đúng thứ tự các căn cứ được nhắc tới trong bài
+        final_citations = [item for n in cited_order for item in legal_context if item.get("index") == n]
+        if not final_citations and legal_context:
+            final_citations = [legal_context[0]]
+    else:
+        # Nếu mô hình không ghi số [X], chỉ lấy căn cứ đầu tiên phù hợp nhất thay vì trả cả 4
+        final_citations = [legal_context[0]] if legal_context else []
+
     return {
         "messages": [reply],
-        "citations": legal_context,
+        "citations": final_citations,
         "found_properties": []
     }
 
-# 5. Node 1: Phân tích Ý định & Bóc tách Tiêu chí (NLU / Slot Extraction)
+# 5. Node 1: Phân tích Ý định & Bóc tách Tiêu chí (NLU / Slot Extraction qua LCEL chain)
 def extract_criteria_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     last_user_message = all_messages[-1].content if all_messages else ""
     current_criteria = state.get("criteria") or {}
     
-    system_prompt = (
-        "Bạn là chuyên gia tư vấn Bất động sản tại thành phố Đà Nẵng. "
-        "Hãy phân tích lịch sử hội thoại và trích xuất các tiêu chí tìm kiếm mới nhất theo JSON schema được cung cấp. "
-        "Các quận hợp lệ tại Đà Nẵng: Hải Châu, Thanh Khê, Sơn Trà, Ngũ Hành Sơn, Cẩm Lệ, Liên Chiểu, Hòa Vang. "
-        "Nếu người dùng bổ sung thêm tiêu chí (ví dụ: giá, số phòng), hãy trích xuất tiêu chí mới mà không làm mất thông tin cũ."
-    )
-    
     try:
-        extractor = llm.with_structured_output(PropertyCriteria)
-        context_messages = [SystemMessage(content=system_prompt)]
-        for m in all_messages[-6:]:
-            context_messages.append(m)
-            
-        criteria_obj = extractor.invoke(context_messages)
-        new_criteria = criteria_obj.dict()
+        criteria_obj = criteria_extraction_chain.invoke({"messages": all_messages[-6:]})
+        new_criteria = criteria_obj.model_dump()
     except Exception:
         new_criteria = {
             "category": "rent" if "thuê" in last_user_message.lower() else ("sale" if "mua" in last_user_message.lower() else None),
@@ -239,7 +280,7 @@ def search_properties_node(state: AgentState) -> Dict[str, Any]:
     )
     return {"found_properties": properties}
 
-# 7. Node 3: Sinh phản hồi tư vấn BĐS
+# 7. Node 3: Sinh phản hồi tư vấn BĐS qua LCEL chain
 def generate_response_node(state: AgentState) -> Dict[str, Any]:
     properties = state.get("found_properties", [])
     all_messages = state.get("messages", [])
@@ -258,19 +299,12 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
         for p in properties
     ])
     
-    system_prompt = f"""Bạn là tư vấn viên BĐS chuyên nghiệp tại Đà Nẵng.
-Dưới đây là các căn nhà phù hợp nhất được tìm thấy từ hệ thống:
-{context_desc}
-
-Hãy đọc toàn bộ lịch sử trao đổi của khách hàng, viết phản hồi ngắn gọn, thân thiện, giải đáp đúng trọng tâm câu hỏi mới nhất, làm nổi bật ưu điểm của các căn và chủ động gợi ý khách đặt lịch xem nhà."""
-
-    chat_prompt: List[BaseMessage] = [SystemMessage(content=system_prompt)]
-    for m in all_messages[-6:]:
-        chat_prompt.append(m)
-
     try:
-        response = llm.invoke(chat_prompt)
-        reply = AIMessage(content=response.content)
+        content = property_recommendation_chain.invoke({
+            "context_desc": context_desc,
+            "messages": all_messages[-6:]
+        })
+        reply = AIMessage(content=content)
     except Exception:
         reply = AIMessage(content=f"Dạ em xin gửi anh/chị {len(properties)} bất động sản phù hợp nhất tại Đà Nẵng theo yêu cầu. Anh/chị có muốn em hỗ trợ đặt lịch đi xem thực tế căn nào không ạ?")
 

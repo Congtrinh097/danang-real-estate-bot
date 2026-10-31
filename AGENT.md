@@ -65,6 +65,9 @@ E:\ProjectForLeaning\
 4. Gọi `text-embedding-3-small` tạo vector 1536 chiều -> Upsert vào collection `danang_properties`.
 
 ### 3.2. Luồng Xử lý Hội thoại & Phân loại Ý định (Chat Stream & Router Flow)
+
+> 🔗 **Sơ đồ tương tác Archify:** [Xem trực quan agent_workflow.html](file:///E:/ProjectForLeaning/docs/agent_workflow.html) (Cấu hình JSON: [agent_workflow.json](file:///E:/ProjectForLeaning/docs/agent_workflow.json))
+
 ```mermaid
 flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]

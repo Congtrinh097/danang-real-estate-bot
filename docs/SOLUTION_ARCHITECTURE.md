@@ -6,11 +6,17 @@
 
 ---
 
-## 2. Bản đồ Kiến trúc Hệ thống (Archify Interactive Diagram)
+## 2. Bản đồ Kiến trúc & Luồng Xử lý Agent (Archify Interactive Diagrams)
 
-> File sơ đồ kiến trúc trực quan độc lập (Standalone HTML, hỗ trợ Dark/Light mode, zoom, export):
-> 🔗 **[Xem sơ đồ trực quan architecture.html](file:///E:/ProjectForLeaning/docs/architecture.html)**
-> 📄 Cấu hình đặc tả sơ đồ: [architecture.json](file:///E:/ProjectForLeaning/docs/architecture.json)
+> **Sơ đồ trực quan độc lập (Standalone HTML, hỗ trợ Dark/Light mode, pan/zoom, guided views, export SVG/PNG):**
+> 
+> 1. 🔗 **[Xem Sơ đồ Luồng LangGraph Agent: agent_workflow.html](file:///E:/ProjectForLeaning/docs/agent_workflow.html)**
+>    * Cấu hình đặc tả: [agent_workflow.json](file:///E:/ProjectForLeaning/docs/agent_workflow.json)
+>    * Chi tiết: Phân luồng Router Agent 3 nhánh (BĐS, RAG Pháp lý trích dẫn luật [1],[2], General Chat) và streaming SSE.
+> 
+> 2. 🔗 **[Xem Sơ đồ Kiến trúc Hệ thống: architecture.html](file:///E:/ProjectForLeaning/docs/architecture.html)**
+>    * Cấu hình đặc tả: [architecture.json](file:///E:/ProjectForLeaning/docs/architecture.json)
+>    * Chi tiết: Tổng thể Client ReactJS, FastAPI Gateway, LangGraph StateGraph, Dual-collection Qdrant DB, PostgreSQL và Cloud LLM with Fallback.
 
 ---
 

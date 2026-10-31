@@ -73,3 +73,6 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Archify visual checks
+*.visual-check.*
