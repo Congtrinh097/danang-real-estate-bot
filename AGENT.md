@@ -71,8 +71,9 @@ E:\ProjectForLeaning\
 ```mermaid
 flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]
-    API --> R0["Node 0: route_intent\n(Router Agent / Intent Classifier)"]
+    API --> R0["Node 0: route_intent\n(Router Agent / Intent & Guardrails Classifier)"]
     
+    R0 -->|intent in ['out_of_scope', 'rule_violation']| O1["Node Guardrail: out_of_scope_response\n(Phản hồi thân thiện, giải thích phạm vi BĐS Đà Nẵng)"]
     R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM chào hỏi, không search Qdrant)"]
     R0 -->|intent == 'search_property'| N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
     R0 -->|intent == 'legal_consultation'| L1["Node Legal: legal_advisory_node\n(RAG Pháp lý từ danang_legal_docs\n& Trích dẫn [1], [2])"]
@@ -80,7 +81,8 @@ flowchart TD
     N1 --> N2["Node 2: search_properties\n(Qdrant Search danang_properties)"]
     N2 --> N3["Node 3: generate_response\n(LLM Context-Aware Generator)"]
     
-    G1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Căn cứ luật: {'type': 'citations'}\n3. Token chữ: {'type': 'token'}\n4. [DONE]"]
+    O1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Căn cứ luật: {'type': 'citations'}\n3. Token chữ: {'type': 'token'}\n4. [DONE]"]
+    G1 --> Stream
     N3 --> Stream
     L1 --> Stream
     Stream --> Client
