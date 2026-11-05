@@ -44,3 +44,32 @@ def test_set_router_model_dynamically():
     set_router_model(original_model)
     from agent import router_llm as restored_llm
     assert restored_llm.model_name == original_model
+
+
+def test_jev_decision_model_support(monkeypatch):
+    """
+    Test hỗ trợ chuyên biệt cho model decision typesafe/jev (OpenRouter /api/alpha/decisions)
+    """
+    from langchain_core.messages import HumanMessage
+    from agent import set_router_model, router_chain, IntentClassification
+    import agent
+
+    # Mock call_jev_decisions
+    monkeypatch.setattr(
+        agent,
+        "call_jev_decisions",
+        lambda model, key, msgs: IntentClassification(
+            intent="search_property",
+            reason="Jev Decision Test Mock"
+        )
+    )
+
+    set_router_model("typesafe/jev-1.14", api_key="test_key")
+    from agent import router_chain as active_chain
+
+    result = active_chain.invoke({"messages": [HumanMessage(content="Tìm nhà Sơn Trà 3 tỷ")]})
+    assert result.intent == "search_property"
+    assert "Jev Decision" in result.reason
+
+    # Khôi phục về model mặc định
+    set_router_model(settings.OPENAI_MODEL_NAME)
