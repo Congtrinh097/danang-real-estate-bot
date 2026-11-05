@@ -10,6 +10,17 @@ from rag_evaluator import RAGEvaluator, GOLDEN_LEGAL_EVAL_SAMPLES
 from datasets import Dataset
 
 
+def test_golden_legal_eval_samples_count():
+    """
+    Kiểm tra danh sách mẫu đánh giá chuẩn GOLDEN_LEGAL_EVAL_SAMPLES có đủ 10 mẫu
+    bao quát toàn diện các chủ đề pháp lý nhà đất Đà Nẵng.
+    """
+    assert len(GOLDEN_LEGAL_EVAL_SAMPLES) == 10
+    for sample in GOLDEN_LEGAL_EVAL_SAMPLES:
+        assert "user_input" in sample and sample["user_input"].strip()
+        assert "reference" in sample and sample["reference"].strip()
+
+
 def test_ragas_evaluator_dataset_preparation():
     """
     Test Task 2: Chuẩn bị dataset chuẩn Ragas từ luồng RAG pháp lý

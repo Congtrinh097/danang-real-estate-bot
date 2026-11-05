@@ -20,6 +20,34 @@ GOLDEN_LEGAL_EVAL_SAMPLES = [
     {
         "user_input": "Điều kiện để công chứng hợp đồng mua bán nhà đất là gì?",
         "reference": "Hợp đồng mua bán chuyển nhượng bất động sản phải có Giấy chứng nhận quyền sử dụng đất (sổ đỏ/sổ hồng), không có tranh chấp, quyền sử dụng đất không bị kê biên và các bên có đủ năng lực hành vi dân sự.",
+    },
+    {
+        "user_input": "Việt kiều (người gốc Việt định cư ở nước ngoài) có được mua đất và sở hữu nhà ở tại Đà Nẵng như người trong nước không?",
+        "reference": "Theo Luật Đất đai 2024, người gốc Việt Nam định cư ở nước ngoài được phép nhập cảnh vào Việt Nam có quyền sở hữu nhà ở gắn liền với quyền sử dụng đất ở theo quy định như công dân Việt Nam định cư trong nước.",
+    },
+    {
+        "user_input": "Sổ đỏ và Sổ hồng cũ đã cấp trước đây có bắt buộc phải đổi sang mẫu mới theo Luật Đất đai 2024 không?",
+        "reference": "Theo Điều 131 Luật Đất đai 2024, các Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở (Sổ đỏ, Sổ hồng) đã được cấp trước ngày 01/08/2024 vẫn giữ nguyên giá trị pháp lý và không bắt buộc phải đổi sang mẫu mới.",
+    },
+    {
+        "user_input": "Tỷ lệ tối đa người nước ngoài được sở hữu trong một tòa nhà chung cư là bao nhiêu?",
+        "reference": "Theo quy định của Luật Nhà ở 2023, tổ chức, cá nhân nước ngoài được sở hữu không quá 30% tổng số căn hộ trong một tòa nhà chung cư thương mại.",
+    },
+    {
+        "user_input": "Khi mua bán chuyển nhượng nhà đất tại Đà Nẵng, các bên phải nộp những khoản thuế và lệ phí gì?",
+        "reference": "Khi chuyển nhượng bất động sản, các bên có nghĩa vụ nộp thuế thu nhập cá nhân là 2% trên giá trị chuyển nhượng và lệ phí trước bạ là 0.5% tại Chi cục Thuế trong thời hạn 10 ngày kể từ ngày ký hợp đồng công chứng.",
+    },
+    {
+        "user_input": "Chủ đầu tư dự án nhà ở hình thành trong tương lai được thu tối đa bao nhiêu tiền đặt cọc từ khách hàng?",
+        "reference": "Theo Luật Nhà ở 2023, chủ đầu tư dự án bất động sản chỉ được thu tiền đặt cọc không quá 5% giá bán nhà ở từ khách hàng khi nhà ở đã đủ điều kiện đưa vào kinh doanh và đã hoàn thành nghĩa vụ bảo lãnh ngân hàng.",
+    },
+    {
+        "user_input": "Cơ quan nào có thẩm quyền làm thủ tục sang tên sổ đỏ, đăng ký biến động đất đai tại thành phố Đà Nẵng?",
+        "reference": "Thẩm quyền đăng ký biến động, làm thủ tục sang tên chuyển nhượng quyền sử dụng đất thuộc về Chi nhánh Văn phòng Đăng ký đất đai tại các quận, huyện trực thuộc Sở Tài nguyên và Môi trường thành phố Đà Nẵng.",
+    },
+    {
+        "user_input": "Chuyển mục đích sử dụng đất nông nghiệp sang đất ở tại Đà Nẵng có phải xin phép không?",
+        "reference": "Theo Điều 121 Luật Đất đai 2024, việc chuyển đất nông nghiệp sang đất ở bắt buộc phải được cơ quan nhà nước có thẩm quyền cho phép và người sử dụng đất phải thực hiện nghĩa vụ tài chính nộp tiền sử dụng đất chênh lệch theo Bảng giá đất cụ thể của UBND thành phố Đà Nẵng.",
     }
 ]
 
