@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     FALLBACK_OPENAI_BASE_URL: Optional[str] = os.getenv("FALLBACK_OPENAI_BASE_URL", "https://api.openai.com/v1")
     EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "text-embedding-3-small")
     
+    # Configurable Router / Decision Node Model (cho phép dùng model chuyên biệt cho routing)
+    ROUTER_MODEL_NAME: Optional[str] = os.getenv("ROUTER_MODEL_NAME", None)
+    ROUTER_BASE_URL: Optional[str] = os.getenv("ROUTER_BASE_URL", None)
+    ROUTER_API_KEY: Optional[str] = os.getenv("ROUTER_API_KEY", None)
+    
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "danang_properties")
     QDRANT_LEGAL_COLLECTION_NAME: str = os.getenv("QDRANT_LEGAL_COLLECTION_NAME", "danang_legal_docs")

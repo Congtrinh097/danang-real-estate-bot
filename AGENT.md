@@ -71,9 +71,10 @@ E:\ProjectForLeaning\
 ```mermaid
 flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]
-    API --> R0["Node 0: route_intent\n(Router Agent / Intent & Guardrails Classifier)"]
+    API --> R0["Node 0: route_intent\n(Router Agent / Configurable Model)"]
     
     R0 -->|intent in ['out_of_scope', 'rule_violation']| O1["Node Guardrail: out_of_scope_response\n(Phản hồi thân thiện, giải thích phạm vi BĐS Đà Nẵng)"]
+    R0 -->|intent == 'mortgage_calculation'| M1["Node Tool: mortgage_calc_node\n(Tính lãi vay ngân hàng, gốc lãi giảm dần/trả đều)"]
     R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM chào hỏi, không search Qdrant)"]
     R0 -->|intent == 'search_property'| N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
     R0 -->|intent == 'legal_consultation'| L1["Node Legal: legal_advisory_node\n(RAG Pháp lý từ danang_legal_docs\n& Trích dẫn [1], [2])"]
@@ -82,17 +83,25 @@ flowchart TD
     N2 --> N3["Node 3: generate_response\n(LLM Context-Aware Generator)"]
     
     O1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Căn cứ luật: {'type': 'citations'}\n3. Token chữ: {'type': 'token'}\n4. [DONE]"]
+    M1 --> Stream
     G1 --> Stream
     N3 --> Stream
     L1 --> Stream
     Stream --> Client
 ```
 
-### 3.3. Luồng Quản Trị & Nạp Tài Liệu Pháp Lý (Legal Ingestion Pipeline)
-1. **Nguồn tài liệu**: Hỗ trợ tập tin `.pdf`, `.docx` (Word), `.md` (Markdown), `.txt`.
-2. **Chuyển đổi**: `DocumentConverter` tự động chuẩn hóa văn bản về cấu trúc Markdown UTF-8 (`# Luật`, `## Chương`, `### Điều`).
+### 3.3. Luồng Quản Trị & Nạp Tài Liệu Pháp Lý với Docling OCR (Legal Ingestion Pipeline)
+1. **Nguồn tài liệu**: Hỗ trợ tập tin `.pdf` (kể cả PDF scan dạng ảnh không có text layer), `.docx` (Word), `.md` (Markdown), `.txt`.
+2. **Chuyển đổi & OCR**: `DocumentConverter` tự động nhận diện nếu PDF là dạng scan không có text layer để kích hoạt engine **Docling (RapidOCR)** nhằm trích xuất toàn bộ văn bản và bảng biểu chuẩn Markdown UTF-8 (`# Luật`, `## Chương`, `### Điều`).
 3. **Chunking & Indexing**: Dùng `MarkdownHeaderTextSplitter` cắt chunk theo cấu trúc Điều/Khoản luật, lưu vector vào collection riêng `danang_legal_docs` trong Qdrant.
 4. **Trích dẫn minh bạch**: Phản hồi pháp lý sinh các ký hiệu `[1]`, `[2]`, frontend cho phép click để trượt mở Right-side Drawer xem toàn văn văn bản luật đối chiếu.
+5. **Đánh giá chất lượng RAG (Ragas)**: Tích hợp module `RAGEvaluator` với các bộ tiêu chuẩn định lượng `faithfulness` (độ tin cậy trích dẫn, chống ảo giác) và `answer_relevancy` (độ bám sát câu hỏi người dùng).
+
+### 3.4. Công Cụ Tính Lãi Vay Ngân Hàng (Mortgage Calculator Tool)
+1. **Module toán tài chính**: `MortgageCalculator` hỗ trợ tính toán 2 phương thức vay:
+   - **Dư nợ giảm dần** (gốc cố định hàng tháng, lãi giảm dần theo dư nợ thực tế, hỗ trợ thời gian ưu đãi lãi suất).
+   - **Trả đều hàng tháng** (niên kim cố định).
+2. **Tự động bóc tách tham số**: Tích hợp chain bóc tách giá trị BĐS, tỷ lệ vay (% hoặc số tiền), kỳ hạn vay và tự động sinh bảng kế hoạch thanh toán chi tiết cho khách hàng.
 
 ---
 

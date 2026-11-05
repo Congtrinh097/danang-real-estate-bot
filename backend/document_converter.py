@@ -64,26 +64,35 @@ class DocumentConverter:
         return "\n".join(md_lines)
 
     @staticmethod
-    def _convert_pdf(file_bytes: bytes) -> str:
+    def _convert_pdf(file_bytes: bytes, filename: str = "document.pdf") -> str:
+        raw_text = ""
         try:
             reader = PdfReader(io.BytesIO(file_bytes))
-        except Exception as e:
-            raise ValueError(f"Không thể đọc file PDF (file lỗi hoặc định dạng không hợp lệ): {str(e)}")
+            pages_text = []
+            for idx, page in enumerate(reader.pages):
+                try:
+                    text = page.extract_text()
+                    if text:
+                        pages_text.append(text.strip())
+                except Exception:
+                    continue
+            raw_text = "\n\n".join(pages_text).strip()
+        except Exception:
+            raw_text = ""
 
-        pages_text = []
-        for idx, page in enumerate(reader.pages):
-            try:
-                text = page.extract_text()
-                if text:
-                    pages_text.append(text.strip())
-            except Exception:
-                continue
+        # Nếu pypdf trích xuất được text rõ ràng, chuẩn hóa Markdown
+        if raw_text:
+            return DocumentConverter._format_markdown_legal(raw_text)
 
-        raw_text = "\n\n".join(pages_text)
-        if not raw_text.strip():
-            raise ValueError("Không trích xuất được nội dung văn bản từ file PDF (file scan dạng ảnh hoặc trang trắng). Vui lòng cung cấp file PDF chứa text hoặc định dạng Word/Markdown.")
-        
-        # Chuẩn hóa các dòng tiêu đề Điều / Chương nếu có
+        # Nếu PDF không có text layer (file PDF scan / ảnh), kích hoạt Docling OCR
+        ocr_result = DocumentConverter.convert_with_docling(file_bytes, filename)
+        if ocr_result and ocr_result.strip():
+            return DocumentConverter._format_markdown_legal(ocr_result.strip())
+
+        raise ValueError("Không trích xuất được nội dung văn bản từ file PDF (file scan dạng ảnh hoặc trang trắng không nhận diện được chữ). Vui lòng cung cấp file PDF chứa text hoặc định dạng Word/Markdown.")
+
+    @staticmethod
+    def _format_markdown_legal(raw_text: str) -> str:
         lines = raw_text.split("\n")
         formatted_lines = []
         for line in lines:
@@ -97,5 +106,31 @@ class DocumentConverter:
                 formatted_lines.append(f"\n### {line_str}\n")
             else:
                 formatted_lines.append(line_str)
-
         return "\n".join(formatted_lines)
+
+    @staticmethod
+    def convert_with_docling(file_bytes: bytes, filename: str = "document.pdf") -> Optional[str]:
+        """Sử dụng Docling với OCR (RapidOCR) để trích xuất cấu trúc văn bản Markdown từ tài liệu scan hoặc phức tạp."""
+        try:
+            from docling.document_converter import DocumentConverter as DoclingConverter, PdfFormatOption
+            from docling.datamodel.base_models import DocumentStream
+            from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
+
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = True
+            pipeline_options.ocr_options = RapidOcrOptions()
+
+            doc_converter = DoclingConverter(
+                format_options={
+                    "pdf": PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
+
+            stream = DocumentStream(name=filename, stream=io.BytesIO(file_bytes))
+            conv_res = doc_converter.convert(stream)
+            if conv_res and conv_res.document:
+                return conv_res.document.export_to_markdown()
+        except Exception as e:
+            # Fallback nếu Docling OCR gặp lỗi môi trường
+            pass
+        return None

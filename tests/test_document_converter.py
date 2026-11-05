@@ -53,6 +53,32 @@ def test_convert_pdf(monkeypatch):
     assert "## Chương I: Quy Định Chung" in result
     assert "### Điều 1: Phạm vi áp dụng luật" in result
 
+def test_convert_scanned_pdf_fallback_to_docling(monkeypatch):
+    """
+    Test Task 4: Khi file PDF là file scan không có text layer (pypdf trả về rỗng),
+    hệ thống tự động kích hoạt Docling OCR để trích xuất text thay vì báo lỗi.
+    """
+    from pypdf import PageObject
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    pdf_io = io.BytesIO()
+    writer.write(pdf_io)
+    pdf_bytes = pdf_io.getvalue()
+
+    # Giả lập pypdf không đọc được text (scanned PDF)
+    monkeypatch.setattr(PageObject, "extract_text", lambda self: "")
+    # Giả lập Docling OCR nhận diện chữ thành công từ hình ảnh scan
+    monkeypatch.setattr(
+        DocumentConverter,
+        "convert_with_docling",
+        lambda file_bytes, filename: "Chương I: Quy Định Chung\nĐiều 1: Quy định về cấp sổ đỏ đất đai Đà Nẵng"
+    )
+
+    result = DocumentConverter.convert_to_markdown(pdf_bytes, "scanned_so_do.pdf")
+    assert "## Chương I: Quy Định Chung" in result
+    assert "### Điều 1: Quy định về cấp sổ đỏ đất đai Đà Nẵng" in result
+
+
 def test_convert_blank_pdf(monkeypatch):
     from pypdf import PageObject
     writer = PdfWriter()
@@ -63,6 +89,7 @@ def test_convert_blank_pdf(monkeypatch):
     pdf_bytes = pdf_io.getvalue()
 
     monkeypatch.setattr(PageObject, "extract_text", lambda self: "")
+    monkeypatch.setattr(DocumentConverter, "convert_with_docling", lambda file_bytes, filename: None)
     with pytest.raises(ValueError, match="Không trích xuất được nội dung"):
         DocumentConverter.convert_to_markdown(pdf_bytes, "blank.pdf")
 
