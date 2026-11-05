@@ -71,6 +71,11 @@ primary_llm_kwargs = {
 }
 if settings.OPENAI_BASE_URL:
     primary_llm_kwargs["base_url"] = settings.OPENAI_BASE_URL
+    if "openrouter.ai" in settings.OPENAI_BASE_URL:
+        primary_llm_kwargs["default_headers"] = {
+            "HTTP-Referer": "http://localhost:8000",
+            "X-Title": "Da Nang Real Estate Bot"
+        }
 primary_llm = ChatOpenAI(**primary_llm_kwargs)
 
 fallback_llm = ChatOpenAI(
@@ -105,6 +110,11 @@ def create_router_llm(
     }
     if chosen_base_url:
         kwargs["base_url"] = chosen_base_url
+        if "openrouter.ai" in chosen_base_url:
+            kwargs["default_headers"] = {
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Da Nang Real Estate Bot (Router)"
+            }
     return ChatOpenAI(**kwargs)
 
 router_llm = create_router_llm()
