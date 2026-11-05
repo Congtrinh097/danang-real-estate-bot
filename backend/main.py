@@ -169,6 +169,20 @@ def delete_legal_document(doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== PHÂN HỆ ĐÁNH GIÁ RAGAS ====================
+
+@app.get("/api/rag/evaluate")
+@app.post("/api/rag/evaluate")
+async def evaluate_rag():
+    """Endpoint kích hoạt Ragas benchmark cho các node RAG (chạy trong worker thread tránh block event loop)"""
+    try:
+        from rag_evaluator import RAGEvaluator
+        evaluator = RAGEvaluator()
+        report = await asyncio.to_thread(evaluator.evaluate_legal_rag)
+        return {"success": True, "report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     # Tắt reload để tránh tạo 2 process tranh chấp file Qdrant local
