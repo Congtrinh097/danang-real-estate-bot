@@ -36,8 +36,12 @@ class MortgageMCPClient:
             return asyncio.run(self.a_call_tool(tool_name, arguments))
         except RuntimeError:
             import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                return pool.submit(asyncio.run, self.a_call_tool(tool_name, arguments)).result()
+
+            def _run() -> str:
+                return asyncio.run(self.a_call_tool(tool_name, arguments))
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(_run).result()
 
     def get_langchain_tool(self) -> StructuredTool:
         """Chuyển đổi MCP Tool thành LangChain StructuredTool để LLM bind và gọi."""
