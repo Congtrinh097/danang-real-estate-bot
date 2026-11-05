@@ -79,6 +79,26 @@ def test_convert_scanned_pdf_fallback_to_docling(monkeypatch):
     assert "### Điều 1: Quy định về cấp sổ đỏ đất đai Đà Nẵng" in result
 
 
+def test_convert_pdf_fallback_to_pypdfium2(monkeypatch):
+    """Khi pypdf không đọc được text (ví dụ lỗi font), pypdfium2 trích xuất được text layer thay thế."""
+    from pypdf import PageObject
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    pdf_io = io.BytesIO()
+    writer.write(pdf_io)
+    pdf_bytes = pdf_io.getvalue()
+
+    monkeypatch.setattr(PageObject, "extract_text", lambda self: "")
+    monkeypatch.setattr(
+        DocumentConverter,
+        "_extract_with_pypdfium2",
+        lambda file_bytes: "Chương II: Thủ Tục Đất Đai\nĐiều 10: Trình tự sang tên sổ hồng"
+    )
+
+    result = DocumentConverter.convert_to_markdown(pdf_bytes, "doc_cid_font.pdf")
+    assert "## Chương II: Thủ Tục Đất Đai" in result
+    assert "### Điều 10: Trình tự sang tên sổ hồng" in result
+
 def test_convert_blank_pdf(monkeypatch):
     from pypdf import PageObject
     writer = PdfWriter()

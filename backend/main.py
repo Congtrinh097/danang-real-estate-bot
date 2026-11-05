@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sys
 import io
@@ -113,11 +114,15 @@ def submit_lead(lead: LeadRequest):
 
 @app.post("/api/legal/upload")
 async def upload_legal_document(file: UploadFile = File(...)):
-    """Upload tài liệu (.pdf, .docx, .md) -> tự động convert sang Markdown và lưu bản thảo"""
+    """Upload tài liệu (.pdf, .docx, .md) -> tự động convert sang Markdown và lưu bản thảo (chạy trong worker thread tránh block event loop)"""
     try:
         file_bytes = await file.read()
-        md_content = DocumentConverter.convert_to_markdown(file_bytes, file.filename)
-        doc_meta = legal_service.save_document(file.filename, md_content)
+        md_content = await asyncio.to_thread(
+            DocumentConverter.convert_to_markdown, file_bytes, file.filename
+        )
+        doc_meta = await asyncio.to_thread(
+            legal_service.save_document, file.filename, md_content
+        )
         return {"success": True, "data": doc_meta}
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -141,10 +146,10 @@ def get_legal_document_preview(doc_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/legal/documents/{doc_id}/index")
-def index_legal_document(doc_id: str):
-    """Cắt chunk theo cấu trúc Điều/Khoản và nạp vector vào Qdrant"""
+async def index_legal_document(doc_id: str):
+    """Cắt chunk theo cấu trúc Điều/Khoản và nạp vector vào Qdrant (chạy trong worker thread)"""
     try:
-        chunks_count = legal_service.index_document(doc_id)
+        chunks_count = await asyncio.to_thread(legal_service.index_document, doc_id)
         return {
             "success": True,
             "chunks_count": chunks_count,

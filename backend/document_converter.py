@@ -64,27 +64,55 @@ class DocumentConverter:
         return "\n".join(md_lines)
 
     @staticmethod
-    def _convert_pdf(file_bytes: bytes, filename: str = "document.pdf") -> str:
-        raw_text = ""
+    def _extract_with_pypdf(file_bytes: bytes) -> str:
         try:
             reader = PdfReader(io.BytesIO(file_bytes))
             pages_text = []
-            for idx, page in enumerate(reader.pages):
+            for page in reader.pages:
                 try:
                     text = page.extract_text()
-                    if text:
+                    if text and text.strip():
                         pages_text.append(text.strip())
                 except Exception:
                     continue
-            raw_text = "\n\n".join(pages_text).strip()
+            return "\n\n".join(pages_text).strip()
         except Exception:
-            raw_text = ""
+            return ""
 
-        # Nếu pypdf trích xuất được text rõ ràng, chuẩn hóa Markdown
-        if raw_text:
+    @staticmethod
+    def _extract_with_pypdfium2(file_bytes: bytes) -> str:
+        try:
+            import pypdfium2 as pdfium
+            pdf = pdfium.PdfDocument(file_bytes)
+            pages_text = []
+            for page in pdf:
+                try:
+                    tp = page.get_textpage()
+                    text = tp.get_text_range()
+                    if text and text.strip():
+                        pages_text.append(text.strip())
+                except Exception:
+                    continue
+            return "\n\n".join(pages_text).strip()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _convert_pdf(file_bytes: bytes, filename: str = "document.pdf") -> str:
+        # Bước 1: Trích xuất nhanh bằng pypdf
+        raw_text = DocumentConverter._extract_with_pypdf(file_bytes)
+
+        # Bước 2: Nếu pypdf không lấy được text (font mã hóa đặc thù), dùng pypdfium2 (PDFium engine)
+        if not raw_text or len(raw_text.strip()) < 10:
+            pdfium_text = DocumentConverter._extract_with_pypdfium2(file_bytes)
+            if pdfium_text and len(pdfium_text.strip()) >= 10:
+                raw_text = pdfium_text
+
+        # Nếu trích xuất được text rõ ràng từ text layer, chuẩn hóa sang Markdown
+        if raw_text and len(raw_text.strip()) >= 10:
             return DocumentConverter._format_markdown_legal(raw_text)
 
-        # Nếu PDF không có text layer (file PDF scan / ảnh), kích hoạt Docling OCR
+        # Bước 3: Nếu PDF hoàn toàn không có text layer (file PDF scan / dạng ảnh), kích hoạt Docling OCR
         ocr_result = DocumentConverter.convert_with_docling(file_bytes, filename)
         if ocr_result and ocr_result.strip():
             return DocumentConverter._format_markdown_legal(ocr_result.strip())
@@ -119,6 +147,12 @@ class DocumentConverter:
             pipeline_options = PdfPipelineOptions()
             pipeline_options.do_ocr = True
             pipeline_options.ocr_options = RapidOcrOptions()
+            pipeline_options.do_table_structure = False  # Bỏ qua TableFormer để tăng tốc độ xử lý trên CPU
+            pipeline_options.generate_page_images = False
+            pipeline_options.generate_picture_images = False
+            pipeline_options.generate_table_images = False
+            pipeline_options.images_scale = 1.0
+            pipeline_options.document_timeout = 60.0  # Giới hạn timeout 60s tránh treo tiến trình
 
             doc_converter = DoclingConverter(
                 format_options={
@@ -131,6 +165,5 @@ class DocumentConverter:
             if conv_res and conv_res.document:
                 return conv_res.document.export_to_markdown()
         except Exception as e:
-            # Fallback nếu Docling OCR gặp lỗi môi trường
-            pass
+            print(f"[WARN] Docling OCR chuyển đổi thất bại hoặc quá thời gian: {e}")
         return None
