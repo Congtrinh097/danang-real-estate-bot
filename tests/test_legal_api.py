@@ -45,6 +45,18 @@ def test_legal_upload_and_preview_and_delete():
     assert del_res.status_code == 200
     assert del_res.json()["success"] is True
 
+def test_legal_upload_timeout_returns_408(monkeypatch):
+    from document_converter import DocumentConverter
+
+    def mock_convert_timeout(file_bytes, filename):
+        raise TimeoutError("Quá thời gian xử lý file PDF (60s). Tài liệu scan quá dài.")
+
+    monkeypatch.setattr(DocumentConverter, "convert_to_markdown", mock_convert_timeout)
+    file_tuple = ("scanned_huge.pdf", io.BytesIO(b"%PDF-1.4 mock"), "application/pdf")
+    upload_res = client.post("/api/legal/upload", files={"file": file_tuple})
+    assert upload_res.status_code == 408
+    assert "Quá thời gian xử lý" in upload_res.json()["detail"]
+
 def test_chat_stream_emits_citations_event():
     # Gửi câu hỏi pháp lý vào endpoint /api/chat/stream
     payload = {

@@ -124,6 +124,8 @@ async def upload_legal_document(file: UploadFile = File(...)):
             legal_service.save_document, file.filename, md_content
         )
         return {"success": True, "data": doc_meta}
+    except TimeoutError as te:
+        raise HTTPException(status_code=408, detail=str(te))
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

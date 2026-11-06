@@ -116,3 +116,20 @@ def test_convert_blank_pdf(monkeypatch):
 def test_convert_unsupported_file_format():
     with pytest.raises(ValueError, match="Định dạng file không được hỗ trợ"):
         DocumentConverter.convert_to_markdown(b"binarycontent", "malware.exe")
+
+def test_convert_pdf_docling_timeout(monkeypatch):
+    from pypdf import PageObject
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+
+    pdf_io = io.BytesIO()
+    writer.write(pdf_io)
+    pdf_bytes = pdf_io.getvalue()
+
+    monkeypatch.setattr(PageObject, "extract_text", lambda self: "")
+    def mock_docling_timeout(file_bytes, filename):
+        raise TimeoutError("Quá thời gian xử lý file PDF (60s).")
+    monkeypatch.setattr(DocumentConverter, "convert_with_docling", mock_docling_timeout)
+
+    with pytest.raises(TimeoutError, match="Quá thời gian xử lý"):
+        DocumentConverter.convert_to_markdown(pdf_bytes, "heavy_scanned.pdf")

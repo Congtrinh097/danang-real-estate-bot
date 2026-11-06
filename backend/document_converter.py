@@ -143,6 +143,7 @@ class DocumentConverter:
             from docling.document_converter import DocumentConverter as DoclingConverter, PdfFormatOption
             from docling.datamodel.base_models import DocumentStream
             from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
+            from docling.datamodel.document import ConversionStatus
 
             pipeline_options = PdfPipelineOptions()
             pipeline_options.do_ocr = True
@@ -162,8 +163,41 @@ class DocumentConverter:
 
             stream = DocumentStream(name=filename, stream=io.BytesIO(file_bytes))
             conv_res = doc_converter.convert(stream)
-            if conv_res and conv_res.document:
-                return conv_res.document.export_to_markdown()
+
+            # Kiểm tra lỗi timeout từ Docling
+            if conv_res:
+                is_timeout = False
+                if hasattr(conv_res, "has_timeout_errors") and conv_res.has_timeout_errors():
+                    is_timeout = True
+                elif getattr(conv_res, "errors", None):
+                    for err in conv_res.errors:
+                        err_cat = str(getattr(err, "category", "")).lower()
+                        err_msg = str(getattr(err, "error_message", "")).lower()
+                        if "timeout" in err_cat or "timeout" in err_msg:
+                            is_timeout = True
+                            break
+
+                if is_timeout:
+                    raise TimeoutError(
+                        f"Quá thời gian xử lý file PDF ({pipeline_options.document_timeout:.0f}s). "
+                        "Tài liệu scan quá dài hoặc chứa quá nhiều trang để nhận diện OCR kịp thời. "
+                        "Vui lòng cung cấp file PDF chứa text layer gốc hoặc định dạng Word/Markdown."
+                    )
+
+                if getattr(conv_res, "status", None) == ConversionStatus.FAILURE:
+                    raise ValueError("Docling OCR chuyển đổi thất bại. Không thể nhận diện nội dung từ tài liệu.")
+
+                if conv_res.document:
+                    return conv_res.document.export_to_markdown()
+        except (TimeoutError, ValueError):
+            raise
         except Exception as e:
-            print(f"[WARN] Docling OCR chuyển đổi thất bại hoặc quá thời gian: {e}")
+            err_msg = str(e).lower()
+            if "timeout" in err_msg or "time budget exhausted" in err_msg:
+                raise TimeoutError(
+                    f"Quá thời gian xử lý file PDF (60s). "
+                    "Tài liệu scan quá dài để nhận diện OCR kịp thời. "
+                    "Vui lòng cung cấp file PDF chứa text layer gốc hoặc định dạng Word/Markdown."
+                )
+            print(f"[WARN] Docling OCR chuyển đổi thất bại hoặc gặp lỗi: {e}")
         return None
