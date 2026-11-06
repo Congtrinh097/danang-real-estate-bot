@@ -90,10 +90,11 @@ async def chat_stream(req: ChatRequest):
             if messages:
                 bot_text = messages[-1].content
                 # Stream giả lập từng cụm từ để frontend có hiệu ứng gõ mượt mà
-                chunk_size = 15
+                chunk_size = 6
                 for i in range(0, len(bot_text), chunk_size):
                     chunk = bot_text[i:i+chunk_size]
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+                    await asyncio.sleep(0.015)
 
             yield "data: [DONE]\n\n"
         except Exception as e:

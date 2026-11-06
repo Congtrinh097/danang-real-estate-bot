@@ -188,7 +188,10 @@ export default function App() {
     if (!query.trim() || loading || !activeThreadId) return;
 
     const userMsg = { sender: "user", text: query, properties: [], citations: [] };
-    updateActiveThreadMessages((prev) => [...prev, userMsg]);
+    let botMsg = { sender: "bot", text: "", properties: [], citations: [], isThinking: true };
+
+    // Thêm câu hỏi người dùng và bubble bot đang suy nghĩ vào ngay lập tức
+    updateActiveThreadMessages((prev) => [...prev, userMsg, botMsg]);
     setInput("");
     setLoading(true);
 
@@ -203,9 +206,6 @@ export default function App() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
-      let botMsg = { sender: "bot", text: "", properties: [], citations: [] };
-
-      updateActiveThreadMessages((prev) => [...prev, botMsg]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -222,6 +222,7 @@ export default function App() {
             try {
               const data = JSON.parse(raw);
               if (data.type === "token") {
+                botMsg.isThinking = false;
                 botMsg.text += data.content;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "properties") {
@@ -231,6 +232,7 @@ export default function App() {
                 botMsg.citations = data.data;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "error") {
+                botMsg.isThinking = false;
                 botMsg.text = "Lỗi xử lý: " + data.content;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               }
@@ -242,16 +244,12 @@ export default function App() {
       }
     } catch (error) {
       console.error("Lỗi gửi tin:", error);
-      updateActiveThreadMessages((prev) => [
-        ...prev,
-        {
-          sender: "bot",
-          text: "Dạ hiện tại không thể kết nối tới Backend FastAPI (cổng 8000). Anh/chị kiểm tra lại service nhé!",
-          properties: [],
-          citations: []
-        }
-      ]);
+      botMsg.isThinking = false;
+      botMsg.text = "Dạ hiện tại không thể kết nối tới Backend FastAPI (cổng 8000). Anh/chị kiểm tra lại service nhé!";
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
     } finally {
+      botMsg.isThinking = false;
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg, isThinking: false }]);
       setLoading(false);
     }
   };
@@ -337,8 +335,22 @@ export default function App() {
     });
   };
 
-  // Render text có chèn các badge trích dẫn [1], [2] tương tác và Markdown formatting
-  const renderMessageContent = (msg) => {
+  // Render text có chèn các badge trích dẫn [1], [2] tương tác, trạng thái đang suy nghĩ và hiệu ứng stream cursor
+  const renderMessageContent = (msg, isStreaming = false) => {
+    // 1. Trạng thái Đang suy nghĩ: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking
+    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0)) {
+      return (
+        <div className="thinking-bubble">
+          <div className="thinking-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <span className="thinking-text">Đang suy nghĩ...</span>
+        </div>
+      );
+    }
+
     if (!msg.text) return null;
     const citations = msg.citations || [];
 
@@ -350,10 +362,11 @@ export default function App() {
       <div>
         <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>
           {renderFormattedText(msg.text, citations)}
+          {isStreaming && <span className="streaming-cursor" />}
         </div>
 
-        {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý */}
-        {hasValidCitations && (
+        {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý và đã stream xong */}
+        {hasValidCitations && !isStreaming && (
           <button
             className="citations-footer-btn"
             onClick={() => handleOpenCitation(citations[0]?.index || 1, citations)}
@@ -574,13 +587,16 @@ export default function App() {
 
           {/* Danh sách tin nhắn */}
           <div className="message-list">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`message-row ${msg.sender}`}>
-                <div className={`avatar ${msg.sender}`}>
-                  {msg.sender === "bot" ? <Building2 size={18} /> : "Bạn"}
-                </div>
-                <div className="message-content">
-                  {msg.sender === "bot" ? renderMessageContent(msg) : <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>}
+            {messages.map((msg, idx) => {
+              const isLastBotMsg = msg.sender === "bot" && idx === messages.length - 1;
+              const isStreaming = isLastBotMsg && loading;
+              return (
+                <div key={idx} className={`message-row ${msg.sender}`}>
+                  <div className={`avatar ${msg.sender}`}>
+                    {msg.sender === "bot" ? <Building2 size={18} /> : "Bạn"}
+                  </div>
+                  <div className="message-content">
+                    {msg.sender === "bot" ? renderMessageContent(msg, isStreaming) : <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>}
 
                   {/* Property Carousel Cards */}
                   {msg.properties && msg.properties.length > 0 && (
@@ -618,8 +634,9 @@ export default function App() {
                   )}
                 </div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
+            );
+          })}
+          <div ref={messagesEndRef} />
           </div>
 
           {/* Input Bar */}
