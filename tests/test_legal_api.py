@@ -70,3 +70,28 @@ def test_chat_stream_emits_citations_event():
     # Phải có event citations và event token
     assert '"type": "citations"' in stream_content or '"type": "token"' in stream_content
     assert "[DONE]" in stream_content
+
+def test_chat_stream_does_not_emit_citations_for_subsequent_general_chat():
+    thread_id = "test_stream_citations_multi_turn_02"
+
+    # Lượt 1: Hỏi câu pháp lý
+    payload1 = {
+        "message": "Người nước ngoài có được mua chung cư ở Đà Nẵng không?",
+        "thread_id": thread_id
+    }
+    res1 = client.post("/api/chat/stream", json=payload1)
+    assert res1.status_code == 200
+
+    # Lượt 2: Hỏi câu chào hỏi thông thường
+    payload2 = {
+        "message": "Cảm ơn em nhiều nhé!",
+        "thread_id": thread_id
+    }
+    res2 = client.post("/api/chat/stream", json=payload2)
+    assert res2.status_code == 200
+    stream2 = res2.text
+
+    # Stream của lượt 2 tuyệt đối KHÔNG được gửi event citations
+    assert '"type": "citations"' not in stream2
+    assert '"type": "token"' in stream2
+    assert "[DONE]" in stream2

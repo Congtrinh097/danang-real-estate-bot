@@ -63,3 +63,28 @@ def test_legal_consultation_intent_and_citations():
         assert len(citations) == len(cited_nums)
         for c in citations:
             assert c["index"] in cited_nums
+
+def test_subsequent_non_legal_message_clears_citations():
+    """
+    Kiểm tra multi-turn:
+    Sau khi hỏi câu hỏi pháp lý và nhận citations, lượt tiếp theo nếu người dùng
+    hỏi câu hỏi thông thường (general_chat) hoặc tìm BĐS, state citations phải được reset về rỗng ([])
+    để không hiển thị nhầm nút căn cứ pháp lý trên UI.
+    """
+    thread_id = "test_tdd_multi_turn_citations_002"
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "tags": ["test_legal", thread_id],
+    }
+
+    # Lượt 1: Hỏi câu pháp lý
+    legal_query = "Người nước ngoài có được mua căn hộ chung cư ở Đà Nẵng không?"
+    state_turn1 = real_estate_agent.invoke({"messages": [HumanMessage(content=legal_query)]}, config=config)
+    assert state_turn1["intent"] == "legal_consultation"
+    assert len(state_turn1.get("citations", [])) > 0
+
+    # Lượt 2: Người dùng cảm ơn hoặc chào hỏi thông thường
+    chat_query = "Dạ em cảm ơn anh/chị nhiều nhé!"
+    state_turn2 = real_estate_agent.invoke({"messages": [HumanMessage(content=chat_query)]}, config=config)
+    assert state_turn2["intent"] == "general_chat"
+    assert state_turn2.get("citations") == []

@@ -308,7 +308,7 @@ def route_intent_node(state: AgentState) -> Dict[str, Any]:
         "jailbreak", "dan mode"
     ]
     if any(kw in text_lower for kw in jailbreak_keywords):
-        return {"intent": "rule_violation"}
+        return {"intent": "rule_violation", "citations": []}
 
     danang_districts = ["sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "hòa vang", "đà nẵng"]
     other_locations = [
@@ -323,10 +323,10 @@ def route_intent_node(state: AgentState) -> Dict[str, Any]:
 
     # Nếu hỏi tỉnh thành khác mà không liên quan đến Đà Nẵng -> out_of_scope
     if any(loc in text_lower for loc in other_locations) and not any(dn in text_lower for dn in danang_districts):
-        return {"intent": "out_of_scope"}
+        return {"intent": "out_of_scope", "citations": []}
 
     if any(kw in text_lower for kw in unrelated_keywords):
-        return {"intent": "out_of_scope"}
+        return {"intent": "out_of_scope", "citations": []}
 
     try:
         result = router_chain.invoke({"messages": all_messages[-4:]})
@@ -345,7 +345,7 @@ def route_intent_node(state: AgentState) -> Dict[str, Any]:
         else:
             intent = "general_chat"
 
-    return {"intent": intent}
+    return {"intent": intent, "citations": []}
 
 # Conditional Edge router function
 def decide_route(state: AgentState) -> str:
@@ -450,7 +450,8 @@ def general_chat_response_node(state: AgentState) -> Dict[str, Any]:
 
     return {
         "messages": [reply],
-        "found_properties": []
+        "found_properties": [],
+        "citations": []
     }
 
 # 4.1. Node Legal Advisory Response (RAG Pháp lý & trích dẫn điều luật qua LCEL chain)
@@ -553,11 +554,11 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
 
     if criteria.get("customer_phone"):
         reply_text = f"Dạ em đã nhận được thông tin số điện thoại {criteria['customer_phone']}. Chuyên viên tư vấn khu vực Đà Nẵng sẽ liên hệ lại qua Zalo/Điện thoại với anh/chị ngay ạ!"
-        return {"messages": [AIMessage(content=reply_text)]}
+        return {"messages": [AIMessage(content=reply_text)], "citations": []}
 
     if not properties:
         reply_text = "Hiện tại em chưa tìm thấy bất động sản nào khớp hoàn toàn với yêu cầu trên. Anh/chị có thể nới lỏng ngân sách hoặc mở rộng sang các quận lân cận không ạ?"
-        return {"messages": [AIMessage(content=reply_text)]}
+        return {"messages": [AIMessage(content=reply_text)], "citations": []}
 
     context_desc = "\n".join([
         f"- {p['title']} ({p['district']}): {p['price']:,} VNĐ. {p['description']}"
@@ -573,7 +574,7 @@ def generate_response_node(state: AgentState) -> Dict[str, Any]:
     except Exception:
         reply = AIMessage(content=f"Dạ em xin gửi anh/chị {len(properties)} bất động sản phù hợp nhất tại Đà Nẵng theo yêu cầu. Anh/chị có muốn em hỗ trợ đặt lịch đi xem thực tế căn nào không ạ?")
 
-    return {"messages": [reply]}
+    return {"messages": [reply], "citations": []}
 
 # 8. Thiết lập LangGraph Workflow với Router Dispatcher, Guardrails & Mortgage Calculator
 workflow = StateGraph(AgentState)

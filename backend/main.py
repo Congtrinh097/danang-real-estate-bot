@@ -79,8 +79,9 @@ async def chat_stream(req: ChatRequest):
             if properties:
                 yield f"data: {json.dumps({'type': 'properties', 'data': properties})}\n\n"
 
-            # Gửi danh sách căn cứ trích dẫn pháp lý (nếu có) để ReactJS render badges / drawer
-            citations = final_state.get("citations", [])
+            # Gửi danh sách căn cứ trích dẫn pháp lý (chỉ gửi khi intent lượt này là legal_consultation và có citations)
+            intent = final_state.get("intent")
+            citations = final_state.get("citations", []) if intent == "legal_consultation" else []
             if citations:
                 yield f"data: {json.dumps({'type': 'citations', 'data': citations})}\n\n"
 

@@ -302,16 +302,21 @@ export default function App() {
       const match = part.match(/^\[(\d+)\]$/);
       if (match) {
         const num = parseInt(match[1], 10);
-        return (
-          <button
-            key={i}
-            className="citation-badge"
-            onClick={() => handleOpenCitation(num, citations)}
-            title="Bấm để xem căn cứ pháp lý đối chiếu"
-          >
-            [{num}]
-          </button>
-        );
+        // Chỉ biến thành clickable badge nếu số đó thực sự tồn tại trong danh sách citations của message này
+        const hasMatchingCitation = Array.isArray(citations) && citations.some((c) => (c.index || 0) === num);
+        if (hasMatchingCitation) {
+          return (
+            <button
+              key={i}
+              className="citation-badge"
+              onClick={() => handleOpenCitation(num, citations)}
+              title="Bấm để xem căn cứ pháp lý đối chiếu"
+            >
+              [{num}]
+            </button>
+          );
+        }
+        return part;
       }
 
       // Bước 2: Tách theo định dạng Markdown: **in đậm** hoặc *in nghiêng*
@@ -337,14 +342,18 @@ export default function App() {
     if (!msg.text) return null;
     const citations = msg.citations || [];
 
+    // Nút footer chỉ hiển thị khi có citations hợp lệ VÀ tin nhắn thực sự có chứa trích dẫn pháp lý
+    const hasCitationsInText = /\[\d+\]/.test(msg.text);
+    const hasValidCitations = citations.length > 0 && hasCitationsInText;
+
     return (
       <div>
         <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>
           {renderFormattedText(msg.text, citations)}
         </div>
 
-        {/* Nút footer xem căn cứ pháp lý nếu câu trả lời có citations */}
-        {citations.length > 0 && (
+        {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý */}
+        {hasValidCitations && (
           <button
             className="citations-footer-btn"
             onClick={() => handleOpenCitation(citations[0]?.index || 1, citations)}
