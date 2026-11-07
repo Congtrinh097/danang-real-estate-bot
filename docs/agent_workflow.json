@@ -6,35 +6,52 @@
     "quality_profile": "showcase",
     "views": [
       {
-        "id": "search-path",
-        "label": "Luồng Tìm kiếm BĐS",
+        "id": "property-search",
+        "label": "1. Tìm kiếm BĐS",
         "focus": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
-        "note": "Nhận diện nhu cầu tìm thuê/mua nhà, trích xuất tiêu chí và tra cứu Qdrant."
+        "note": "Nhận diện nhu cầu thuê/mua nhà, bóc tách tiêu chí quận/giá/loại hình và tra cứu Qdrant."
       },
       {
-        "id": "legal-rag-path",
-        "label": "Tư vấn Pháp lý RAG",
-        "focus": ["user", "fastapi", "router", "legal_advisory", "legal_rag_db", "sse_output"],
-        "note": "Tra cứu căn cứ pháp lý từ danang_legal_docs và trích dẫn số [1], [2]."
+        "id": "legal-rag",
+        "label": "2. Tư vấn Pháp lý RAG",
+        "focus": ["user", "fastapi", "router", "legal_advisory", "sse_output"],
+        "note": "Tra cứu Luật Đất đai 2024 & Luật Nhà ở từ danang_legal_docs, trích dẫn chính xác [1], [2]."
       },
       {
-        "id": "general-chat-path",
-        "label": "Giao tiếp Thông thường",
+        "id": "mortgage-calc",
+        "label": "3. Tính Lãi Vay (MCP)",
+        "focus": ["user", "fastapi", "router", "mortgage_calc", "sse_output"],
+        "note": "Gọi Tool qua MCP Client tính toán lịch trả góp dư nợ giảm dần hoặc niên kim cố định."
+      },
+      {
+        "id": "guardrail-safety",
+        "label": "4. Guardrail & An toàn",
+        "focus": ["user", "fastapi", "router", "guardrail_node", "sse_output"],
+        "note": "Chặn prompt injection/jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng."
+      },
+      {
+        "id": "general-chat",
+        "label": "5. Hội thoại Xã giao",
         "focus": ["user", "fastapi", "router", "general_chat", "sse_output"],
-        "note": "Chào hỏi và giải đáp chung không qua cơ sở dữ liệu."
+        "note": "Chào hỏi lịch sự, tư vấn thời tiết Đà Nẵng và khéo léo giới thiệu dịch vụ nhà đất."
       }
     ]
   },
   "lanes": [
     { "id": "client", "label": "Client & Web Gateway" },
-    { "id": "orchestrator", "label": "Router & State Dispatcher" },
-    { "id": "property_pipeline", "label": "Property Search Pipeline" },
-    { "id": "legal_pipeline", "label": "Legal Advisory RAG" }
+    { "id": "guardrail_lane", "label": "Guardrails & An Toàn", "variant": "exception" },
+    { "id": "orchestrator", "label": "Router & Điều Phối Hội Thoại" },
+    { "id": "legal_pipeline", "label": "Legal Advisory RAG" },
+    { "id": "tools_pipeline", "label": "Financial Engine (MCP Tool)" },
+    { "id": "property_pipeline", "label": "Property Search Pipeline" }
   ],
   "phases": [
     { "id": "phase_intake", "label": "1. Tiếp nhận & Định tuyến", "fromCol": 0, "toCol": 2 },
-    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Slot / RAG / Chat)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
+    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
     { "id": "phase_output", "label": "3. Tổng hợp & Stream SSE", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "property_flow_group", "label": "Tìm kiếm & Khớp căn", "lane": "property_pipeline", "fromCol": 3, "toCol": 5, "variant": "emphasis" }
   ],
   "mainPath": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
   "nodes": [
@@ -64,7 +81,17 @@
       "type": "backend",
       "label": "Router Agent",
       "sublabel": "route_intent_node",
-      "tag": "Intent Classifier",
+      "tag": "6 Phân loại ý định",
+      "width": 120
+    },
+    {
+      "id": "guardrail_node",
+      "lane": "guardrail_lane",
+      "col": 3,
+      "type": "security",
+      "label": "Guardrail Node",
+      "sublabel": "out_of_scope_response",
+      "tag": "Chặn lệch phạm vi",
       "width": 120
     },
     {
@@ -74,6 +101,17 @@
       "type": "backend",
       "label": "General Chat",
       "sublabel": "general_chat_response",
+      "tag": "Chào hỏi xã giao",
+      "width": 120
+    },
+    {
+      "id": "mortgage_calc",
+      "lane": "tools_pipeline",
+      "col": 3,
+      "type": "messagebus",
+      "label": "Mortgage Calc",
+      "sublabel": "LLM + MCP Tool",
+      "tag": "Bảng tính lãi vay",
       "width": 120
     },
     {
@@ -93,6 +131,7 @@
       "type": "database",
       "label": "Search Qdrant",
       "sublabel": "danang_properties",
+      "tag": "Vector & Metadata",
       "width": 120
     },
     {
@@ -102,6 +141,7 @@
       "type": "backend",
       "label": "Generate Response",
       "sublabel": "generate_response_node",
+      "tag": "Gợi ý BĐS & Đặt lịch",
       "width": 120
     },
     {
@@ -111,16 +151,7 @@
       "type": "backend",
       "label": "Legal Advisory",
       "sublabel": "legal_advisory_node",
-      "tag": "Citations Generator",
-      "width": 120
-    },
-    {
-      "id": "legal_rag_db",
-      "lane": "legal_pipeline",
-      "col": 4,
-      "type": "database",
-      "label": "Legal Docs Qdrant",
-      "sublabel": "danang_legal_docs",
+      "tag": "RAG danang_legal_docs",
       "width": 120
     },
     {
@@ -129,9 +160,10 @@
       "col": 5,
       "type": "frontend",
       "label": "SSE Stream",
-      "sublabel": "Cards + Citations + Tokens",
+      "sublabel": "Cards + Citations",
       "brand": "react",
-      "width": 120
+      "tag": "Thinking & Tokens",
+      "width": 130
     }
   ],
   "edges": [
@@ -150,10 +182,24 @@
       "variant": "emphasis"
     },
     {
+      "id": "edge_router_guardrail",
+      "from": "router",
+      "to": "guardrail_node",
+      "label": "out_of_scope",
+      "variant": "security"
+    },
+    {
       "id": "edge_router_chat",
       "from": "router",
       "to": "general_chat",
       "label": "general_chat",
+      "variant": "default"
+    },
+    {
+      "id": "edge_router_mortgage",
+      "from": "router",
+      "to": "mortgage_calc",
+      "label": "mortgage_calc",
       "variant": "default"
     },
     {
@@ -167,7 +213,7 @@
       "id": "edge_router_legal",
       "from": "router",
       "to": "legal_advisory",
-      "label": "legal_consultation",
+      "label": "legal_consult",
       "variant": "security"
     },
     {
@@ -185,11 +231,28 @@
       "variant": "emphasis"
     },
     {
-      "id": "edge_legal_rag",
-      "from": "legal_advisory",
-      "to": "legal_rag_db",
-      "label": "tra cứu luật",
-      "variant": "security"
+      "id": "edge_guardrail_stream",
+      "from": "guardrail_node",
+      "to": "sse_output",
+      "label": "từ chối khéo",
+      "variant": "security",
+      "role": "return"
+    },
+    {
+      "id": "edge_chat_stream",
+      "from": "general_chat",
+      "to": "sse_output",
+      "label": "chào hỏi",
+      "variant": "default",
+      "role": "return"
+    },
+    {
+      "id": "edge_mortgage_stream",
+      "from": "mortgage_calc",
+      "to": "sse_output",
+      "label": "lịch trả góp",
+      "variant": "default",
+      "role": "return"
     },
     {
       "id": "edge_gen_stream",
@@ -201,35 +264,28 @@
     },
     {
       "id": "edge_legal_stream",
-      "from": "legal_rag_db",
+      "from": "legal_advisory",
       "to": "sse_output",
-      "label": "citations",
+      "label": "citations & text",
       "variant": "security",
-      "role": "return",
-      "route": "outside-right"
-    },
-    {
-      "id": "edge_chat_stream",
-      "from": "general_chat",
-      "to": "sse_output",
-      "label": "tokens",
-      "variant": "default",
       "role": "return"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Phân loại Ý định (Router Agent)",
+      "title": "Điều Phối Đa Ý Định & Guardrail",
       "items": [
-        "Phân luồng 3 nhánh: search_property, legal_consultation và general_chat kèm cơ chế fallback an toàn."
+        "Router Agent phân loại 6 ý định: search_property, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.",
+        "Guardrail chặn ngay các câu hỏi ngoài Đà Nẵng hoặc prompt injection để bảo vệ phạm vi hoạt động."
       ]
     },
     {
       "dot": "emerald",
-      "title": "Dual Collection Qdrant RAG",
+      "title": "Dual Collection Qdrant & MCP Tool",
       "items": [
-        "Tra cứu danang_properties (lọc metadata & vector) và danang_legal_docs (trích dẫn điều luật [1], [2])."
+        "Tra cứu song song collection danang_properties (tìm kiếm nhà đất) và danang_legal_docs (văn bản luật đã OCR).",
+        "Tích hợp MCP Tool tính toán lãi vay ngân hàng với 2 phương án: dư nợ giảm dần và niên kim cố định."
       ]
     }
   ]
