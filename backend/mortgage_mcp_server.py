@@ -1,9 +1,17 @@
+import sys
+from pathlib import Path
 from typing import Optional, Dict, Any
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
+
+# Đảm bảo đường dẫn import hoạt động khi chạy độc lập dưới dạng stdio process
+backend_dir = Path(__file__).resolve().parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from mortgage_calculator import MortgageCalculator, MortgageInput
 
-# Khởi tạo MCP Server cho nghiệp vụ tài chính & tính lãi vay mua BĐS Đà Nẵng
-mortgage_mcp_server = MCPServer("danang-real-estate-mortgage-server")
+# Khởi tạo FastMCP Server cho nghiệp vụ tài chính & tính lãi vay mua BĐS Đà Nẵng
+mortgage_mcp_server = FastMCP("danang-real-estate-mortgage-server")
 
 
 @mortgage_mcp_server.tool(
@@ -40,3 +48,7 @@ def calculate_mortgage_loan(
 
     res = MortgageCalculator.calculate(inp)
     return res.summary_markdown
+
+
+if __name__ == "__main__":
+    mortgage_mcp_server.run()

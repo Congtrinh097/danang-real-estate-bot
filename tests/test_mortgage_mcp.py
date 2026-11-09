@@ -7,7 +7,13 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from mortgage_mcp_server import mortgage_mcp_server
-from mortgage_mcp_client import MortgageMCPClient, mortgage_mcp_client, mortgage_langchain_tool
+from mortgage_mcp_client import (
+    MortgageMCPClient,
+    mortgage_mcp_client,
+    mortgage_langchain_tool,
+    create_mortgage_agent,
+    get_mortgage_mcp_tools
+)
 from langchain_core.messages import HumanMessage, AIMessage
 from agent import real_estate_agent
 
@@ -37,16 +43,26 @@ def test_mcp_client_direct_call():
     assert "1,400,000,000 VNĐ" in result
 
 
+def test_create_mortgage_agent():
+    """Kiểm tra tạo Mortgage Agent bằng create_agent và nạp MCP tools qua adapter."""
+    agent = create_mortgage_agent()
+    assert agent is not None
+    tools = get_mortgage_mcp_tools()
+    assert len(tools) > 0
+    assert tools[0].name == "calculate_mortgage_loan"
+
+
 def test_langchain_tool_conversion():
-    """Kiểm tra LangChain StructuredTool gọi qua MCP Client."""
+    """Kiểm tra LangChain Tool gọi qua MCP Client Adapter."""
     res = mortgage_langchain_tool.invoke({
         "property_price": 3_000_000_000,
         "loan_ratio": 80.0,
         "tenure_years": 15,
         "annual_interest_rate": 9.0
     })
-    assert "2,400,000,000 VNĐ" in res
-    assert "15 năm" in res
+    res_str = str(res)
+    assert "2,400,000,000 VNĐ" in res_str
+    assert "15 năm" in res_str
 
 
 def test_llm_to_mcp_client_to_tool_flow():

@@ -11,7 +11,12 @@ from config import settings
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from mortgage_calculator import MortgageCalculator, MortgageInput
-from mortgage_mcp_client import mortgage_mcp_client, mortgage_langchain_tool
+from mortgage_mcp_client import (
+    mortgage_mcp_client,
+    mortgage_langchain_tool,
+    create_mortgage_agent,
+    get_mortgage_mcp_tools
+)
 
 # 1. Định nghĩa Schema phân loại ý định (Router Agent & Input Guardrails)
 class IntentClassification(BaseModel):
@@ -91,8 +96,15 @@ if settings.OPENAI_BASE_URL and settings.OPENAI_BASE_URL.rstrip('/') != (setting
 else:
     llm = primary_llm
 
-# Bind MCP Tools cho LLM (Mô hình LLM -> MCP Client -> Tool)
-llm_with_mortgage_tool = llm.bind_tools([mortgage_langchain_tool])
+# Khởi tạo ReAct Agent chuyên trách tính lãi suất & tài chính vay mua BĐS Đà Nẵng
+# Sử dụng create_agent kết hợp tool calling từ langchain-mcp-adapters
+mortgage_agent = create_mortgage_agent(llm)
+
+# Bind MCP Tools cho LLM (dự phòng tương thích ngược)
+if mortgage_langchain_tool:
+    llm_with_mortgage_tool = llm.bind_tools([mortgage_langchain_tool])
+else:
+    llm_with_mortgage_tool = llm
 
 # Khởi tạo mô hình Decision / Router LLM độc lập (cho phép cấu hình model riêng cho decision node)
 def create_router_llm(
@@ -360,39 +372,22 @@ def decide_route(state: AgentState) -> str:
         return "legal_advisory"
     return "extract_criteria"
 
-# 3.0. Node Mortgage Calculation Tool (Mô hình LLM -> MCP Client -> Tool)
+# 3.0. Node Mortgage Calculation Agent (Mô hình ReAct Agent -> MCP Client Adapter -> FastMCP Tool)
 def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     last_user_message = all_messages[-1].content if all_messages else ""
 
     try:
-        # 1. LLM nhận danh sách tools từ MCP và quyết định gọi Tool kèm trích xuất tham số
-        llm_response = llm_with_mortgage_tool.invoke([
-            SystemMessage(content=(
-                "Bạn là chuyên gia tư vấn tài chính ngân hàng mua nhà đất tại Đà Nẵng.\n"
-                "Nhiệm vụ: BẮT BUỘC sử dụng tool 'calculate_mortgage_loan' được cung cấp để tính toán chính xác phương án trả góp cho khách hàng.\n"
-                "Quy đổi tiền tệ sang VNĐ: '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000, '500 triệu' -> 500000000."
-            ))
-        ] + list(all_messages[-4:]))
-
-        if llm_response.tool_calls:
-            # 2. LLM phát sinh tool_call -> Chuyển tiếp tới MCP Client -> Thực thi trên MCP Tool Server
-            tool_call = llm_response.tool_calls[0]
-            tool_result = mortgage_mcp_client.call_tool(
-                tool_call["name"],
-                tool_call.get("args", {})
-            )
-            reply = AIMessage(content=tool_result)
+        # 1. Ủy thác câu hỏi cho Mortgage ReAct Agent (được tạo bởi create_agent + langchain-mcp-adapters)
+        # Agent tự động thực hiện vòng lặp ReAct: suy luận -> gọi tool MCP -> nhận kết quả -> trả lời
+        agent_result = mortgage_agent.invoke({"messages": list(all_messages[-4:])})
+        agent_messages = agent_result.get("messages", [])
+        if agent_messages:
+            reply = agent_messages[-1]
         else:
-            # Nếu LLM không sinh tool_call thì ủy thác qua MCP client với tham số trích xuất
-            extraction = mortgage_extraction_chain.invoke({"messages": all_messages[-4:]})
-            tool_result = mortgage_mcp_client.call_tool(
-                "calculate_mortgage_loan",
-                extraction.model_dump()
-            )
-            reply = AIMessage(content=tool_result)
+            raise ValueError("Mortgage agent không trả về tin nhắn")
     except Exception:
-        # Fallback an toàn qua MCP Client
+        # Fallback an toàn qua MCP Client nếu agent gặp sự cố
         text_lower = last_user_message.lower()
         price = 2_000_000_000.0
         if "3 tỷ" in text_lower or "3 tỉ" in text_lower:
