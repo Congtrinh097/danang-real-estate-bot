@@ -40,6 +40,7 @@ const createNewThreadObject = () => {
 
 const STORAGE_KEY = "danang_re_threads";
 const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 export default function App() {
   // Navigation: "chat" | "admin_legal"
@@ -132,7 +133,7 @@ export default function App() {
   const fetchLegalDocs = async () => {
     setLoadingDocs(true);
     try {
-      const res = await fetch("http://localhost:8000/api/legal/documents");
+      const res = await fetch(`${API_BASE}/api/legal/documents`);
       const json = await res.json();
       if (json.success) {
         setLegalDocs(json.data || []);
@@ -201,7 +202,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat/stream", {
+      const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: query, thread_id: activeThreadId }),
@@ -270,7 +271,7 @@ export default function App() {
     if (!leadForm.name || !leadForm.phone) return;
 
     try {
-      await fetch("http://localhost:8000/api/leads", {
+      await fetch(`${API_BASE}/api/leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -395,7 +396,7 @@ export default function App() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/legal/upload", {
+      const res = await fetch(`${API_BASE}/api/legal/upload`, {
         method: "POST",
         body: formData
       });
@@ -418,7 +419,7 @@ export default function App() {
   const handleIndexDoc = async (docId) => {
     setAdminMessage({ type: "info", text: "Đang cắt đoạn theo Điều/Khoản và tính embeddings nạp vào Qdrant..." });
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}/index`, {
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}/index`, {
         method: "POST"
       });
       const data = await res.json();
@@ -435,7 +436,7 @@ export default function App() {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu: "${title}" cùng toàn bộ vector liên quan?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}`, {
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}`, {
         method: "DELETE"
       });
       const data = await res.json();
@@ -450,7 +451,7 @@ export default function App() {
 
   const handlePreviewDoc = async (docId, title) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}/preview`);
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}/preview`);
       const data = await res.json();
       if (data.success) {
         setPreviewDoc({ id: docId, title, content: data.data.content });

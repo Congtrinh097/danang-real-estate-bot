@@ -76,3 +76,6 @@ logs/
 
 # Archify visual checks
 *.visual-check.*
+
+# Cloudflare
+.cloudflared*
