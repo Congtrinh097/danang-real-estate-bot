@@ -17,7 +17,8 @@ import {
   Check,
   AlertCircle,
   Database,
-  ArrowRight
+  ArrowRight,
+  Menu
 } from "lucide-react";
 
 const INITIAL_GREETING = {
@@ -43,6 +44,8 @@ const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
 export default function App() {
   // Navigation: "chat" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
+  // Mobile Sidebar Drawer Toggle
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // 1. Quản lý danh sách threads & thread đang active
   const [threads, setThreads] = useState(() => {
@@ -146,6 +149,8 @@ export default function App() {
     setThreads((prev) => [newThread, ...prev]);
     setActiveThreadId(newThread.id);
     setInput("");
+    setActiveTab("chat");
+    setIsMobileSidebarOpen(false);
   };
 
   const handleDeleteThread = (e, threadIdToDelete) => {
@@ -457,16 +462,33 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <div className="sidebar">
+      {/* Mobile Backdrop for Sidebar Drawer */}
+      {isMobileSidebarOpen && (
+        <div
+          className="sidebar-backdrop active"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar (Desktop cố định, Mobile dạng Drawer) */}
+      <div className={`sidebar ${isMobileSidebarOpen ? "mobile-open" : ""}`}>
         <div className="brand-header">
-          <div className="brand-badge">
-            <Building2 size={24} />
+          <div className="brand-header-left">
+            <div className="brand-badge">
+              <Building2 size={24} />
+            </div>
+            <div>
+              <div className="brand-title">Đà Nẵng BĐS & Luật AI</div>
+              <div className="brand-subtitle">Tư vấn Nhà đất & Pháp lý</div>
+            </div>
           </div>
-          <div>
-            <div className="brand-title">Đà Nẵng BĐS & Luật AI</div>
-            <div className="brand-subtitle">Tư vấn Nhà đất & Pháp lý</div>
-          </div>
+          <button
+            className="btn-close-sidebar-mobile"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            title="Đóng menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Quản lý Thread */}
@@ -487,6 +509,7 @@ export default function App() {
                 onClick={() => {
                   setActiveThreadId(t.id);
                   setActiveTab("chat");
+                  setIsMobileSidebarOpen(false);
                 }}
               >
                 <div className="thread-info">
@@ -514,6 +537,7 @@ export default function App() {
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?");
             }}
           >
@@ -523,6 +547,7 @@ export default function App() {
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Điều kiện để nhà ở thương mại được phép mua bán theo Luật Nhà ở mới nhất?");
             }}
           >
@@ -532,6 +557,7 @@ export default function App() {
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Quy định về mức tiền đặt cọc tối đa khi mua nhà dự án?");
             }}
           >
@@ -541,6 +567,7 @@ export default function App() {
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu");
             }}
           >
@@ -554,33 +581,50 @@ export default function App() {
         <div className="chat-main">
           {/* Header với Navigation Switcher */}
           <div className="chat-header">
-            <div>
-              <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
-                {activeThread?.title || "Trợ lý AI Nhà Đất & Pháp Lý Đà Nẵng"}
-              </h3>
-              <p style={{ fontSize: "12px", color: "#64748b" }}>
-                ID phiên: <code style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px" }}>{activeThreadId}</code>
-              </p>
+            <div className="header-left">
+              <button
+                className="btn-mobile-menu"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                title="Mở menu & lịch sử hội thoại"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="header-title-wrapper">
+                <h3 className="header-title">
+                  {activeThread?.title || "Trợ lý AI Nhà Đất & Pháp Lý Đà Nẵng"}
+                </h3>
+                <p className="header-session-id">
+                  ID: <code>{activeThreadId ? activeThreadId.slice(0, 16) + (activeThreadId.length > 16 ? "..." : "") : ""}</code>
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div className="header-right">
+              <button
+                className="btn-mobile-new-thread"
+                onClick={handleCreateNewThread}
+                title="Tạo đoạn chat mới"
+              >
+                <Plus size={18} />
+              </button>
+
               <div className="header-nav">
                 <button
                   className={`nav-tab-btn ${activeTab === "chat" ? "active" : ""}`}
                   onClick={() => setActiveTab("chat")}
                 >
-                  <MessageSquare size={14} /> Tư Vấn BĐS
+                  <MessageSquare size={14} /> <span className="nav-btn-text">Tư Vấn BĐS</span>
                 </button>
                 <button
                   className={`nav-tab-btn ${activeTab === "admin_legal" ? "active" : ""}`}
                   onClick={() => setActiveTab("admin_legal")}
                 >
-                  <Scale size={14} /> Quản Trị Pháp Lý
+                  <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
                 </button>
               </div>
 
               <div className="status-badge">
-                <div className="status-dot"></div> Sẵn sàng tư vấn
+                <div className="status-dot"></div> <span className="status-badge-text">Sẵn sàng</span>
               </div>
             </div>
           </div>
@@ -641,6 +685,38 @@ export default function App() {
 
           {/* Input Bar */}
           <div className="chat-input-bar">
+            {messages.length <= 2 && (
+              <div className="mobile-quick-chips">
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?")}
+                >
+                  ⚖️ Người nước ngoài mua chung cư
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Tính lãi vay ngân hàng mua nhà 2 tỷ, vay 70% trong 20 năm trả bao nhiêu?")}
+                >
+                  💰 Tính lãi vay 2 tỷ
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu")}
+                >
+                  🏢 Căn hộ 2PN Sơn Trà
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Quy định về mức tiền đặt cọc tối đa khi mua nhà dự án?")}
+                >
+                  📝 Tiền đặt cọc tối đa
+                </button>
+              </div>
+            )}
             <form
               className="input-container"
               onSubmit={(e) => {
@@ -650,7 +726,7 @@ export default function App() {
             >
               <input
                 type="text"
-                placeholder="Hỏi về pháp lý, sổ đỏ, đặt cọc hoặc tìm thuê/mua nhà đất Đà Nẵng..."
+                placeholder="Hỏi pháp lý, sổ đỏ, tính lãi vay, BĐS Đà Nẵng..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
@@ -665,21 +741,30 @@ export default function App() {
         /* ==================== MÀN HÌNH QUẢN TRỊ TÀI LIỆU PHÁP LÝ ==================== */
         <div className="admin-view-container">
           <div className="admin-header">
-            <div>
-              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
-                Quản Trị Cơ Sở Dữ Liệu Pháp Lý Nhà Ở
-              </h2>
-              <p style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
-                Tải lên file PDF, Word (.docx) hoặc Markdown (.md). Hệ thống tự động chuyển đổi sang Markdown và nạp vector vào Qdrant.
-              </p>
+            <div className="admin-header-title-group">
+              <button
+                className="btn-mobile-menu"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                title="Mở menu"
+              >
+                <Menu size={20} />
+              </button>
+              <div>
+                <h2 className="admin-title">
+                  Quản Trị Cơ Sở Dữ Liệu Pháp Lý
+                </h2>
+                <p className="admin-subtitle">
+                  Tải lên file PDF, Word (.docx), Markdown (.md) và nạp vector Qdrant.
+                </p>
+              </div>
             </div>
 
             <div className="header-nav">
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
-                <MessageSquare size={14} /> Về Khung Chat
+                <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
               </button>
               <button className="nav-tab-btn active">
-                <Scale size={14} /> Quản Trị Pháp Lý
+                <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
               </button>
             </div>
           </div>

@@ -5,26 +5,47 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-body {
+html, body {
+  width: 100%;
+  max-width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
   background-color: #f1f5f9;
   color: #1e293b;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  height: 100%;
+  overflow-x: hidden;
 }
 
 .app-container {
   display: flex;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
+  max-width: 100vw;
   overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
 }
 
 /* Sidebar */
 .sidebar {
   width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  flex-shrink: 0;
   background-color: #ffffff;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .brand-header {
@@ -209,10 +230,17 @@ body {
 
 /* Chat Main Area */
 .chat-main {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #f8fafc;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .chat-header {
@@ -223,6 +251,11 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .status-badge {
@@ -235,6 +268,7 @@ body {
   padding: 4px 10px;
   border-radius: 20px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .status-dot {
@@ -242,21 +276,29 @@ body {
   height: 8px;
   border-radius: 50%;
   background-color: #10b981;
+  flex-shrink: 0;
 }
 
 .message-list {
-  flex: 1;
+  flex: 1 1 0%;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .message-row {
   display: flex;
   gap: 12px;
   max-width: 85%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .message-row.user {
@@ -292,6 +334,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .bubble {
@@ -300,6 +346,9 @@ body {
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .message-row.user .bubble {
@@ -410,6 +459,10 @@ body {
   overflow-x: auto;
   padding: 4px 0 12px 0;
   scrollbar-width: thin;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .property-card {
@@ -502,6 +555,11 @@ body {
   padding: 16px 24px;
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .input-container {
@@ -512,15 +570,22 @@ body {
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   padding: 8px 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .input-container input {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
   border: none;
   background: transparent;
   outline: none;
   font-size: 14px;
   color: #0f172a;
+  box-sizing: border-box;
 }
 
 .btn-send {
@@ -529,11 +594,14 @@ body {
   border: none;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  max-width: 36px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.2s;
 }
 
@@ -853,3 +921,559 @@ body {
 .btn-action:hover {
   opacity: 0.85;
 }
+
+/* ==================== RESPONSIVE & MOBILE STYLES ==================== */
+
+/* Nút mở Menu & Tạo chat nhanh trên Mobile (Mặc định ẩn trên Desktop) */
+.btn-mobile-menu,
+.btn-mobile-new-thread,
+.btn-close-sidebar-mobile {
+  display: none;
+}
+
+.brand-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.header-title-wrapper {
+  min-width: 0;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-session-id {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.admin-header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Quick Prompt Chips cuộn ngang */
+.mobile-quick-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 10px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mobile-quick-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-chip-btn {
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  padding: 6px 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+}
+
+.quick-chip-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.quick-chip-btn:active {
+  transform: scale(0.97);
+}
+
+/* ---------------- TABLET & MOBILE BREAKPOINT (≤ 768px) ---------------- */
+@media (max-width: 768px) {
+  /* Nền mờ khi Sidebar Drawer trượt ra */
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .sidebar-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sidebar trượt từ cạnh trái (Off-canvas Drawer) */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 84vw;
+    max-width: 320px;
+    height: 100vh;
+    z-index: 110;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+    padding: 16px 18px;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .brand-header {
+    justify-content: space-between;
+    padding-bottom: 16px;
+  }
+
+  .btn-close-sidebar-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: #f1f5f9;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-close-sidebar-mobile:active {
+    background: #e2e8f0;
+  }
+
+  /* Chat Header Mobile */
+  .chat-header {
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    padding: 8px 12px;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    gap: 8px;
+  }
+
+  .header-title-wrapper {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .btn-mobile-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #334155;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-mobile-menu:active {
+    background: #e2e8f0;
+  }
+
+  .btn-mobile-new-thread {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-mobile-new-thread:active {
+    background: #dbeafe;
+  }
+
+  .header-title {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .header-session-id {
+    display: none;
+  }
+
+  .header-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .nav-btn-text,
+  .status-badge-text {
+    display: none !important;
+  }
+
+  .nav-tab-btn {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .status-badge {
+    padding: 6px;
+    border-radius: 50%;
+    min-width: unset;
+  }
+
+  /* Tin nhắn & Khung Chat */
+  .message-list {
+    padding: 12px 10px 16px 10px;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .message-row {
+    max-width: 95%;
+    gap: 8px;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .message-content {
+    min-width: 0;
+    max-width: calc(100% - 38px);
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .avatar svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .bubble {
+    padding: 10px 14px;
+    font-size: 13.5px;
+    border-radius: 14px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .thinking-bubble {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* Property Cards Carousel Mobile */
+  .cards-scroll-container {
+    padding: 4px 2px 12px 2px;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .property-card {
+    width: 240px;
+    border-radius: 12px;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  .card-img {
+    height: 125px;
+  }
+
+  .card-body {
+    padding: 11px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    height: 36px;
+    margin-bottom: 4px;
+  }
+
+  .card-price {
+    font-size: 14.5px;
+    margin-bottom: 8px;
+  }
+
+  .card-meta {
+    font-size: 11.5px;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .btn-book {
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+
+  /* Chat Input Bar Mobile (Hỗ trợ Safe Area iPhone/Android) */
+  .chat-input-bar {
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom)) 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  .mobile-quick-chips {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .input-container {
+    padding: 6px 10px;
+    border-radius: 12px;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Font-size 16px ngăn chặn Safari iOS tự động phóng to (auto-zoom) */
+  .input-container input {
+    font-size: 16px;
+    flex: 1 1 0%;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .btn-send {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    border-radius: 9px;
+    flex-shrink: 0;
+  }
+
+  /* Citations Drawer Mobile (Trượt 100% màn hình) */
+  .citations-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+
+  .drawer-header {
+    padding: 14px 16px;
+  }
+
+  .drawer-body {
+    padding: 16px;
+  }
+
+  /* Modal Đặt lịch xem nhà Mobile */
+  .modal-overlay {
+    padding: 14px;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 92vw;
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    font-size: 16px; /* Chống auto-zoom trên iOS */
+  }
+
+  /* Admin View Mobile */
+  .admin-view-container {
+    padding: 16px 12px 30px 12px;
+    height: 100vh;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .admin-title {
+    font-size: 17px !important;
+  }
+
+  .admin-subtitle {
+    font-size: 12px !important;
+  }
+
+  .admin-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .admin-stat-card {
+    padding: 14px;
+  }
+
+  .admin-upload-zone {
+    padding: 20px 14px;
+    margin-bottom: 16px;
+  }
+
+  .legal-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+  }
+
+  .legal-table th,
+  .legal-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+/* ---------------- SMALL PHONE BREAKPOINT (≤ 480px) ---------------- */
+@media (max-width: 480px) {
+  .chat-header {
+    padding: 8px 10px;
+  }
+
+  .header-left {
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .header-title-wrapper {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .header-title {
+    font-size: 13px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-btn-text,
+  .status-badge-text {
+    display: none !important;
+  }
+
+  .status-badge {
+    padding: 6px;
+    border-radius: 50%;
+  }
+
+  .nav-tab-btn {
+    padding: 6px 8px;
+  }
+
+  .message-list {
+    padding: 10px 8px 14px 8px;
+  }
+
+  .message-row {
+    max-width: 98%;
+  }
+
+  .property-card {
+    width: 220px;
+  }
+
+  .quick-chip-btn {
+    font-size: 11.5px;
+    padding: 5px 11px;
+  }
+
+  .chat-input-bar {
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom)) 8px;
+  }
+
+  .input-container {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .btn-send {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    max-width: 36px;
+  }
+}
+
