@@ -42,6 +42,7 @@ venv.bak/
 # Database & Local Storage
 data/postgres_data/
 data/qdrant_storage/
+data/qdrant_local/
 backend/data/qdrant_local/
 *.sqlite3
 *.db

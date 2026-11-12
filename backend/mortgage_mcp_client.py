@@ -9,6 +9,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
 
 from mortgage_calculator import MortgageCalculator, MortgageInput
+from bank_research_service import bank_research_service
 
 # Thư mục gốc backend & đường dẫn tới mortgage_mcp_server.py
 backend_dir = Path(__file__).resolve().parent
@@ -98,14 +99,15 @@ def create_mortgage_agent(model=None):
 
     system_prompt = (
         "Bạn là chuyên viên tài chính và ngân hàng cấp cao chuyên tư vấn vay vốn mua bất động sản tại TP. Đà Nẵng.\n"
-        "Nhiệm vụ trọng tâm: Khi khách hàng hỏi về vay mua nhà, tính lãi suất, số tiền trả góp hàng tháng, hoặc phương án vay vốn ngân hàng, "
-        "bạn BẮT BUỘC phải gọi tool 'calculate_mortgage_loan' được cung cấp qua MCP Client Adapter để có bảng tính toán chính xác.\n"
+        "Nhiệm vụ trọng tâm:\n"
+        "1. KHI NGƯỜI DÙNG HỎI SO SÁNH CÁC GÓI VAY, LÃI SUẤT NGÂN HÀNG HIỆN TẠI, HOẶC NÊN CHỌN NGÂN HÀNG NÀO (Vietcombank, BIDV, Techcombank, MBBank, ACB...):\n"
+        "   - BẮT BUỘC phải gọi tool 'search_bank_mortgage_rates' để có bảng dữ liệu lãi suất thị trường thực tế và tính toán lãi suất bình quân theo số năm vay.\n"
+        "   - Cung cấp bảng so sánh rõ ràng: Lãi ưu đãi, Thời hạn ưu đãi, Lãi thả nổi, Lãi bình quân cả kỳ, Phí phạt trả trước hạn.\n"
+        "   - Đưa ra đề xuất cụ thể theo mục đích: An cư lâu dài (ưu tiên Big 4 biên độ thấp), Đầu tư lướt sóng tất toán sớm (ưu tiên phí phạt thấp/miễn phí sớm), hoặc Tối ưu dòng tiền trả nợ.\n"
+        "2. KHI NGƯỜI DÙNG CẦN TÍNH TOÁN CHI TIẾT SỐ TIỀN TRẢ GÓP HÀNG THÁNG CỤ THỂ:\n"
+        "   - BẮT BUỘC gọi tool 'calculate_mortgage_loan' để nhận bảng tính toán chuẩn xác.\n"
         "Quy đổi tiền tệ sang VNĐ chính xác: '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000, '800 triệu' -> 800000000.\n"
-        "Sau khi nhận kết quả từ tool, bạn hãy:\n"
-        "1. Trình bày số tiền gốc và lãi tháng đầu khách hàng cần trả rõ ràng.\n"
-        "2. Đưa ra lời khuyên tài chính cá nhân hóa (ví dụ: tỷ lệ an toàn nợ trên thu nhập DTI không vượt quá 40-50%, "
-        "chuẩn bị tối thiểu 30% vốn tự có, lưu ý lãi suất thả nổi sau thời gian ưu đãi).\n"
-        "Thái độ giao tiếp luôn nhã nhặn, chuyên nghiệp và tận tâm hỗ trợ khách hàng."
+        "Thái độ giao tiếp luôn nhã nhặn, chuyên nghiệp, đồng hành và hỗ trợ khách hàng tối ưu chi phí lãi vay."
     )
 
     return create_agent(
@@ -122,6 +124,21 @@ class MortgageMCPClientLegacy:
         self.server = server
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+        if tool_name == "search_bank_mortgage_rates":
+            packages, insights = bank_research_service.research_market(
+                tenure_years=arguments.get("tenure_years", 20) or 20,
+                bank_names=arguments.get("bank_names")
+            )
+            report = bank_research_service.format_comparison_report(
+                packages=packages,
+                tenure_years=arguments.get("tenure_years", 20) or 20,
+                loan_amount=arguments.get("loan_amount"),
+                loan_purpose=arguments.get("loan_purpose", "mua_nha_o") or "mua_nha_o"
+            )
+            if insights:
+                report += "\n\n📌 **Dữ liệu & Cập nhật thị trường:**\n" + "\n".join(insights[:2])
+            return report
+
         inp = MortgageInput(
             property_price=arguments.get("property_price"),
             loan_amount=arguments.get("loan_amount"),

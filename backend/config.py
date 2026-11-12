@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate")
 
+    # Tavily Web Search API (Cho nghiên cứu lãi suất ngân hàng và thị trường)
+    TAVILY_API_KEY: Optional[str] = os.getenv("TAVILY_API_KEY", "")
+
     # LangSmith Observability
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "true")
     LANGCHAIN_ENDPOINT: str = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
@@ -47,5 +50,7 @@ if settings.LANGCHAIN_API_KEY:
     os.environ["LANGCHAIN_API_KEY"] = settings.LANGCHAIN_API_KEY
 if settings.LANGCHAIN_PROJECT:
     os.environ["LANGCHAIN_PROJECT"] = settings.LANGCHAIN_PROJECT
+if settings.TAVILY_API_KEY:
+    os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
 
 

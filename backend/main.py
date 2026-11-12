@@ -112,6 +112,41 @@ def submit_lead(lead: LeadRequest):
         "message": "Đã ghi nhận thông tin đặt lịch xem nhà thành công!"
     }
 
+# ==================== PHÂN HỆ THẨM ĐỊNH HỢP ĐỒNG BĐS ====================
+
+@app.post("/api/contract/upload")
+async def upload_contract_for_chat(file: UploadFile = File(...)):
+    """Upload file hợp đồng (.pdf, .docx, .txt, .md) trong chat -> chuyển đổi sang Markdown bằng DocumentConverter"""
+    try:
+        file_bytes = await file.read()
+        md_text = await asyncio.to_thread(
+            DocumentConverter.convert_to_markdown, file_bytes, file.filename
+        )
+
+        # Kiểm tra sơ bộ nội dung tệp có dấu hiệu hợp đồng hay không
+        text_lower = md_text.lower()
+        contract_signatures = [
+            "hợp đồng", "thỏa thuận", "đặt cọc", "mua bán", "chuyển nhượng", "cho thuê",
+            "bên a", "bên b", "bên bán", "bên mua", "bên đặt cọc", "bên nhận cọc",
+            "tiền cọc", "phạt cọc", "quyền sử dụng đất", "tài sản giao dịch"
+        ]
+        is_contract = any(sig in text_lower for sig in contract_signatures)
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "char_count": len(md_text),
+            "content": md_text,
+            "is_contract": is_contract,
+            "warning": None if is_contract else "Tệp tải lên có thể không phải là văn bản hợp đồng hoặc thỏa thuận giao dịch bất động sản."
+        }
+    except TimeoutError as te:
+        raise HTTPException(status_code=408, detail=str(te))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể đọc file hợp đồng: {str(e)}")
+
 # ==================== PHÂN HỆ QUẢN TRỊ TÀI LIỆU PHÁP LÝ ====================
 
 @app.post("/api/legal/upload")

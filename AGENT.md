@@ -97,11 +97,17 @@ flowchart TD
 4. **Trích dẫn minh bạch**: Phản hồi pháp lý sinh các ký hiệu `[1]`, `[2]`, frontend cho phép click để trượt mở Right-side Drawer xem toàn văn văn bản luật đối chiếu.
 5. **Đánh giá chất lượng RAG (Ragas)**: Tích hợp module `RAGEvaluator` với các bộ tiêu chuẩn định lượng `faithfulness` (độ tin cậy trích dẫn, chống ảo giác) và `answer_relevancy` (độ bám sát câu hỏi người dùng).
 
-### 3.4. Công Cụ Tính Lãi Vay Ngân Hàng (Mortgage Calculator Tool)
+### 3.4. Công Cụ Tính Lãi Vay Ngân Hàng & Nghiên Cứu Thị Trường (Mortgage & Bank Research Tool)
 1. **Module toán tài chính**: `MortgageCalculator` hỗ trợ tính toán 2 phương thức vay:
    - **Dư nợ giảm dần** (gốc cố định hàng tháng, lãi giảm dần theo dư nợ thực tế, hỗ trợ thời gian ưu đãi lãi suất).
    - **Trả đều hàng tháng** (niên kim cố định).
-2. **Tự động bóc tách tham số**: Tích hợp chain bóc tách giá trị BĐS, tỷ lệ vay (% hoặc số tiền), kỳ hạn vay và tự động sinh bảng kế hoạch thanh toán chi tiết cho khách hàng.
+2. **Tool TavilySearch Research Thị Trường Ngân Hàng (`search_bank_mortgage_rates`)**:
+   - Tự động research và cập nhật biểu lãi suất vay mua BĐS của các ngân hàng lớn tại Việt Nam (nhóm Big 4: Vietcombank, BIDV, VietinBank, Agribank; và các NHTMCP hàng đầu: Techcombank, MBBank, VPBank, ACB).
+   - Tự động tính toán lãi suất bình quân hàng năm (`effective_annual_rate`) dựa trên thời hạn vay thực tế (`tenure_years`) kết hợp thời gian ưu đãi và lãi suất thả nổi.
+   - So sánh đa ngân hàng và đưa ra đề xuất gói vay tối ưu chi phí tiền lãi theo mục đích vay: an cư dài hạn, đầu tư lướt sóng tất toán sớm, hoặc tối ưu dòng tiền hàng tháng.
+3. **Mô hình kiến trúc FastMCP**:
+   - `mortgage_mcp_server.py` cung cấp 2 tool: `calculate_mortgage_loan` và `search_bank_mortgage_rates`.
+   - `mortgage_mcp_client.py` nạp tự động qua `langchain-mcp-adapters` vào `mortgage_agent` (ReAct Agent).
 
 ---
 

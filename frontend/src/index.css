@@ -364,6 +364,180 @@ html, body {
   border-bottom-left-radius: 4px;
 }
 
+/* Cho phép message row mở rộng linh hoạt khi có bảng dữ liệu */
+.message-row.bot:has(.markdown-table-wrapper) {
+  max-width: 95%;
+}
+
+/* ==================== MARKDOWN BODY & TABLES ==================== */
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+.markdown-body p {
+  margin: 0 0 8px 0;
+  line-height: 1.65;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+.markdown-body h1 {
+  font-size: 17px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 5px;
+}
+
+.markdown-body h2 {
+  font-size: 16px;
+}
+
+.markdown-body h3 {
+  font-size: 15px;
+  color: #1e3a8a;
+}
+
+.markdown-body h4 {
+  font-size: 14px;
+  color: #334155;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 6px 0 10px 0;
+  padding-left: 20px;
+}
+
+.markdown-body li {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+.markdown-body hr {
+  border: 0;
+  height: 1px;
+  background: #e2e8f0;
+  margin: 14px 0;
+}
+
+.markdown-body strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: #475569;
+}
+
+.markdown-body code {
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.markdown-body blockquote {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 4px solid #3b82f6;
+  background: #eff6ff;
+  border-radius: 0 8px 8px 0;
+  color: #1e40af;
+  font-size: 13.5px;
+}
+
+/* Markdown Table Wrapper & Table */
+.markdown-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin: 10px 0 12px 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.markdown-table thead {
+  background: #f8fafc;
+}
+
+.markdown-table th {
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.markdown-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+.markdown-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-table tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+.markdown-table tbody tr:nth-child(even) td {
+  background-color: #fafbfc;
+}
+
+.markdown-table tbody tr:nth-child(even):hover td {
+  background-color: #f1f5f9;
+}
+
+.markdown-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-link:hover {
+  color: #1d4ed8;
+}
+
 /* Trạng thái đang suy nghĩ & Streaming cursor */
 .thinking-bubble {
   display: inline-flex;
@@ -1474,6 +1648,146 @@ html, body {
     height: 36px;
     min-width: 36px;
     max-width: 36px;
+  }
+}
+
+/* ==================== CONTRACT AUDITOR & ATTACHMENT STYLES ==================== */
+
+.prompt-btn-highlight,
+.quick-chip-highlight {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+  font-weight: 600 !important;
+}
+
+.prompt-btn-highlight:hover,
+.quick-chip-highlight:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+  border-color: #3b82f6 !important;
+}
+
+.attached-contract-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.attached-contract-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.attached-contract-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.attached-contract-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+.attached-contract-size {
+  font-size: 11px;
+  color: #65a30d;
+}
+
+.btn-remove-attachment {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-attachment:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.btn-attach {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-attach:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.btn-attach.has-file {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.btn-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.markdown-blockquote {
+  border-left: 4px solid #3b82f6;
+  background: #f8fafc;
+  padding: 10px 14px;
+  margin: 10px 0;
+  border-radius: 0 8px 8px 0;
+  color: #334155;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .btn-attach {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 9px;
+  }
+
+  .attached-contract-name {
+    max-width: 180px;
+    font-size: 12px;
   }
 }
 

@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import {
   Send,
   Building2,
@@ -18,8 +21,25 @@ import {
   AlertCircle,
   Database,
   ArrowRight,
-  Menu
+  Menu,
+  Paperclip,
+  Copy
 } from "lucide-react";
+
+const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
+Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
+- Bên A (Bên Bán): Công ty Cổ phần Đầu tư Bất động sản XYZ (Chủ đầu tư dự án căn hộ The Ocean View Đà Nẵng).
+- Bên B (Bên Mua): Ông Nguyễn Văn A, CCCD số 04809000xxxx.
+
+Hai bên thống nhất ký thỏa thuận đặt cọc với các điều khoản sau:
+Điều 1: Căn hộ số A12-05 tại dự án The Ocean View, quận Sơn Trà, TP. Đà Nẵng. Dự án đang hoàn thiện móng cọc. Giá bán: 2.000.000.000 VNĐ (Hai tỷ đồng).
+Điều 2: Tiền đặt cọc: Bên B đồng ý đặt cọc cho Bên A số tiền là 300.000.000 VNĐ (Ba trăm triệu đồng, tương đương 15% tổng giá trị căn hộ) ngay sau khi ký thỏa thuận này.
+Điều 3: Phạt vi phạm:
+- Nếu Bên B (Bên mua) không tiếp tục ký Hợp đồng mua bán đúng thời hạn thì Bên B sẽ mất toàn bộ số tiền đặt cọc 300.000.000 VNĐ cho Bên A.
+- Nếu Bên A (Bên bán) không tiếp tục bán căn hộ cho Bên B thì Bên A chỉ có trách nhiệm hoàn trả lại số tiền đặt cọc gốc 300.000.000 VNĐ cho Bên B trong vòng 30 ngày mà không phải chịu bất kỳ khoản phạt cọc hay bồi thường nào khác.
+Điều 4: Nghĩa vụ thuế phí: Mọi khoản thuế TNCN, lệ phí trước bạ và phí cấp sổ hồng do Bên B (Bên mua) tự chịu chi phí.
+
+Nhờ AI thẩm định các điều khoản, bẫy cọc và tính hợp pháp của bản thỏa thuận đặt cọc này giúp tôi!`;
 
 const INITIAL_GREETING = {
   sender: "bot",
@@ -104,6 +124,45 @@ export default function App() {
   // Drawer căn cứ pháp lý
   const [activeDrawerCitations, setActiveDrawerCitations] = useState(null);
   const [selectedCitationIndex, setSelectedCitationIndex] = useState(1);
+
+  // Đính kèm file hợp đồng rà soát trong Chat
+  const [attachedContract, setAttachedContract] = useState(null);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const contractFileInputRef = useRef(null);
+
+  const handleContractFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingContract(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/contract/upload`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Không thể đọc file hợp đồng");
+
+      if (data.is_contract === false) {
+        alert(`⚠️ Chú ý: Tệp "${file.name}" dường như không phải hợp đồng hay thỏa thuận mua bán/đặt cọc BĐS. Trợ lý AI sẽ kiểm tra và từ chối thẩm định nếu không đúng định dạng hợp đồng.`);
+      }
+
+      setAttachedContract({
+        name: file.name,
+        size: (file.size / 1024).toFixed(1) + " KB",
+        content: data.content,
+        isContract: data.is_contract
+      });
+    } catch (err) {
+      alert("Lỗi tải file hợp đồng: " + err.message);
+    } finally {
+      setUploadingContract(false);
+      if (contractFileInputRef.current) contractFileInputRef.current.value = "";
+    }
+  };
 
   // Quản trị tài liệu pháp lý (Admin)
   const [legalDocs, setLegalDocs] = useState([]);
@@ -190,10 +249,19 @@ export default function App() {
   };
 
   const handleSend = async (textToSend) => {
-    const query = textToSend || input;
-    if (!query.trim() || loading || !activeThreadId) return;
+    let query = textToSend || input;
+    if ((!query.trim() && !attachedContract) || loading || !activeThreadId) return;
 
-    const userMsg = { sender: "user", text: query, properties: [], citations: [] };
+    let userDisplayText = query;
+    let backendPayloadText = query;
+
+    if (attachedContract) {
+      userDisplayText = `📄 **Đính kèm hợp đồng:** \`${attachedContract.name}\` (${attachedContract.size})\n\n${query || "Nhờ chuyên gia AI thẩm định các điều khoản, bẫy cọc và tính an toàn pháp lý của hợp đồng này."}`;
+      backendPayloadText = `[HỢP ĐỒNG ĐÍNH KÈM TỪ TỆP: ${attachedContract.name}]\n${attachedContract.content}\n\n[YÊU CẦU CỦA KHÁCH HÀNG]:\n${query || "Nhờ chuyên gia thẩm định và chỉ ra các rủi ro, bẫy cọc, vi phạm pháp luật trong hợp đồng này giúp tôi."}`;
+      setAttachedContract(null);
+    }
+
+    const userMsg = { sender: "user", text: userDisplayText, properties: [], citations: [] };
     let botMsg = { sender: "bot", text: "", properties: [], citations: [], isThinking: true };
 
     // Thêm câu hỏi người dùng và bubble bot đang suy nghĩ vào ngay lập tức
@@ -205,7 +273,7 @@ export default function App() {
       const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query, thread_id: activeThreadId }),
+        body: JSON.stringify({ message: backendPayloadText, thread_id: activeThreadId }),
       });
 
       if (!response.body) throw new Error("Không nhận được luồng stream");
@@ -295,51 +363,92 @@ export default function App() {
     setSelectedCitationIndex(index);
   };
 
-  // Helper render text hỗ trợ Markdown in đậm (**text**), in nghiêng (*text*) và badge citation ([1], [2])
-  const renderFormattedText = (text, citations) => {
-    if (!text) return null;
-
-    // Bước 1: Tách theo citations [1], [2]...
-    const citationParts = text.split(/(\[\d+\])/g);
-
-    return citationParts.map((part, i) => {
-      const match = part.match(/^\[(\d+)\]$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        // Chỉ biến thành clickable badge nếu số đó thực sự tồn tại trong danh sách citations của message này
-        const hasMatchingCitation = Array.isArray(citations) && citations.some((c) => (c.index || 0) === num);
-        if (hasMatchingCitation) {
-          return (
-            <button
-              key={i}
-              className="citation-badge"
-              onClick={() => handleOpenCitation(num, citations)}
-              title="Bấm để xem căn cứ pháp lý đối chiếu"
-            >
-              [{num}]
-            </button>
-          );
+  // Helper thay thế citations [1], [2] thành interactive badge button trong các phần tử React
+  const replaceCitations = (node, citations) => {
+    if (typeof node === "string") {
+      const parts = node.split(/(\[\d+\])/g);
+      if (parts.length === 1) return node;
+      return parts.map((part, i) => {
+        const m = part.match(/^\[(\d+)\]$/);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          const hasMatchingCitation = Array.isArray(citations) && citations.some((c) => (c.index || 0) === num);
+          if (hasMatchingCitation) {
+            return (
+              <button
+                key={i}
+                className="citation-badge"
+                onClick={() => handleOpenCitation(num, citations)}
+                title="Bấm để xem căn cứ pháp lý đối chiếu"
+              >
+                [{num}]
+              </button>
+            );
+          }
         }
         return part;
-      }
-
-      // Bước 2: Tách theo định dạng Markdown: **in đậm** hoặc *in nghiêng*
-      const inlineParts = part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-      return (
-        <React.Fragment key={i}>
-          {inlineParts.map((subPart, j) => {
-            if (subPart.startsWith("**") && subPart.endsWith("**") && subPart.length >= 4) {
-              return <strong key={j} style={{ fontWeight: "700" }}>{subPart.slice(2, -2)}</strong>;
-            }
-            if (subPart.startsWith("*") && subPart.endsWith("*") && subPart.length >= 2) {
-              return <em key={j}>{subPart.slice(1, -1)}</em>;
-            }
-            return subPart;
-          })}
+      });
+    }
+    if (React.isValidElement(node) && node.props && node.props.children) {
+      return React.cloneElement(node, {}, replaceCitations(node.props.children, citations));
+    }
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>
+          {replaceCitations(child, citations)}
         </React.Fragment>
-      );
-    });
+      ));
+    }
+    return node;
   };
+
+  const createMarkdownComponents = (citations) => ({
+    table: ({ node, ...props }) => (
+      <div className="markdown-table-wrapper">
+        <table className="markdown-table" {...props} />
+      </div>
+    ),
+    th: ({ node, children, ...props }) => (
+      <th {...props}>{replaceCitations(children, citations)}</th>
+    ),
+    td: ({ node, children, ...props }) => (
+      <td {...props}>{replaceCitations(children, citations)}</td>
+    ),
+    p: ({ node, children, ...props }) => (
+      <p {...props}>{replaceCitations(children, citations)}</p>
+    ),
+    li: ({ node, children, ...props }) => (
+      <li {...props}>{replaceCitations(children, citations)}</li>
+    ),
+    h1: ({ node, children, ...props }) => (
+      <h1 {...props}>{replaceCitations(children, citations)}</h1>
+    ),
+    h2: ({ node, children, ...props }) => (
+      <h2 {...props}>{replaceCitations(children, citations)}</h2>
+    ),
+    h3: ({ node, children, ...props }) => (
+      <h3 {...props}>{replaceCitations(children, citations)}</h3>
+    ),
+    h4: ({ node, children, ...props }) => (
+      <h4 {...props}>{replaceCitations(children, citations)}</h4>
+    ),
+    strong: ({ node, children, ...props }) => (
+      <strong {...props}>{replaceCitations(children, citations)}</strong>
+    ),
+    em: ({ node, children, ...props }) => (
+      <em {...props}>{replaceCitations(children, citations)}</em>
+    ),
+    blockquote: ({ node, children, ...props }) => (
+      <blockquote className="markdown-blockquote" {...props}>
+        {replaceCitations(children, citations)}
+      </blockquote>
+    ),
+    a: ({ node, children, href, ...props }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link" {...props}>
+        {replaceCitations(children, citations)}
+      </a>
+    )
+  });
 
   // Render text có chèn các badge trích dẫn [1], [2] tương tác, trạng thái đang suy nghĩ và hiệu ứng stream cursor
   const renderMessageContent = (msg, isStreaming = false) => {
@@ -366,9 +475,16 @@ export default function App() {
 
     return (
       <div>
-        <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>
-          {renderFormattedText(msg.text, citations)}
-          {isStreaming && <span className="streaming-cursor" />}
+        <div className="bubble bot-bubble">
+          <div className="markdown-body">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkBreaks]}
+              components={createMarkdownComponents(citations)}
+            >
+              {msg.text}
+            </ReactMarkdown>
+            {isStreaming && <span className="streaming-cursor" />}
+          </div>
         </div>
 
         {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý và đã stream xong */}
@@ -535,6 +651,16 @@ export default function App() {
         <div className="quick-prompts">
           <h4>Gợi ý tra cứu nhanh</h4>
           <button
+            className="prompt-btn prompt-btn-highlight"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend(SAMPLE_CONTRACT_PROMPT);
+            }}
+          >
+            📋 Rà soát Hợp đồng cọc mẫu (bẫy cọc 15%)
+          </button>
+          <button
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
@@ -690,6 +816,13 @@ export default function App() {
               <div className="mobile-quick-chips">
                 <button
                   type="button"
+                  className="quick-chip-btn quick-chip-highlight"
+                  onClick={() => handleSend(SAMPLE_CONTRACT_PROMPT)}
+                >
+                  📋 Rà soát Hợp đồng cọc mẫu
+                </button>
+                <button
+                  type="button"
                   className="quick-chip-btn"
                   onClick={() => handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?")}
                 >
@@ -709,15 +842,28 @@ export default function App() {
                 >
                   🏢 Căn hộ 2PN Sơn Trà
                 </button>
+              </div>
+            )}
+
+            {/* Thẻ hiển thị file hợp đồng đính kèm */}
+            {attachedContract && (
+              <div className="attached-contract-chip">
+                <div className="attached-contract-info">
+                  <FileText size={15} className="attached-contract-icon" />
+                  <span className="attached-contract-name">{attachedContract.name}</span>
+                  <span className="attached-contract-size">({attachedContract.size})</span>
+                </div>
                 <button
                   type="button"
-                  className="quick-chip-btn"
-                  onClick={() => handleSend("Quy định về mức tiền đặt cọc tối đa khi mua nhà dự án?")}
+                  className="btn-remove-attachment"
+                  onClick={() => setAttachedContract(null)}
+                  title="Hủy đính kèm"
                 >
-                  📝 Tiền đặt cọc tối đa
+                  <X size={14} />
                 </button>
               </div>
             )}
+
             <form
               className="input-container"
               onSubmit={(e) => {
@@ -725,14 +871,40 @@ export default function App() {
                 handleSend();
               }}
             >
+              {/* Input file ẩn cho chức năng đính kèm hợp đồng */}
+              <input
+                type="file"
+                ref={contractFileInputRef}
+                style={{ display: "none" }}
+                accept=".pdf,.docx,.doc,.txt,.md"
+                onChange={handleContractFileUpload}
+              />
+              <button
+                type="button"
+                className={`btn-attach ${attachedContract ? "has-file" : ""}`}
+                onClick={() => contractFileInputRef.current?.click()}
+                disabled={loading || uploadingContract}
+                title="Đính kèm file hợp đồng (.pdf, .docx, .txt, .md)"
+              >
+                {uploadingContract ? (
+                  <div className="btn-spinner-small" />
+                ) : (
+                  <Paperclip size={18} />
+                )}
+              </button>
+
               <input
                 type="text"
-                placeholder="Hỏi pháp lý, sổ đỏ, tính lãi vay, BĐS Đà Nẵng..."
+                placeholder={
+                  attachedContract
+                    ? "Nhập thêm ghi chú hoặc nhấn gửi để thẩm định hợp đồng..."
+                    : "Hỏi pháp lý, đính kèm hợp đồng, tính lãi vay, BĐS Đà Nẵng..."
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading}
               />
-              <button type="submit" className="btn-send" disabled={loading}>
+              <button type="submit" className="btn-send" disabled={loading || uploadingContract}>
                 <Send size={18} />
               </button>
             </form>

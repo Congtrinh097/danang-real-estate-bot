@@ -19,3 +19,4 @@ docling>=2.147.0
 ragas>=0.4.0
 mcp>=1.24.0
 langchain-mcp-adapters>=0.1.0
+tavily-python>=0.5.0
