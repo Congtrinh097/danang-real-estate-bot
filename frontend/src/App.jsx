@@ -23,7 +23,11 @@ import {
   ArrowRight,
   Menu,
   Paperclip,
-  Copy
+  Copy,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
@@ -58,11 +62,27 @@ const createNewThreadObject = () => {
   };
 };
 
+const USER_ID_KEY = "danang_re_user_id";
+
+const getOrCreateUserId = () => {
+  try {
+    let uid = localStorage.getItem(USER_ID_KEY);
+    if (!uid) {
+      uid = "usr_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem(USER_ID_KEY, uid);
+    }
+    return uid;
+  } catch (e) {
+    return "usr_guest_" + Math.random().toString(36).substring(2, 8);
+  }
+};
+
 const STORAGE_KEY = "danang_re_threads";
 const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 export default function App() {
+  const [userId] = useState(() => getOrCreateUserId());
   // Navigation: "chat" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
   // Mobile Sidebar Drawer Toggle
@@ -284,7 +304,15 @@ export default function App() {
     }
 
     const userMsg = { sender: "user", text: userDisplayText, properties: [], citations: [] };
-    let botMsg = { sender: "bot", text: "", properties: [], citations: [], isThinking: true };
+    let botMsg = {
+      sender: "bot",
+      text: "",
+      properties: [],
+      citations: [],
+      isThinking: true,
+      thinkingStatus: "Đang phân tích yêu cầu...",
+      thinkingHistory: ["Đang phân tích yêu cầu..."]
+    };
 
     // Thêm câu hỏi người dùng và bubble bot đang suy nghĩ vào ngay lập tức
     updateActiveThreadMessages((prev) => [...prev, userMsg, botMsg]);
@@ -295,7 +323,11 @@ export default function App() {
       const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: backendPayloadText, thread_id: activeThreadId }),
+        body: JSON.stringify({
+          message: backendPayloadText,
+          thread_id: activeThreadId,
+          user_id: userId
+        }),
       });
 
       if (!response.body) throw new Error("Không nhận được luồng stream");
@@ -317,7 +349,14 @@ export default function App() {
 
             try {
               const data = JSON.parse(raw);
-              if (data.type === "token") {
+              if (data.type === "status") {
+                botMsg.thinkingStatus = data.message;
+                if (!botMsg.thinkingHistory) botMsg.thinkingHistory = [];
+                if (!botMsg.thinkingHistory.includes(data.message)) {
+                  botMsg.thinkingHistory.push(data.message);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "token") {
                 botMsg.isThinking = false;
                 botMsg.text += data.content;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
@@ -326,6 +365,10 @@ export default function App() {
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "citations") {
                 botMsg.citations = data.data;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "hitl_approval_request") {
+                botMsg.hitlRequest = data.data;
+                botMsg.isThinking = false;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "budget_update") {
                 if (data.data) {
@@ -350,6 +393,95 @@ export default function App() {
     } finally {
       botMsg.isThinking = false;
       updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg, isThinking: false }]);
+      setLoading(false);
+    }
+  };
+
+  const handleHITLDecision = async (decision, editedArgs = null, rejectReason = null) => {
+    if (loading || !activeThreadId) return;
+    setLoading(true);
+
+    // Xóa hitlRequest khỏi botMsg trước đó để ẩn nút duyệt
+    updateActiveThreadMessages((prev) => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].hitlRequest) {
+          copy[i] = { ...copy[i], hitlResolved: decision };
+          break;
+        }
+      }
+      return copy;
+    });
+
+    let followupMsg = {
+      sender: "bot",
+      text: "",
+      properties: [],
+      citations: [],
+      isThinking: true,
+      thinkingStatus: "Đang ghi nhận quyết định...",
+      thinkingHistory: ["Đang ghi nhận quyết định..."]
+    };
+    updateActiveThreadMessages((prev) => [...prev, followupMsg]);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/chat/hitl-decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: activeThreadId,
+          user_id: userId,
+          decision: decision,
+          edited_args: editedArgs,
+          reject_message: rejectReason
+        })
+      });
+
+      if (!response.body) throw new Error("Không nhận được response stream");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const raw = line.replace("data: ", "").trim();
+            if (raw === "[DONE]") break;
+            try {
+              const data = JSON.parse(raw);
+              if (data.type === "status") {
+                followupMsg.thinkingStatus = data.message;
+                if (!followupMsg.thinkingHistory) followupMsg.thinkingHistory = [];
+                if (!followupMsg.thinkingHistory.includes(data.message)) {
+                  followupMsg.thinkingHistory.push(data.message);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              } else if (data.type === "token") {
+                followupMsg.isThinking = false;
+                followupMsg.text += data.content;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              } else if (data.type === "error") {
+                followupMsg.isThinking = false;
+                followupMsg.text = "Lỗi: " + data.content;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      followupMsg.isThinking = false;
+      followupMsg.text = "Có lỗi xảy ra khi xác nhận: " + e.message;
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+    } finally {
+      followupMsg.isThinking = false;
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg, isThinking: false }]);
       setLoading(false);
     }
   };
@@ -478,40 +610,68 @@ export default function App() {
 
   // Render text có chèn các badge trích dẫn [1], [2] tương tác, trạng thái đang suy nghĩ và hiệu ứng stream cursor
   const renderMessageContent = (msg, isStreaming = false) => {
-    // 1. Trạng thái Đang suy nghĩ: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking
-    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0)) {
+    // 1. Trạng thái Đang suy nghĩ / Xử lý: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking (và không có hitlRequest hoặc properties)
+    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0) && !msg.hitlRequest) {
+      const currentStatus = msg.thinkingStatus || "Đang phân tích yêu cầu...";
+      const history = msg.thinkingHistory || [currentStatus];
+
       return (
-        <div className="thinking-bubble">
-          <div className="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div className="thinking-card-wrapper">
+          <div className="thinking-status-box">
+            <div className="thinking-status-header">
+              <div className="thinking-icon-pulse">
+                <Sparkles size={16} className="sparkle-icon" />
+              </div>
+              <div className="thinking-status-details">
+                <span className="thinking-status-title">Agent Workflow</span>
+                <span className="thinking-status-desc">{currentStatus}</span>
+              </div>
+              <div className="thinking-spinner">
+                <Loader2 size={16} className="spin-icon" />
+              </div>
+            </div>
+
+            {history.length > 1 && (
+              <div className="thinking-steps-track">
+                {history.map((step, sIdx) => {
+                  const isCurrent = sIdx === history.length - 1;
+                  return (
+                    <div key={sIdx} className={`thinking-step-item ${isCurrent ? "current" : "completed"}`}>
+                      <div className="step-indicator">
+                        {isCurrent ? <span className="step-dot-active" /> : <Check size={11} />}
+                      </div>
+                      <span className="step-text">{step}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <span className="thinking-text">Đang suy nghĩ...</span>
         </div>
       );
     }
 
-    if (!msg.text) return null;
     const citations = msg.citations || [];
 
     // Nút footer chỉ hiển thị khi có citations hợp lệ VÀ tin nhắn thực sự có chứa trích dẫn pháp lý
-    const hasCitationsInText = /\[\d+\]/.test(msg.text);
+    const hasCitationsInText = msg.text ? /\[\d+\]/.test(msg.text) : false;
     const hasValidCitations = citations.length > 0 && hasCitationsInText;
 
     return (
       <div>
-        <div className="bubble bot-bubble">
-          <div className="markdown-body">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkBreaks]}
-              components={createMarkdownComponents(citations)}
-            >
-              {msg.text}
-            </ReactMarkdown>
-            {isStreaming && <span className="streaming-cursor" />}
+        {msg.text && (
+          <div className="bubble bot-bubble">
+            <div className="markdown-body">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={createMarkdownComponents(citations)}
+              >
+                {msg.text}
+              </ReactMarkdown>
+              {isStreaming && <span className="streaming-cursor" />}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý và đã stream xong */}
         {hasValidCitations && !isStreaming && (
@@ -521,6 +681,73 @@ export default function App() {
           >
             <Scale size={14} /> Xem {citations.length} căn cứ pháp lý đã trích dẫn
           </button>
+        )}
+
+        {/* Thẻ xác nhận đặt lịch xem nhà qua Human-In-The-Loop */}
+        {msg.hitlRequest && (
+          <div className="hitl-approval-card">
+            <div className="hitl-header">
+              <CheckCircle2 size={18} className="hitl-icon" />
+              <h4>
+                {msg.hitlResolved === "approve"
+                  ? "Đã xác nhận đặt lịch xem nhà"
+                  : msg.hitlResolved === "reject"
+                  ? "Đã hủy yêu cầu đặt lịch"
+                  : "Xác nhận thông tin đặt lịch xem nhà"}
+              </h4>
+            </div>
+            <p className="hitl-description">
+              {msg.hitlResolved
+                ? "Thông tin đặt lịch đã được gửi xử lý:"
+                : "Vui lòng kiểm tra lại thông tin dưới đây trước khi trợ lý lưu vào hệ thống:"}
+            </p>
+            {msg.hitlRequest.action_requests?.map((act, actIdx) => (
+              <div key={actIdx} className="hitl-action-details">
+                <div className="hitl-row">
+                  <span className="hitl-label">Khách hàng:</span>
+                  <span className="hitl-val">{act.args?.name || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">Số điện thoại:</span>
+                  <span className="hitl-val">{act.args?.phone || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">Thời gian:</span>
+                  <span className="hitl-val hitl-time">{act.args?.viewing_time || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">BĐS quan tâm:</span>
+                  <span className="hitl-val">{act.args?.property_title || "Theo trao đổi"}</span>
+                </div>
+                {act.args?.note && (
+                  <div className="hitl-row">
+                    <span className="hitl-label">Ghi chú:</span>
+                    <span className="hitl-val">{act.args?.note}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {!msg.hitlResolved && (
+              <div className="hitl-actions">
+                <button
+                  type="button"
+                  className="btn-hitl-approve"
+                  disabled={loading}
+                  onClick={() => handleHITLDecision("approve")}
+                >
+                  <Check size={16} /> Xác nhận & Đặt lịch ngay
+                </button>
+                <button
+                  type="button"
+                  className="btn-hitl-reject"
+                  disabled={loading}
+                  onClick={() => handleHITLDecision("reject", null, "Khách hàng đổi ý, không muốn đặt lịch nữa.")}
+                >
+                  <X size={16} /> Hủy bỏ
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -681,10 +908,30 @@ export default function App() {
             onClick={() => {
               setActiveTab("chat");
               setIsMobileSidebarOpen(false);
+              handleSend("Tôi muốn đặt lịch xem nhà tại dự án Monarchy Sơn Trà");
+            }}
+          >
+            📅 Đặt lịch xem căn hộ Monarchy
+          </button>
+          <button
+            className="prompt-btn"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend("Kiểm tra giúp tôi các lịch hẹn xem nhà đã đặt");
+            }}
+          >
+            📋 Xem lại các lịch đã hẹn
+          </button>
+          <button
+            className="prompt-btn"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend(SAMPLE_CONTRACT_PROMPT);
             }}
           >
-            📋 Rà soát Hợp đồng cọc mẫu (bẫy cọc 15%)
+            ⚖️ Rà soát Hợp đồng cọc mẫu (bẫy cọc 15%)
           </button>
           <button
             className="prompt-btn"
@@ -694,27 +941,7 @@ export default function App() {
               handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?");
             }}
           >
-            ⚖️ Người nước ngoài mua chung cư ĐN
-          </button>
-          <button
-            className="prompt-btn"
-            onClick={() => {
-              setActiveTab("chat");
-              setIsMobileSidebarOpen(false);
-              handleSend("Điều kiện để nhà ở thương mại được phép mua bán theo Luật Nhà ở mới nhất?");
-            }}
-          >
-            📜 Điều kiện mua bán nhà ở thương mại
-          </button>
-          <button
-            className="prompt-btn"
-            onClick={() => {
-              setActiveTab("chat");
-              setIsMobileSidebarOpen(false);
-              handleSend("Quy định về mức tiền đặt cọc tối đa khi mua nhà dự án?");
-            }}
-          >
-            📝 Quy định tiền đặt cọc mua nhà
+            📜 Người nước ngoài mua chung cư ĐN
           </button>
           <button
             className="prompt-btn"
@@ -747,7 +974,7 @@ export default function App() {
                   {activeThread?.title || "Trợ lý AI Nhà Đất & Pháp Lý Đà Nẵng"}
                 </h3>
                 <p className="header-session-id">
-                  ID: <code>{activeThreadId ? activeThreadId.slice(0, 16) + (activeThreadId.length > 16 ? "..." : "") : ""}</code>
+                  ID: <code>{activeThreadId ? activeThreadId.slice(0, 16) + (activeThreadId.length > 16 ? "..." : "") : ""}</code> | Khách: <code title={userId}>{userId.slice(0, 12)}...</code>
                 </p>
               </div>
             </div>

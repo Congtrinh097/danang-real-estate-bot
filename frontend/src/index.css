@@ -539,6 +539,157 @@ html, body {
 }
 
 /* Trạng thái đang suy nghĩ & Streaming cursor */
+.thinking-card-wrapper {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.thinking-status-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.06);
+  padding: 12px 16px;
+  min-width: 280px;
+  max-width: 480px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.thinking-status-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thinking-icon-pulse {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  flex-shrink: 0;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0);
+  }
+}
+
+.thinking-status-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.thinking-status-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.thinking-status-desc {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.thinking-spinner {
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.spin-icon {
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Các bước workflow trước đó */
+.thinking-steps-track {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.thinking-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.thinking-step-item.completed {
+  color: #64748b;
+}
+
+.thinking-step-item.current {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.step-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.thinking-step-item.completed .step-indicator {
+  background-color: #ecfdf5;
+  color: #10b981;
+}
+
+.thinking-step-item.current .step-indicator {
+  background-color: #eff6ff;
+}
+
+.step-dot-active {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #2563eb;
+  animation: thinking-bounce 1s infinite ease-in-out;
+}
+
+.step-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
 .thinking-bubble {
   display: inline-flex;
   align-items: center;
@@ -1904,3 +2055,135 @@ html, body {
   }
 }
 
+
+/* ==================== HUMAN IN THE LOOP (HITL) APPROVAL CARD ==================== */
+.hitl-approval-card {
+  margin-top: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1.5px solid #93c5fd;
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+  animation: slideDownBanner 0.3s ease-out;
+}
+
+.hitl-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hitl-header h4 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin: 0;
+}
+
+.hitl-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.hitl-description {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.hitl-action-details {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hitl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.hitl-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.hitl-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.hitl-val {
+  color: #0f172a;
+  font-weight: 600;
+  text-align: right;
+}
+
+.hitl-val.hitl-time {
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.hitl-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-hitl-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+}
+
+.btn-hitl-approve:hover:not(:disabled) {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+.btn-hitl-reject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-hitl-reject:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.btn-hitl-approve:disabled,
+.btn-hitl-reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

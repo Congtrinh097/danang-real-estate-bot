@@ -18,7 +18,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
-from agent import real_estate_agent
+from langgraph.types import Command
+from agent import real_estate_agent, property_agent
+from appointment_tools import set_current_user_id
+from appointment_service import appointment_service
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from document_converter import DocumentConverter
@@ -45,6 +48,14 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     thread_id: str = "default_user_session"
+    user_id: Optional[str] = "default_user"
+
+class HITLDecisionRequest(BaseModel):
+    thread_id: str
+    user_id: Optional[str] = "default_user"
+    decision: str = "approve"  # 'approve', 'reject', 'edit'
+    edited_args: Optional[Dict[str, Any]] = None
+    reject_message: Optional[str] = None
 
 class LeadRequest(BaseModel):
     name: str
@@ -98,7 +109,8 @@ def get_alerts():
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
-    # Thiết lập TraceContext cho AgentOps
+    # Thiết lập TraceContext cho AgentOps và gắn user_id vào context
+    set_current_user_id(req.user_id or "default_user")
     request_id = f"req_{int(asyncio.get_event_loop().time() * 1000)}"
     TraceContext.set_context(request_id=request_id, thread_id=req.thread_id, workload_type="chat")
 
@@ -138,8 +150,43 @@ async def chat_stream(req: ChatRequest):
             print(f"[WARN] Pre-check thread budget failed: {check_err}")
 
         try:
-            # 1. Chạy Graph
-            final_state = real_estate_agent.invoke(inputs, config=config)
+            # Thông báo trạng thái bắt đầu
+            yield f"data: {json.dumps({'type': 'status', 'stage': 'routing', 'message': 'Đang phân tích yêu cầu của bạn...'})}\n\n"
+            await asyncio.sleep(0.01)
+
+            final_state = {}
+            intent_identified = None
+
+            # Stream theo updates của từng node trong LangGraph
+            async for step_update in real_estate_agent.astream(inputs, config=config, stream_mode="updates"):
+                for node_name, node_output in step_update.items():
+                    if isinstance(node_output, dict):
+                        final_state.update(node_output)
+
+                    # Khi node route_intent hoàn thành, phát hiện ý định và cập nhật trạng thái chi tiết cho người dùng
+                    if node_name == "route_intent":
+                        intent_identified = node_output.get("intent") if isinstance(node_output, dict) else None
+                        status_map = {
+                            "search_property": "Đang tìm kiếm bất động sản phù hợp tại Đà Nẵng...",
+                            "legal_consultation": "Đang tra cứu cơ sở dữ liệu Luật Đất Đai & Nhà Ở...",
+                            "mortgage_calculation": "Đang kết nối công cụ tính toán lãi suất & gói vay...",
+                            "contract_audit": "Đang rà soát điều khoản hợp đồng & kiểm tra bẫy pháp lý...",
+                            "general_chat": "Đang soạn nội dung phản hồi...",
+                            "out_of_scope": "Đang kiểm tra phạm vi hỗ trợ...",
+                            "rule_violation": "Đang kiểm tra tiêu chuẩn an toàn..."
+                        }
+                        msg = status_map.get(intent_identified, "Đang xử lý thông tin...")
+                        yield f"data: {json.dumps({'type': 'status', 'stage': intent_identified or 'processing', 'message': msg})}\n\n"
+                        await asyncio.sleep(0.01)
+
+                    elif node_name == "property_agent":
+                        yield f"data: {json.dumps({'type': 'status', 'stage': 'property_completed', 'message': 'Đã hoàn tất tìm kiếm BĐS'})}\n\n"
+                    elif node_name == "legal_advisory":
+                        yield f"data: {json.dumps({'type': 'status', 'stage': 'legal_completed', 'message': 'Đã tổng hợp căn cứ pháp lý'})}\n\n"
+                    elif node_name == "mortgage_calc":
+                        yield f"data: {json.dumps({'type': 'status', 'stage': 'mortgage_completed', 'message': 'Đã hoàn tất tính toán phương án vay'})}\n\n"
+                    elif node_name == "contract_audit":
+                        yield f"data: {json.dumps({'type': 'status', 'stage': 'contract_completed', 'message': 'Đã hoàn thành thẩm định hợp đồng'})}\n\n"
             
             # Gửi danh sách BĐS tìm thấy (nếu có) trước để ReactJS render Cards
             properties = final_state.get("found_properties", [])
@@ -147,10 +194,15 @@ async def chat_stream(req: ChatRequest):
                 yield f"data: {json.dumps({'type': 'properties', 'data': properties})}\n\n"
 
             # Gửi danh sách căn cứ trích dẫn pháp lý (chỉ gửi khi intent lượt này là legal_consultation và có citations)
-            intent = final_state.get("intent")
+            intent = final_state.get("intent") or intent_identified
             citations = final_state.get("citations", []) if intent == "legal_consultation" else []
             if citations:
                 yield f"data: {json.dumps({'type': 'citations', 'data': citations})}\n\n"
+
+            # Gửi sự kiện HITL interrupt nếu có yêu cầu duyệt đặt lịch hẹn
+            hitl_interrupt = final_state.get("hitl_interrupt")
+            if hitl_interrupt:
+                yield f"data: {json.dumps({'type': 'hitl_approval_request', 'data': hitl_interrupt})}\n\n"
 
             # Gửi phản hồi văn bản của Bot
             messages = final_state.get("messages", [])
@@ -188,6 +240,62 @@ async def chat_stream(req: ChatRequest):
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/api/chat/hitl-decision")
+async def hitl_decision_stream(req: HITLDecisionRequest):
+    """Tiếp nhận quyết định của người dùng (Approve / Reject / Edit) sau khi bị ngắt bởi HumanInTheLoopMiddleware và stream kết quả hoàn thành"""
+    set_current_user_id(req.user_id or "default_user")
+    request_id = f"req_hitl_{int(asyncio.get_event_loop().time() * 1000)}"
+    TraceContext.set_context(request_id=request_id, thread_id=req.thread_id, workload_type="chat")
+
+    sub_config = {"configurable": {"thread_id": f"prop_sub_{req.thread_id}"}}
+
+    # Xây dựng decision payload theo cấu trúc của HumanInTheLoopMiddleware
+    decision_payload = {"type": req.decision}
+    if req.decision == "reject":
+        decision_payload["message"] = req.reject_message or "Khách hàng đã hủy yêu cầu đặt lịch xem nhà này."
+    elif req.decision == "edit" and req.edited_args:
+        decision_payload["edited_action"] = {
+            "name": "book_viewing_appointment",
+            "args": req.edited_args
+        }
+
+    async def event_generator():
+        try:
+            yield f"data: {json.dumps({'type': 'status', 'stage': 'hitl_resuming', 'message': 'Đang ghi nhận quyết định và hoàn tất thủ tục...'})}\n\n"
+            await asyncio.sleep(0.01)
+
+            # Resume property_agent với Command
+            cmd = Command(resume={"decisions": [decision_payload]})
+            agent_result = await asyncio.to_thread(property_agent.invoke, cmd, config=sub_config)
+            agent_messages = agent_result.get("messages", [])
+
+            reply_text = ""
+            if agent_messages:
+                reply_text = agent_messages[-1].content
+            else:
+                reply_text = "Đã xử lý xong phản hồi của bạn."
+
+            chunk_size = 6
+            for i in range(0, len(reply_text), chunk_size):
+                chunk = reply_text[i:i+chunk_size]
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+                await asyncio.sleep(0.015)
+
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.get("/api/appointments")
+def get_user_appointments_api(user_id: str, status: Optional[str] = None):
+    """API lấy danh sách lịch hẹn của user"""
+    return {
+        "success": True,
+        "data": appointment_service.get_user_appointments(user_id=user_id, status=status)
+    }
 
 @app.post("/api/leads")
 def submit_lead(lead: LeadRequest):

@@ -28,6 +28,16 @@ from mortgage_mcp_client import (
     create_mortgage_agent,
     get_mortgage_mcp_tools
 )
+from appointment_tools import (
+    appointment_tools,
+    book_viewing_appointment,
+    get_user_appointments,
+    update_appointment,
+    cancel_appointment,
+    set_current_user_id,
+    get_current_user_id
+)
+from langchain.agents.middleware import HumanInTheLoopMiddleware
 
 # 1. Định nghĩa Schema phân loại ý định (Router Agent & Input Guardrails)
 class IntentClassification(BaseModel):
@@ -80,6 +90,7 @@ class AgentState(TypedDict):
     criteria: Optional[Dict[str, Any]]
     found_properties: List[Dict[str, Any]]
     citations: Optional[List[Dict[str, Any]]]
+    hitl_interrupt: Optional[Dict[str, Any]]
 
 # Khởi tạo LLM với cơ chế Fallback (ưu tiên custom OPENAI_BASE_URL, tự động fallback về endpoint OpenAI chính thức nếu lỗi)
 primary_llm_kwargs = {
@@ -141,7 +152,14 @@ def search_danang_properties(
         limit=limit
     )
 
-# Khởi tạo ReAct Agent chuyên trách tìm kiếm và tư vấn BĐS Đà Nẵng bằng create_agent
+# Khởi tạo ReAct Agent chuyên trách tìm kiếm BĐS và Quản lý Đặt lịch xem nhà Đà Nẵng bằng create_agent
+appointment_hitl_middleware = HumanInTheLoopMiddleware(
+    interrupt_on={"book_viewing_appointment": True},
+    description_prefix="Yêu cầu người dùng xác nhận thông tin trước khi lưu lịch hẹn xem nhà vào cơ sở dữ liệu."
+)
+
+property_agent_memory = MemorySaver()
+
 def create_property_search_agent(model: ChatOpenAI):
     system_prompt = (
         "Bạn là chuyên viên môi giới và tư vấn bất động sản cao cấp am hiểu sâu sắc thị trường TP. Đà Nẵng.\n"
@@ -151,16 +169,31 @@ def create_property_search_agent(model: ChatOpenAI):
         "   - Nếu người dùng chưa nói ngân sách cụ thể, vẫn gọi tool 'search_danang_properties' với category (ví dụ: 'rent' hoặc 'sale'), district ('Sơn Trà'), min_bedrooms (ví dụ: 2), để lấy các căn hiện có ra giới thiệu trước cho khách.\n"
         "   - Chuyển đổi chuẩn xác đơn vị tiền tệ sang số VNĐ: '15 triệu' -> 15000000, '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000.\n"
         "   - Chuẩn hóa tên quận tại Đà Nẵng: 'Hải Châu', 'Sơn Trà', 'Ngũ Hành Sơn', 'Thanh Khê', 'Cẩm Lệ', 'Liên Chiểu', 'Hòa Vang'.\n"
-        "   - Nếu người dùng để lại số điện thoại/Zalo liên hệ, hãy trân trọng ghi nhận và báo chuyên viên khu vực sẽ liên hệ ngay.\n"
-        "2. SAU KHI NHẬN KẾT QUẢ TỪ TOOL 'search_danang_properties':\n"
+        "2. QUY TRÌNH ĐẶT LỊCH XEM NHÀ (APPOINTMENT BOOKING):\n"
+        "   - Khi khách hàng muốn đặt lịch xem nhà hoặc đồng ý đi xem thực tế một căn BĐS:\n"
+        "   - Hãy kiểm tra xem đã có đủ 4 thông tin sau chưa:\n"
+        "     1. Họ và tên khách hàng (name)\n"
+        "     2. Số điện thoại / Zalo (phone)\n"
+        "     3. Thời gian hẹn cụ thể (viewing_time, ví dụ: '15:00 chiều mai', '10h sáng thứ Bảy')\n"
+        "     4. Tên căn nhà / BĐS muốn xem hoặc ghi chú thêm (property_title / note)\n"
+        "   - Nếu thiếu bất kỳ thông tin nào, hãy hỏi khéo léo để khách bổ sung đầy đủ.\n"
+        "   - KHI ĐÃ CÓ ĐỦ THÔNG TIN TRÊN: Hãy gọi tool 'book_viewing_appointment'. Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để khách hàng duyệt xác nhận trước khi lưu.\n"
+        "3. QUẢN LÝ LỊCH HẸN ĐÃ ĐẶT:\n"
+        "   - Khi khách hỏi lại lịch hẹn ('Tôi có lịch hẹn nào không?', 'Xem lại lịch đã đặt'): Gọi ngay tool 'get_user_appointments'.\n"
+        "   - Khi khách muốn dời giờ, đổi ngày, sửa ghi chú: Hỏi mã lịch hẹn hoặc căn nhà, rồi gọi tool 'update_appointment'.\n"
+        "   - Khi khách muốn hủy lịch hẹn: Hỏi mã lịch hẹn hoặc lý do hủy, rồi gọi tool 'cancel_appointment'.\n"
+        "4. SAU KHI NHẬN KẾT QUẢ TỪ TOOL 'search_danang_properties':\n"
         "   - Nếu tìm thấy BĐS: Trình bày chi tiết, làm nổi bật ưu điểm từng căn (vị trí, mức giá, diện tích, pháp lý, tiện ích view/nội thất) và chủ động mời khách đặt lịch đi xem thực tế.\n"
         "   - Nếu không tìm thấy căn nào hoàn toàn khớp: Lịch sự thông báo và khéo léo gợi ý nới lỏng ngân sách hoặc mở rộng sang các quận lân cận.\n"
         "Thái độ giao tiếp: Chuyên nghiệp, nhã nhặn, nhiệt tình và chủ động phục vụ."
     )
+    all_agent_tools = [search_danang_properties] + appointment_tools
     return create_agent(
         model=model,
-        tools=[search_danang_properties],
-        system_prompt=system_prompt
+        tools=all_agent_tools,
+        system_prompt=system_prompt,
+        middleware=[appointment_hitl_middleware],
+        checkpointer=property_agent_memory
     )
 
 property_agent = create_property_search_agent(llm)
@@ -423,6 +456,14 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         "kê đơn thuốc", "chữa đau dạ dày", "crypto", "bitcoin"
     ]
 
+    # Pre-check nhanh cho yêu cầu đặt lịch, tra cứu lịch hẹn xem nhà
+    appointment_triggers = [
+        "đặt lịch", "lịch hẹn", "hẹn xem nhà", "hẹn đi xem", "xem thực tế",
+        "hỏi lại lịch", "xem lịch", "lịch đã hẹn", "hủy lịch", "đổi lịch", "dời lịch"
+    ]
+    if any(tr in text_lower for tr in appointment_triggers):
+        return {"intent": "search_property", "citations": []}
+
     # Pre-check nhanh cho yêu cầu rà soát / thẩm định hợp đồng
     contract_audit_triggers = [
         "hợp đồng", "thỏa thuận đặt cọc", "thẩm định hợp đồng", "rà soát hợp đồng",
@@ -675,21 +716,41 @@ def contract_audit_node(state: AgentState) -> Dict[str, Any]:
         "found_properties": []
     }
 
-# 5. Node Property Search Agent (Gộp extract_criteria, search_danang_properties & generate_response thành 1 ReAct Agent)
-def property_agent_node(state: AgentState) -> Dict[str, Any]:
+# 5. Node Property Search Agent (Gộp extract_criteria, search_danang_properties & appointment booking thành ReAct Agent)
+def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     current_criteria = state.get("criteria") or {}
     last_user_message = all_messages[-1].content if all_messages else ""
 
+    thread_id = None
+    if config and isinstance(config, dict):
+        thread_id = config.get("configurable", {}).get("thread_id")
+    agent_config = {"configurable": {"thread_id": f"prop_sub_{thread_id or 'default'}"}}
+
     try:
         # Gọi Property ReAct Agent được bảo vệ qua ModelCallGuard
         agent_result = ModelCallGuard.guard_call(
-            lambda: property_agent.invoke({"messages": list(all_messages[-6:])}),
+            lambda: property_agent.invoke({"messages": list(all_messages[-6:])}, config=agent_config),
             model_name=settings.OPENAI_MODEL_NAME,
             estimated_input_tokens=1500,
             estimated_output_tokens=600,
             workload_type="chat"
         )
+
+        # Kiểm tra xem có interrupt từ HumanInTheLoopMiddleware hay không
+        sub_state = property_agent.get_state(agent_config)
+        hitl_interrupt = None
+        for task in sub_state.tasks:
+            interrupts = getattr(task, "interrupts", ())
+            if interrupts:
+                # Tìm thấy yêu cầu duyệt từ HumanInTheLoopMiddleware
+                for intr in interrupts:
+                    intr_val = getattr(intr, "value", {})
+                    hitl_interrupt = intr_val
+                    break
+            if hitl_interrupt:
+                break
+
         agent_messages = agent_result.get("messages", [])
 
         found_properties: List[Dict[str, Any]] = []
@@ -728,10 +789,12 @@ def property_agent_node(state: AgentState) -> Dict[str, Any]:
             "messages": [reply],
             "found_properties": found_properties,
             "criteria": merged,
-            "citations": []
+            "citations": [],
+            "hitl_interrupt": hitl_interrupt
         }
 
-    except Exception:
+    except Exception as exc:
+        print(f"[WARN] Property Agent error: {exc}")
         # Heuristic fallback an toàn nếu gặp sự cố kết nối
         text_lower = last_user_message.lower()
         cat = "rent" if "thuê" in text_lower else ("sale" if "mua" in text_lower else None)
