@@ -63,6 +63,82 @@ class IntentClassification(BaseModel):
     )
     reason: Optional[str] = Field(None, description="Lý do phân loại ý định")
 
+# Hàm làm sạch lịch sử tin nhắn để tránh lỗi 400 (Bad Request: tool_calls mồ côi hoặc không hợp lệ)
+def sanitize_messages_for_prompt(messages: Sequence[BaseMessage], max_messages: int = 6) -> List[BaseMessage]:
+    """
+    Chuẩn hóa danh sách tin nhắn trước khi truyền vào Prompt/LCEL Chain thông thường:
+    1. Chuyển đổi các AIMessage có tool_calls thành tin nhắn text thông thường (loại bỏ trường tool_calls).
+    2. Loại bỏ các ToolMessage độc lập (vì các prompt LCEL thường không khai báo công cụ).
+    3. Đảm bảo cấu trúc hội thoại luôn hợp lệ đối với OpenAI/Azure.
+    """
+    if not messages:
+        return []
+
+    # Lấy các tin nhắn gần nhất
+    recent = list(messages[-max_messages:])
+    cleaned: List[BaseMessage] = []
+
+    for m in recent:
+        # Nếu là ToolMessage thì bỏ qua đối với các chain không dùng tool
+        if getattr(m, "type", "") == "tool" or m.__class__.__name__ == "ToolMessage":
+            continue
+
+        # Nếu là AIMessage có tool_calls, chỉ giữ lại nội dung văn bản content
+        if hasattr(m, "tool_calls") and m.tool_calls:
+            text_content = m.content if isinstance(m.content, str) else str(m.content)
+            if not text_content.strip():
+                text_content = "Đang tra cứu dữ liệu..."
+            cleaned.append(AIMessage(content=text_content))
+        else:
+            cleaned.append(m)
+
+    # Đảm bảo danh sách không rỗng
+    if not cleaned and messages:
+        last = messages[-1]
+        cleaned = [HumanMessage(content=last.content if isinstance(last.content, str) else str(last.content))]
+
+    return cleaned
+
+
+def sanitize_messages_for_react_agent(messages: Sequence[BaseMessage], max_messages: int = 6) -> List[BaseMessage]:
+    """
+    Chuẩn hóa danh sách tin nhắn trước khi truyền vào Sub-Agent ReAct:
+    Đảm bảo tính toàn vẹn của cặp (AIMessage có tool_calls) và ToolMessage tương ứng.
+    Nếu lát cắt cắt đứt ToolMessage khiến tool_call bị mồ côi, ta chuyển đổi AIMessage đó thành text thường.
+    """
+    if not messages:
+        return []
+
+    recent = list(messages[-max_messages:])
+    
+    # Tập hợp các tool_call_id có ToolMessage phản hồi trong slice
+    responded_tool_call_ids = set()
+    for m in recent:
+        if getattr(m, "type", "") == "tool" or m.__class__.__name__ == "ToolMessage":
+            tid = getattr(m, "tool_call_id", None)
+            if tid:
+                responded_tool_call_ids.add(tid)
+
+    cleaned: List[BaseMessage] = []
+    for m in recent:
+        # Nếu là AIMessage có tool_calls
+        if hasattr(m, "tool_calls") and m.tool_calls:
+            # Kiểm tra xem TẤT CẢ tool_call_id trong message này có mặt trong responded_tool_call_ids không
+            all_responded = all(tc.get("id") in responded_tool_call_ids for tc in m.tool_calls if isinstance(tc, dict))
+            if all_responded:
+                cleaned.append(m)
+            else:
+                # Nếu thiếu ToolMessage phản hồi trong slice, chuyển thành text để tránh lỗi 400
+                text_content = m.content if isinstance(m.content, str) else str(m.content)
+                if not text_content.strip():
+                    text_content = "Đã tìm kiếm thông tin theo yêu cầu."
+                cleaned.append(AIMessage(content=text_content))
+        else:
+            cleaned.append(m)
+
+    return cleaned
+
+
 # Schema bóc tách tiêu chí BĐS (Slot Extraction)
 class PropertyCriteria(BaseModel):
     category: Optional[str] = Field(None, description="Loại giao dịch: 'rent' (thuê) hoặc 'sale' (mua bán)")
@@ -170,14 +246,14 @@ def create_property_search_agent(model: ChatOpenAI):
         "   - Chuyển đổi chuẩn xác đơn vị tiền tệ sang số VNĐ: '15 triệu' -> 15000000, '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000.\n"
         "   - Chuẩn hóa tên quận tại Đà Nẵng: 'Hải Châu', 'Sơn Trà', 'Ngũ Hành Sơn', 'Thanh Khê', 'Cẩm Lệ', 'Liên Chiểu', 'Hòa Vang'.\n"
         "2. QUY TRÌNH ĐẶT LỊCH XEM NHÀ (APPOINTMENT BOOKING):\n"
-        "   - Khi khách hàng muốn đặt lịch xem nhà hoặc đồng ý đi xem thực tế một căn BĐS:\n"
-        "   - Hãy kiểm tra xem đã có đủ 4 thông tin sau chưa:\n"
+        "   - Khi khách hàng muốn đặt lịch xem nhà, hoặc cung cấp thông tin liên hệ / thời gian xem nhà:\n"
+        "   - Các thông tin cần thiết:\n"
         "     1. Họ và tên khách hàng (name)\n"
         "     2. Số điện thoại / Zalo (phone)\n"
         "     3. Thời gian hẹn cụ thể (viewing_time, ví dụ: '15:00 chiều mai', '10h sáng thứ Bảy')\n"
-        "     4. Tên căn nhà / BĐS muốn xem hoặc ghi chú thêm (property_title / note)\n"
-        "   - Nếu thiếu bất kỳ thông tin nào, hãy hỏi khéo léo để khách bổ sung đầy đủ.\n"
-        "   - KHI ĐÃ CÓ ĐỦ THÔNG TIN TRÊN: Hãy gọi tool 'book_viewing_appointment'. Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để khách hàng duyệt xác nhận trước khi lưu.\n"
+        "     4. Tên căn nhà / BĐS muốn xem (property_title): Hãy trích xuất từ tên dự án / BĐS mà khách hoặc trợ lý đã trao đổi trước đó (ví dụ: 'Căn hộ Monarchy Sơn Trà', 'Dự án Monarchy Sơn Trà') nếu khách không nêu lại trong tin nhắn hiện tại.\n"
+        "   - Nếu thiếu tên, số điện thoại hoặc giờ hẹn: Hãy hỏi khéo léo để khách bổ sung.\n"
+        "   - KHI ĐÃ CÓ TÊN, SỐ ĐIỆN THOẠI VÀ GIỜ HẸN (kèm tên BĐS từ ngữ cảnh): BẮT BUỘC GỌI NGAY tool 'book_viewing_appointment' (note có thể để trống ''), KHÔNG ĐƯỢC tự ý trả lời bằng lời hứa suông hay cảm ơn mà không gọi tool! Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để hiển thị thẻ xác nhận cho khách hàng duyệt.\n"
         "3. QUẢN LÝ LỊCH HẸN ĐÃ ĐẶT:\n"
         "   - Khi khách hỏi lại lịch hẹn ('Tôi có lịch hẹn nào không?', 'Xem lại lịch đã đặt'): Gọi ngay tool 'get_user_appointments'.\n"
         "   - Khi khách muốn dời giờ, đổi ngày, sửa ghi chú: Hỏi mã lịch hẹn hoặc căn nhà, rồi gọi tool 'update_appointment'.\n"
@@ -486,7 +562,8 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
 
     try:
         invoke_kwargs = {"config": config} if config else {}
-        result = router_chain.invoke({"messages": all_messages[-4:]}, **invoke_kwargs)
+        cleaned_router_msgs = sanitize_messages_for_prompt(all_messages, max_messages=4)
+        result = router_chain.invoke({"messages": cleaned_router_msgs}, **invoke_kwargs)
         intent = result.intent
     except Exception:
         # Heuristic fallback an toàn
@@ -534,7 +611,8 @@ def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
     try:
         # 1. Ủy thác câu hỏi cho Mortgage ReAct Agent (được tạo bởi create_agent + langchain-mcp-adapters)
         # Agent tự động thực hiện vòng lặp ReAct: suy luận -> gọi tool MCP -> nhận kết quả -> trả lời
-        agent_result = mortgage_agent.invoke({"messages": list(all_messages[-4:])})
+        cleaned_mortgage_msgs = sanitize_messages_for_react_agent(all_messages, max_messages=4)
+        agent_result = mortgage_agent.invoke({"messages": cleaned_mortgage_msgs})
         agent_messages = agent_result.get("messages", [])
         if agent_messages:
             reply = agent_messages[-1]
@@ -592,7 +670,8 @@ def out_of_scope_response_node(state: AgentState) -> Dict[str, Any]:
     intent = state.get("intent")
 
     try:
-        content = out_of_scope_chain.invoke({"messages": all_messages[-6:]})
+        cleaned_msgs = sanitize_messages_for_prompt(all_messages, max_messages=6)
+        content = out_of_scope_chain.invoke({"messages": cleaned_msgs})
         reply = AIMessage(content=content)
     except Exception:
         if intent == "rule_violation":
@@ -612,7 +691,8 @@ def general_chat_response_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
 
     try:
-        content = general_chat_chain.invoke({"messages": all_messages[-6:]})
+        cleaned_msgs = sanitize_messages_for_prompt(all_messages, max_messages=6)
+        content = general_chat_chain.invoke({"messages": cleaned_msgs})
         reply = AIMessage(content=content)
     except Exception:
         reply = AIMessage(content="Xin chào anh/chị! Em là trợ lý AI tư vấn Bất động sản tại thành phố Đà Nẵng. Em có thể hỗ trợ anh/chị tìm thuê hoặc mua căn hộ, nhà phố, đất nền theo ngân sách và vị trí mong muốn ạ!")
@@ -640,9 +720,10 @@ def legal_advisory_node(state: AgentState) -> Dict[str, Any]:
         )
 
     try:
+        cleaned_msgs = sanitize_messages_for_prompt(all_messages, max_messages=6)
         content = legal_advisory_chain.invoke({
             "context_str": context_str,
-            "messages": all_messages[-6:]
+            "messages": cleaned_msgs
         })
         reply = AIMessage(content=content)
     except Exception:
@@ -728,9 +809,11 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
     agent_config = {"configurable": {"thread_id": f"prop_sub_{thread_id or 'default'}"}}
 
     try:
+        # Làm sạch lát cắt tin nhắn trước khi truyền vào Sub-Agent ReAct
+        cleaned_agent_msgs = sanitize_messages_for_react_agent(all_messages, max_messages=6)
         # Gọi Property ReAct Agent được bảo vệ qua ModelCallGuard
         agent_result = ModelCallGuard.guard_call(
-            lambda: property_agent.invoke({"messages": list(all_messages[-6:])}, config=agent_config),
+            lambda: property_agent.invoke({"messages": cleaned_agent_msgs}, config=agent_config),
             model_name=settings.OPENAI_MODEL_NAME,
             estimated_input_tokens=1500,
             estimated_output_tokens=600,
