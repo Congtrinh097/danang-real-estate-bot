@@ -1,7 +1,10 @@
 from typing import Annotated, Sequence, TypedDict, Optional, List, Dict, Any, Literal
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+import json
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
+from langchain.tools import tool
+from langchain.agents import create_agent
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -101,6 +104,58 @@ else:
 # Khởi tạo ReAct Agent chuyên trách tính lãi suất & tài chính vay mua BĐS Đà Nẵng
 # Sử dụng create_agent kết hợp tool calling từ langchain-mcp-adapters
 mortgage_agent = create_mortgage_agent(llm)
+
+# Tool tìm kiếm BĐS Đà Nẵng kết nối với cơ sở dữ liệu vector Qdrant
+@tool
+def search_danang_properties(
+    query: str,
+    category: Optional[str] = None,
+    district: Optional[str] = None,
+    max_price: Optional[float] = None,
+    min_bedrooms: Optional[int] = None,
+    limit: int = 3
+) -> List[Dict[str, Any]]:
+    """Tìm kiếm căn hộ, nhà phố, đất nền tại thành phố Đà Nẵng từ cơ sở dữ liệu Qdrant theo tiêu chí khách hàng.
+    Args:
+        query: Từ khóa mô tả tiện ích hoặc vị trí (ví dụ: 'gần biển', 'view sông Hàn', 'full nội thất', 'kiệt ô tô').
+        category: Loại giao dịch: 'rent' (cho thuê) hoặc 'sale' (mua bán).
+        district: Tên quận chuẩn tại Đà Nẵng ('Hải Châu', 'Sơn Trà', 'Ngũ Hành Sơn', 'Thanh Khê', 'Cẩm Lệ', 'Liên Chiểu', 'Hòa Vang').
+        max_price: Mức ngân sách tối đa theo số VNĐ (ví dụ: 15 triệu -> 15000000, 2 tỷ -> 2000000000, 3.5 tỷ -> 3500000000).
+        min_bedrooms: Số phòng ngủ tối thiểu (ví dụ: 1, 2, 3).
+        limit: Số lượng kết quả tối đa cần lấy (mặc định 3).
+    """
+    return qdrant_service.search_properties(
+        query=query,
+        category=category,
+        district=district,
+        max_price=max_price,
+        min_bedrooms=min_bedrooms,
+        limit=limit
+    )
+
+# Khởi tạo ReAct Agent chuyên trách tìm kiếm và tư vấn BĐS Đà Nẵng bằng create_agent
+def create_property_search_agent(model: ChatOpenAI):
+    system_prompt = (
+        "Bạn là chuyên viên môi giới và tư vấn bất động sản cao cấp am hiểu sâu sắc thị trường TP. Đà Nẵng.\n"
+        "Nhiệm vụ trọng tâm:\n"
+        "1. KHI KHÁCH HÀNG TÌM KIẾM, HỎI THUÊ HOẶC MUA BĐS TẠI ĐÀ NẴNG:\n"
+        "   - BẮT BUỘC LUÔN LUÔN gọi tool 'search_danang_properties' NGAY LẬP TỨC để kiểm tra giỏ hàng trong cơ sở dữ liệu trước khi trả lời, KHÔNG ĐƯỢC tự ý hỏi lại ngân sách nếu chưa gọi tool tra cứu.\n"
+        "   - Nếu người dùng chưa nói ngân sách cụ thể, vẫn gọi tool 'search_danang_properties' với category (ví dụ: 'rent' hoặc 'sale'), district ('Sơn Trà'), min_bedrooms (ví dụ: 2), để lấy các căn hiện có ra giới thiệu trước cho khách.\n"
+        "   - Chuyển đổi chuẩn xác đơn vị tiền tệ sang số VNĐ: '15 triệu' -> 15000000, '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000.\n"
+        "   - Chuẩn hóa tên quận tại Đà Nẵng: 'Hải Châu', 'Sơn Trà', 'Ngũ Hành Sơn', 'Thanh Khê', 'Cẩm Lệ', 'Liên Chiểu', 'Hòa Vang'.\n"
+        "   - Nếu người dùng để lại số điện thoại/Zalo liên hệ, hãy trân trọng ghi nhận và báo chuyên viên khu vực sẽ liên hệ ngay.\n"
+        "2. SAU KHI NHẬN KẾT QUẢ TỪ TOOL 'search_danang_properties':\n"
+        "   - Nếu tìm thấy BĐS: Trình bày chi tiết, làm nổi bật ưu điểm từng căn (vị trí, mức giá, diện tích, pháp lý, tiện ích view/nội thất) và chủ động mời khách đặt lịch đi xem thực tế.\n"
+        "   - Nếu không tìm thấy căn nào hoàn toàn khớp: Lịch sự thông báo và khéo léo gợi ý nới lỏng ngân sách hoặc mở rộng sang các quận lân cận.\n"
+        "Thái độ giao tiếp: Chuyên nghiệp, nhã nhặn, nhiệt tình và chủ động phục vụ."
+    )
+    return create_agent(
+        model=model,
+        tools=[search_danang_properties],
+        system_prompt=system_prompt
+    )
+
+property_agent = create_property_search_agent(llm)
 
 # Bind MCP Tools cho LLM (dự phòng tương thích ngược)
 if mortgage_langchain_tool:
@@ -396,7 +451,7 @@ def decide_route(state: AgentState) -> str:
         return "general_chat_response"
     elif intent == "legal_consultation":
         return "legal_advisory"
-    return "extract_criteria"
+    return "property_agent"
 
 # 3.0. Node Mortgage Calculation Agent (Mô hình ReAct Agent -> MCP Client Adapter -> FastMCP Tool)
 def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
@@ -588,77 +643,94 @@ def contract_audit_node(state: AgentState) -> Dict[str, Any]:
         "found_properties": []
     }
 
-# 5. Node 1: Phân tích Ý định & Bóc tách Tiêu chí (NLU / Slot Extraction qua LCEL chain)
-def extract_criteria_node(state: AgentState) -> Dict[str, Any]:
+# 5. Node Property Search Agent (Gộp extract_criteria, search_danang_properties & generate_response thành 1 ReAct Agent)
+def property_agent_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
-    last_user_message = all_messages[-1].content if all_messages else ""
     current_criteria = state.get("criteria") or {}
-    
+    last_user_message = all_messages[-1].content if all_messages else ""
+
     try:
-        criteria_obj = criteria_extraction_chain.invoke({"messages": all_messages[-6:]})
-        new_criteria = criteria_obj.model_dump()
-    except Exception:
-        new_criteria = {
-            "category": "rent" if "thuê" in last_user_message.lower() else ("sale" if "mua" in last_user_message.lower() else None),
-            "district": "Sơn Trà" if "sơn trà" in last_user_message.lower() else ("hải châu" if "hải châu" in last_user_message.lower() else ("liên chiểu" if "liên chiểu" in last_user_message.lower() else None)),
-            "max_price": 15000000.0 if "15 triệu" in last_user_message.lower() or "15000000" in last_user_message else None,
-            "min_bedrooms": 2 if "2 phòng ngủ" in last_user_message.lower() or "2pn" in last_user_message.lower() else None,
-            "keywords": last_user_message,
-            "needs_clarification": False,
-            "customer_phone": None
+        # Gọi Property ReAct Agent được khởi tạo từ create_agent
+        agent_result = property_agent.invoke({"messages": list(all_messages[-6:])})
+        agent_messages = agent_result.get("messages", [])
+
+        found_properties: List[Dict[str, Any]] = []
+        extracted_criteria = dict(current_criteria)
+
+        # Duyệt qua các thông điệp để trích xuất ToolMessage và tool call arguments
+        for msg in agent_messages:
+            # 1. Trích xuất tham số criteria từ tool call
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    if tc.get("name") == "search_danang_properties":
+                        args = tc.get("args") or {}
+                        for k, v in args.items():
+                            if v is not None and k in ["category", "district", "max_price", "min_bedrooms", "property_type"]:
+                                extracted_criteria[k] = v
+
+            # 2. Trích xuất danh sách BĐS từ ToolMessage
+            if msg.__class__.__name__ == "ToolMessage" or getattr(msg, "name", None) == "search_danang_properties":
+                content = msg.content
+                if isinstance(content, str):
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, list):
+                            found_properties = parsed
+                    except Exception:
+                        pass
+                elif isinstance(content, list):
+                    found_properties = content
+
+        reply = agent_messages[-1] if agent_messages else AIMessage(content="Dạ em có thể hỗ trợ anh/chị tìm căn hộ hoặc nhà phố phù hợp tại Đà Nẵng ạ!")
+
+        # Đồng bộ tiêu chí vào State
+        merged = merge_criteria(current_criteria, extracted_criteria)
+
+        return {
+            "messages": [reply],
+            "found_properties": found_properties,
+            "criteria": merged,
+            "citations": []
         }
 
-    updated_criteria = merge_criteria(current_criteria, new_criteria)
-    return {"criteria": updated_criteria}
-
-# 6. Node 2: Tìm kiếm trong Qdrant
-def search_properties_node(state: AgentState) -> Dict[str, Any]:
-    criteria = state.get("criteria", {}) or {}
-    all_messages = state.get("messages", [])
-    last_msg = all_messages[-1].content if all_messages else ""
-    query_text = criteria.get("keywords") or last_msg
-    
-    properties = qdrant_service.search_properties(
-        query=query_text,
-        category=criteria.get("category"),
-        district=criteria.get("district"),
-        max_price=criteria.get("max_price"),
-        min_bedrooms=criteria.get("min_bedrooms"),
-        limit=3
-    )
-    return {"found_properties": properties}
-
-# 7. Node 3: Sinh phản hồi tư vấn BĐS qua LCEL chain
-def generate_response_node(state: AgentState) -> Dict[str, Any]:
-    properties = state.get("found_properties", [])
-    all_messages = state.get("messages", [])
-    criteria = state.get("criteria", {}) or {}
-
-    if criteria.get("customer_phone"):
-        reply_text = f"Dạ em đã nhận được thông tin số điện thoại {criteria['customer_phone']}. Chuyên viên tư vấn khu vực Đà Nẵng sẽ liên hệ lại qua Zalo/Điện thoại với anh/chị ngay ạ!"
-        return {"messages": [AIMessage(content=reply_text)], "citations": []}
-
-    if not properties:
-        reply_text = "Hiện tại em chưa tìm thấy bất động sản nào khớp hoàn toàn với yêu cầu trên. Anh/chị có thể nới lỏng ngân sách hoặc mở rộng sang các quận lân cận không ạ?"
-        return {"messages": [AIMessage(content=reply_text)], "citations": []}
-
-    context_desc = "\n".join([
-        f"- {p['title']} ({p['district']}): {p['price']:,} VNĐ. {p['description']}"
-        for p in properties
-    ])
-    
-    try:
-        content = property_recommendation_chain.invoke({
-            "context_desc": context_desc,
-            "messages": all_messages[-6:]
-        })
-        reply = AIMessage(content=content)
     except Exception:
-        reply = AIMessage(content=f"Dạ em xin gửi anh/chị {len(properties)} bất động sản phù hợp nhất tại Đà Nẵng theo yêu cầu. Anh/chị có muốn em hỗ trợ đặt lịch đi xem thực tế căn nào không ạ?")
+        # Heuristic fallback an toàn nếu gặp sự cố kết nối
+        text_lower = last_user_message.lower()
+        cat = "rent" if "thuê" in text_lower else ("sale" if "mua" in text_lower else None)
+        dist = "Sơn Trà" if "sơn trà" in text_lower else ("hải châu" if "hải châu" in text_lower else None)
+        price = 15000000.0 if "15 triệu" in text_lower else None
 
-    return {"messages": [reply], "citations": []}
+        props = qdrant_service.search_properties(
+            query=last_user_message,
+            category=cat,
+            district=dist,
+            max_price=price,
+            limit=3
+        )
+        if props:
+            p_desc = "\n".join([f"- {p['title']} ({p['district']}): {p['price']:,} VNĐ" for p in props])
+            reply_text = f"Dạ em xin gửi anh/chị danh sách bất động sản phù hợp tại Đà Nẵng:\n{p_desc}\nAnh/chị có muốn đặt lịch đi xem thực tế không ạ?"
+        else:
+            reply_text = "Hiện tại em chưa tìm thấy bất động sản nào khớp hoàn toàn với yêu cầu trên. Anh/chị có thể nới lỏng ngân sách hoặc mở rộng sang các quận lân cận không ạ?"
 
-# 8. Thiết lập LangGraph Workflow với Router Dispatcher, Guardrails & Mortgage Calculator
+        return {
+            "messages": [AIMessage(content=reply_text)],
+            "found_properties": props,
+            "criteria": {"category": cat, "district": dist, "max_price": price},
+            "citations": []
+        }
+
+# Giữ lại các hàm cũ để tương thích ngược nếu module ngoài còn tham chiếu
+def extract_criteria_node(state: AgentState) -> Dict[str, Any]:
+    return property_agent_node(state)
+
+def search_properties_node(state: AgentState) -> Dict[str, Any]:
+    return {"found_properties": state.get("found_properties", [])}
+
+def generate_response_node(state: AgentState) -> Dict[str, Any]:
+    return {"messages": state.get("messages", [])}
+
+# 8. Thiết lập LangGraph Workflow với Router Dispatcher, Guardrails & ReAct Agents
 workflow = StateGraph(AgentState)
 workflow.add_node("route_intent", route_intent_node)
 workflow.add_node("out_of_scope_response", out_of_scope_response_node)
@@ -666,9 +738,7 @@ workflow.add_node("mortgage_calc", mortgage_calc_node)
 workflow.add_node("contract_audit", contract_audit_node)
 workflow.add_node("general_chat_response", general_chat_response_node)
 workflow.add_node("legal_advisory", legal_advisory_node)
-workflow.add_node("extract_criteria", extract_criteria_node)
-workflow.add_node("search_properties", search_properties_node)
-workflow.add_node("generate_response", generate_response_node)
+workflow.add_node("property_agent", property_agent_node)
 
 # Entry point vào Router Agent
 workflow.set_entry_point("route_intent")
@@ -683,7 +753,7 @@ workflow.add_conditional_edges(
         "contract_audit": "contract_audit",
         "general_chat_response": "general_chat_response",
         "legal_advisory": "legal_advisory",
-        "extract_criteria": "extract_criteria"
+        "property_agent": "property_agent"
     }
 )
 
@@ -692,9 +762,7 @@ workflow.add_edge("mortgage_calc", END)
 workflow.add_edge("contract_audit", END)
 workflow.add_edge("general_chat_response", END)
 workflow.add_edge("legal_advisory", END)
-workflow.add_edge("extract_criteria", "search_properties")
-workflow.add_edge("search_properties", "generate_response")
-workflow.add_edge("generate_response", END)
+workflow.add_edge("property_agent", END)
 
 # Checkpointer lưu state bộ nhớ cho từng thread_id
 memory = MemorySaver()

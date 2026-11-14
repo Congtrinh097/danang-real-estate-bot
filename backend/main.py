@@ -3,6 +3,7 @@ import json
 import sys
 import io
 import os
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
 # Tự động nạp biến môi trường (.env) cho LangSmith
@@ -211,14 +212,25 @@ def delete_legal_document(doc_id: str):
 # ==================== PHÂN HỆ ĐÁNH GIÁ RAGAS ====================
 
 @app.get("/api/rag/evaluate")
-@app.post("/api/rag/evaluate")
-async def evaluate_rag():
-    """Endpoint kích hoạt Ragas benchmark cho các node RAG (chạy trong worker thread tránh block event loop)"""
+async def evaluate_rag(node: Optional[str] = "all"):
+    """
+    Endpoint kích hoạt Ragas benchmark cho các node RAG.
+    node: 'legal' (tư vấn pháp lý), 'contract_audit' (thẩm định hợp đồng), 'all' (tất cả)
+    """
     try:
         from rag_evaluator import RAGEvaluator
         evaluator = RAGEvaluator()
-        report = await asyncio.to_thread(evaluator.evaluate_legal_rag)
-        return {"success": True, "report": report}
+        
+        results = {}
+        if node in ["legal", "all"]:
+            ds_legal = await asyncio.to_thread(evaluator.prepare_dataset_from_legal_rag)
+            results["legal"] = await asyncio.to_thread(evaluator.evaluate_legal_rag, ds_legal)
+        
+        if node in ["contract_audit", "all"]:
+            ds_audit = await asyncio.to_thread(evaluator.prepare_dataset_from_contract_audit)
+            results["contract_audit"] = await asyncio.to_thread(evaluator.evaluate_contract_audit_rag, ds_audit)
+            
+        return {"success": True, "data": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -71,10 +71,11 @@ E:\ProjectForLeaning\
 ```mermaid
 flowchart TD
     Client["Client (React)"] -->|POST /api/chat/stream {message, thread_id}| API["FastAPI"]
-    API --> R0["Node 0: route_intent\n(Router Agent / Configurable Model)"]
+    API --> R0["Node 0: route_intent\n(Router Agent / 7 Phân loại ý định)"]
     
     R0 -->|intent in ['out_of_scope', 'rule_violation']| O1["Node Guardrail: out_of_scope_response\n(Phản hồi thân thiện, giải thích phạm vi BĐS Đà Nẵng)"]
-    R0 -->|intent == 'mortgage_calculation'| M1["Node Tool: mortgage_calc_node\n(Tính lãi vay ngân hàng, gốc lãi giảm dần/trả đều)"]
+    R0 -->|intent == 'contract_audit'| C1["Node Audit: contract_audit_node\n(Thẩm định bẫy cọc 5%, phạt cọc 1 chiều\n& Đối chiếu luật trích dẫn [1], [2])"]
+    R0 -->|intent == 'mortgage_calculation'| M1["Node Tool: mortgage_calc_node\n(FastMCP Client: Lãi vay giảm dần/niên kim\n& Research so sánh lãi suất ngân hàng)"]
     R0 -->|intent == 'general_chat'| G1["Node: general_chat_response\n(LLM chào hỏi, không search Qdrant)"]
     R0 -->|intent == 'search_property'| N1["Node 1: extract_criteria\n(LLM NLU + Structured Output)"]
     R0 -->|intent == 'legal_consultation'| L1["Node Legal: legal_advisory_node\n(RAG Pháp lý từ danang_legal_docs\n& Trích dẫn [1], [2])"]
@@ -83,6 +84,7 @@ flowchart TD
     N2 --> N3["Node 3: generate_response\n(LLM Context-Aware Generator)"]
     
     O1 --> Stream["SSE Generator\n1. Card BĐS: {'type': 'properties'}\n2. Căn cứ luật: {'type': 'citations'}\n3. Token chữ: {'type': 'token'}\n4. [DONE]"]
+    C1 --> Stream
     M1 --> Stream
     G1 --> Stream
     N3 --> Stream

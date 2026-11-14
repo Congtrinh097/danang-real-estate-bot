@@ -12,28 +12,28 @@
         "note": "Nhận diện nhu cầu thuê/mua nhà, bóc tách tiêu chí quận/giá/loại hình và tra cứu Qdrant."
       },
       {
+        "id": "contract-audit",
+        "label": "2. Thẩm định Hợp đồng BĐS",
+        "focus": ["user", "fastapi", "router", "contract_audit", "sse_output"],
+        "note": "Xác thực hợp đồng, quét bẫy cọc 5%, phạt cọc 1 chiều và đối chiếu quy định luật kèm trích dẫn."
+      },
+      {
         "id": "legal-rag",
-        "label": "2. Tư vấn Pháp lý RAG",
+        "label": "3. Tư vấn Pháp lý RAG",
         "focus": ["user", "fastapi", "router", "legal_advisory", "sse_output"],
         "note": "Tra cứu Luật Đất đai 2024 & Luật Nhà ở từ danang_legal_docs, trích dẫn chính xác [1], [2]."
       },
       {
         "id": "mortgage-calc",
-        "label": "3. Tính Lãi Vay (MCP)",
+        "label": "4. Lãi Vay & So Sánh Ngân Hàng",
         "focus": ["user", "fastapi", "router", "mortgage_calc", "sse_output"],
-        "note": "Gọi Tool qua MCP Client tính toán lịch trả góp dư nợ giảm dần hoặc niên kim cố định."
+        "note": "ReAct Agent gọi FastMCP Client tính dư nợ giảm dần/niên kim và research so sánh lãi suất ngân hàng."
       },
       {
         "id": "guardrail-safety",
-        "label": "4. Guardrail & An toàn",
-        "focus": ["user", "fastapi", "router", "guardrail_node", "sse_output"],
-        "note": "Chặn prompt injection/jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng."
-      },
-      {
-        "id": "general-chat",
-        "label": "5. Hội thoại Xã giao",
-        "focus": ["user", "fastapi", "router", "general_chat", "sse_output"],
-        "note": "Chào hỏi lịch sự, tư vấn thời tiết Đà Nẵng và khéo léo giới thiệu dịch vụ nhà đất."
+        "label": "5. Guardrail & An toàn",
+        "focus": ["user", "fastapi", "router", "guardrail_node", "general_chat", "sse_output"],
+        "note": "Chặn prompt injection/jailbreak, lịch sự từ chối câu hỏi ngoài Đà Nẵng và giao tiếp chào hỏi."
       }
     ]
   },
@@ -41,13 +41,14 @@
     { "id": "client", "label": "Client & Web Gateway" },
     { "id": "guardrail_lane", "label": "Guardrails & An Toàn", "variant": "exception" },
     { "id": "orchestrator", "label": "Router & Điều Phối Hội Thoại" },
+    { "id": "audit_pipeline", "label": "Contract Audit Engine" },
     { "id": "legal_pipeline", "label": "Legal Advisory RAG" },
-    { "id": "tools_pipeline", "label": "Financial Engine (MCP Tool)" },
+    { "id": "tools_pipeline", "label": "Financial & Market Research (MCP)" },
     { "id": "property_pipeline", "label": "Property Search Pipeline" }
   ],
   "phases": [
     { "id": "phase_intake", "label": "1. Tiếp nhận & Định tuyến", "fromCol": 0, "toCol": 2 },
-    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
+    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
     { "id": "phase_output", "label": "3. Tổng hợp & Stream SSE", "fromCol": 5, "toCol": 5, "variant": "dashed" }
   ],
   "groups": [
@@ -81,7 +82,7 @@
       "type": "backend",
       "label": "Router Agent",
       "sublabel": "route_intent_node",
-      "tag": "6 Phân loại ý định",
+      "tag": "7 Phân loại ý định",
       "width": 120
     },
     {
@@ -105,14 +106,34 @@
       "width": 120
     },
     {
+      "id": "contract_audit",
+      "lane": "audit_pipeline",
+      "col": 3,
+      "type": "backend",
+      "label": "Contract Audit",
+      "sublabel": "contract_audit_node",
+      "tag": "Thẩm định bẫy cọc BĐS",
+      "width": 120
+    },
+    {
+      "id": "legal_advisory",
+      "lane": "legal_pipeline",
+      "col": 3,
+      "type": "backend",
+      "label": "Legal Advisory",
+      "sublabel": "legal_advisory_node",
+      "tag": "RAG danang_legal_docs",
+      "width": 120
+    },
+    {
       "id": "mortgage_calc",
       "lane": "tools_pipeline",
       "col": 3,
       "type": "messagebus",
-      "label": "Mortgage Calc",
-      "sublabel": "LLM + MCP Tool",
-      "tag": "Bảng tính lãi vay",
-      "width": 120
+      "label": "Mortgage & Research",
+      "sublabel": "ReAct Agent + FastMCP",
+      "tag": "Lãi vay & So sánh Bank",
+      "width": 125
     },
     {
       "id": "extract_criteria",
@@ -145,22 +166,12 @@
       "width": 120
     },
     {
-      "id": "legal_advisory",
-      "lane": "legal_pipeline",
-      "col": 3,
-      "type": "backend",
-      "label": "Legal Advisory",
-      "sublabel": "legal_advisory_node",
-      "tag": "RAG danang_legal_docs",
-      "width": 120
-    },
-    {
       "id": "sse_output",
       "lane": "client",
       "col": 5,
       "type": "frontend",
       "label": "SSE Stream",
-      "sublabel": "Cards + Citations",
+      "sublabel": "Cards + Citations + Audit",
       "brand": "react",
       "tag": "Thinking & Tokens",
       "width": 130
@@ -196,6 +207,20 @@
       "variant": "default"
     },
     {
+      "id": "edge_router_audit",
+      "from": "router",
+      "to": "contract_audit",
+      "label": "contract_audit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_router_legal",
+      "from": "router",
+      "to": "legal_advisory",
+      "label": "legal_consult",
+      "variant": "security"
+    },
+    {
       "id": "edge_router_mortgage",
       "from": "router",
       "to": "mortgage_calc",
@@ -208,13 +233,6 @@
       "to": "extract_criteria",
       "label": "search_property",
       "variant": "emphasis"
-    },
-    {
-      "id": "edge_router_legal",
-      "from": "router",
-      "to": "legal_advisory",
-      "label": "legal_consult",
-      "variant": "security"
     },
     {
       "id": "edge_extract_search",
@@ -247,18 +265,10 @@
       "role": "return"
     },
     {
-      "id": "edge_mortgage_stream",
-      "from": "mortgage_calc",
+      "id": "edge_audit_stream",
+      "from": "contract_audit",
       "to": "sse_output",
-      "label": "lịch trả góp",
-      "variant": "default",
-      "role": "return"
-    },
-    {
-      "id": "edge_gen_stream",
-      "from": "generate_resp",
-      "to": "sse_output",
-      "label": "cards & text",
+      "label": "báo cáo thẩm định",
       "variant": "emphasis",
       "role": "return"
     },
@@ -269,23 +279,47 @@
       "label": "citations & text",
       "variant": "security",
       "role": "return"
+    },
+    {
+      "id": "edge_mortgage_stream",
+      "from": "mortgage_calc",
+      "to": "sse_output",
+      "label": "lịch trả & so sánh bank",
+      "variant": "default",
+      "role": "return"
+    },
+    {
+      "id": "edge_gen_stream",
+      "from": "generate_resp",
+      "to": "sse_output",
+      "label": "cards & text",
+      "variant": "emphasis",
+      "role": "return"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Điều Phối Đa Ý Định & Guardrail",
+      "title": "Điều Phối Đa Ý Định (7 Intents) & Guardrail",
       "items": [
-        "Router Agent phân loại 6 ý định: search_property, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.",
-        "Guardrail chặn ngay các câu hỏi ngoài Đà Nẵng hoặc prompt injection để bảo vệ phạm vi hoạt động."
+        "Router Agent phân loại 7 ý định: search_property, contract_audit, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.",
+        "Input Guardrail chặn đứng prompt injection, jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng."
       ]
     },
     {
       "dot": "emerald",
-      "title": "Dual Collection Qdrant & MCP Tool",
+      "title": "Dual Collection Qdrant RAG & Thẩm Định Hợp Đồng",
       "items": [
-        "Tra cứu song song collection danang_properties (tìm kiếm nhà đất) và danang_legal_docs (văn bản luật đã OCR).",
-        "Tích hợp MCP Tool tính toán lãi vay ngân hàng với 2 phương án: dư nợ giảm dần và niên kim cố định."
+        "Tra cứu song song collection danang_properties (nhà đất) và danang_legal_docs (văn bản quy phạm pháp luật đã OCR bằng Docling).",
+        "Contract Auditor tự động rà soát bẫy đặt cọc (trần cọc 5%), phạt cọc một chiều, chấm điểm an toàn và trích dẫn điều luật [1], [2]."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "FastMCP Financial & Bank Research Engine",
+      "items": [
+        "ReAct Agent tích hợp FastMCP Client hỗ trợ tính lịch trả góp dư nợ giảm dần hoặc niên kim cố định.",
+        "Tool research thị trường cập nhật biểu lãi suất nhóm Big 4 & NHTMCP, tính lãi suất bình quân cả kỳ và gợi ý ngân hàng tối ưu."
       ]
     }
   ]

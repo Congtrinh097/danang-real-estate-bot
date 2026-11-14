@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     ROUTER_MODEL_NAME: Optional[str] = os.getenv("ROUTER_MODEL_NAME", None)
     ROUTER_BASE_URL: Optional[str] = os.getenv("ROUTER_BASE_URL", None)
     ROUTER_API_KEY: Optional[str] = os.getenv("ROUTER_API_KEY", None)
+
+    # Configurable Judge Model cho Ragas và DeepEval (Mặc định: gpt-6-luna)
+    JUDGE_MODEL_NAME: str = os.getenv("JUDGE_MODEL_NAME", "gpt-6-luna")
+    JUDGE_BASE_URL: Optional[str] = os.getenv("JUDGE_BASE_URL", None)
+    JUDGE_API_KEY: Optional[str] = os.getenv("JUDGE_API_KEY", None)
     
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "danang_properties")

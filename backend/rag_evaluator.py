@@ -22,50 +22,81 @@ GOLDEN_LEGAL_EVAL_SAMPLES = [
         "reference": "Hợp đồng mua bán chuyển nhượng bất động sản phải có Giấy chứng nhận quyền sử dụng đất (sổ đỏ/sổ hồng), không có tranh chấp, quyền sử dụng đất không bị kê biên và các bên có đủ năng lực hành vi dân sự.",
     },
     {
-        "user_input": "Việt kiều (người gốc Việt định cư ở nước ngoài) có được mua đất và sở hữu nhà ở tại Đà Nẵng như người trong nước không?",
-        "reference": "Theo Luật Đất đai 2024, người gốc Việt Nam định cư ở nước ngoài được phép nhập cảnh vào Việt Nam có quyền sở hữu nhà ở gắn liền với quyền sử dụng đất ở theo quy định như công dân Việt Nam định cư trong nước.",
+        "user_input": "Thủ tục sang tên sổ đỏ tại Đà Nẵng mất bao lâu?",
+        "reference": "Thời gian giải quyết thủ tục đăng ký biến động đất đai thường từ 10 đến 15 ngày làm việc theo quy định hành chính.",
     },
     {
-        "user_input": "Sổ đỏ và Sổ hồng cũ đã cấp trước đây có bắt buộc phải đổi sang mẫu mới theo Luật Đất đai 2024 không?",
-        "reference": "Theo Điều 131 Luật Đất đai 2024, các Giấy chứng nhận quyền sử dụng đất, quyền sở hữu nhà ở (Sổ đỏ, Sổ hồng) đã được cấp trước ngày 01/08/2024 vẫn giữ nguyên giá trị pháp lý và không bắt buộc phải đổi sang mẫu mới.",
+        "user_input": "Thuế thu nhập cá nhân khi bán nhà đất là bao nhiêu phần trăm?",
+        "reference": "Thuế thu nhập cá nhân khi chuyển nhượng bất động sản là 2% trên giá chuyển nhượng ghi trong hợp đồng.",
     },
     {
-        "user_input": "Tỷ lệ tối đa người nước ngoài được sở hữu trong một tòa nhà chung cư là bao nhiêu?",
-        "reference": "Theo quy định của Luật Nhà ở 2023, tổ chức, cá nhân nước ngoài được sở hữu không quá 30% tổng số căn hộ trong một tòa nhà chung cư thương mại.",
+        "user_input": "Lệ phí trước bạ khi mua nhà đất tính như thế nào?",
+        "reference": "Lệ phí trước bạ nhà đất hiện nay là 0.5% giá trị bất động sản theo khung giá quy định.",
     },
     {
-        "user_input": "Khi mua bán chuyển nhượng nhà đất tại Đà Nẵng, các bên phải nộp những khoản thuế và lệ phí gì?",
-        "reference": "Khi chuyển nhượng bất động sản, các bên có nghĩa vụ nộp thuế thu nhập cá nhân là 2% trên giá trị chuyển nhượng và lệ phí trước bạ là 0.5% tại Chi cục Thuế trong thời hạn 10 ngày kể từ ngày ký hợp đồng công chứng.",
+        "user_input": "Có được ủy quyền mua bán nhà đất không?",
+        "reference": "Được phép ủy quyền hợp pháp thông qua hợp đồng ủy quyền có công chứng theo quy định của Bộ luật Dân sự.",
     },
     {
-        "user_input": "Chủ đầu tư dự án nhà ở hình thành trong tương lai được thu tối đa bao nhiêu tiền đặt cọc từ khách hàng?",
-        "reference": "Theo Luật Nhà ở 2023, chủ đầu tư dự án bất động sản chỉ được thu tiền đặt cọc không quá 5% giá bán nhà ở từ khách hàng khi nhà ở đã đủ điều kiện đưa vào kinh doanh và đã hoàn thành nghĩa vụ bảo lãnh ngân hàng.",
+        "user_input": "Nhà đất đang thế chấp ngân hàng có bán được không?",
+        "reference": "Có thể bán được nếu có sự đồng ý bằng văn bản của ngân hàng nhận thế chấp hoặc thực hiện giải chấp trước khi công chứng.",
     },
     {
-        "user_input": "Cơ quan nào có thẩm quyền làm thủ tục sang tên sổ đỏ, đăng ký biến động đất đai tại thành phố Đà Nẵng?",
-        "reference": "Thẩm quyền đăng ký biến động, làm thủ tục sang tên chuyển nhượng quyền sử dụng đất thuộc về Chi nhánh Văn phòng Đăng ký đất đai tại các quận, huyện trực thuộc Sở Tài nguyên và Môi trường thành phố Đà Nẵng.",
+        "user_input": "Đất nông nghiệp có được xây dựng nhà ở kiên cố không?",
+        "reference": "Không được phép xây dựng nhà ở kiên cố trên đất nông nghiệp; phải làm thủ tục chuyển mục đích sử dụng sang đất ở trước.",
     },
     {
-        "user_input": "Chuyển mục đích sử dụng đất nông nghiệp sang đất ở tại Đà Nẵng có phải xin phép không?",
-        "reference": "Theo Điều 121 Luật Đất đai 2024, việc chuyển đất nông nghiệp sang đất ở bắt buộc phải được cơ quan nhà nước có thẩm quyền cho phép và người sử dụng đất phải thực hiện nghĩa vụ tài chính nộp tiền sử dụng đất chênh lệch theo Bảng giá đất cụ thể của UBND thành phố Đà Nẵng.",
+        "user_input": "Thời hiệu giải quyết tranh chấp đất đai là bao lâu?",
+        "reference": "Tranh chấp quyền sử dụng đất không áp dụng thời hiệu khởi kiện theo quy định của pháp luật dân sự và đất đai.",
     }
 ]
 
+GOLDEN_CONTRACT_AUDIT_SAMPLES = [
+    {
+        "user_input": "Kiểm tra hợp đồng: Bên A (Chủ đầu tư) thu tiền cọc 20% giá trị dự án hình thành tương lai.",
+        "reference": "Vi phạm trần đặt cọc 5% theo Khoản 5 Điều 23 Luật Kinh doanh BĐS 2023. Cần giảm xuống tối đa 5%.",
+    },
+    {
+        "user_input": "Kiểm tra hợp đồng: Nếu Bên bán hủy, chỉ hoàn trả cọc gốc, không phạt cọc.",
+        "reference": "Vi phạm nguyên tắc phạt cọc tại Điều 328 BLDS 2015. Bên bán hủy phải chịu phạt cọc gấp đôi.",
+    },
+    {
+        "user_input": "Kiểm tra hợp đồng: Bên mua chịu toàn bộ thuế thu nhập cá nhân 2%.",
+        "reference": "Thuế TNCN là nghĩa vụ của bên bán theo luật thuế, thỏa thuận này bất lợi cho bên mua.",
+    },
+    {
+        "user_input": "Kiểm tra hợp đồng: Dự án đã đủ pháp lý, cọc 5%, phạt cọc tương đương.",
+        "reference": "Hợp đồng an toàn (Compliant).",
+    },
+    {
+        "user_input": "Thời tiết Đà Nẵng hôm nay có mưa không?",
+        "reference": "Tài liệu không phải hợp đồng.",
+    }
+]
 
 class RAGEvaluator:
     """Đánh giá chất lượng các node RAG (Pháp lý & BĐS) sử dụng Ragas framework."""
 
     def __init__(self, llm: Optional[ChatOpenAI] = None, embeddings: Optional[OpenAIEmbeddings] = None):
-        eval_key = settings.OPENAI_API_KEY or "dummy_key_mock"
-        base_url = settings.OPENAI_BASE_URL
+        eval_key = settings.JUDGE_API_KEY or settings.OPENAI_API_KEY or "dummy_key_mock"
+        base_url = settings.JUDGE_BASE_URL or settings.OPENAI_BASE_URL
+        judge_model = settings.JUDGE_MODEL_NAME or settings.OPENAI_MODEL_NAME
         
         eval_llm_kwargs = {
-            "model": settings.OPENAI_MODEL_NAME,
+            "model": judge_model,
             "api_key": eval_key,
-            "temperature": 0.0
         }
+        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+            eval_llm_kwargs["temperature"] = 1.0
+        else:
+            eval_llm_kwargs["temperature"] = 0.0
         if base_url:
             eval_llm_kwargs["base_url"] = base_url
+            if "openrouter.ai" in base_url:
+                eval_llm_kwargs["default_headers"] = {
+                    "HTTP-Referer": "http://localhost:8000",
+                    "X-Title": "Da Nang Real Estate Bot (Ragas Judge)",
+                }
         self.llm = llm or ChatOpenAI(**eval_llm_kwargs)
 
         embed_kwargs = {
@@ -75,6 +106,79 @@ class RAGEvaluator:
         if base_url:
             embed_kwargs["base_url"] = base_url
         self.embeddings = embeddings or OpenAIEmbeddings(**embed_kwargs)
+
+    def prepare_dataset_from_contract_audit(self, samples: Optional[List[Dict[str, str]]] = None) -> Dataset:
+        """Chuẩn bị dataset chuẩn Ragas từ luồng Contract Audit."""
+        from contract_auditor import contract_auditor
+        
+        eval_samples = samples or GOLDEN_CONTRACT_AUDIT_SAMPLES
+        questions = []
+        contexts_list = []
+        answers = []
+        ground_truths = []
+
+        for item in eval_samples:
+            q = item["user_input"]
+            ref = item.get("reference", "")
+
+            # Tra cứu Qdrant context (grounding)
+            legal_ctx = contract_auditor.search_legal_grounding(q)
+            ctx_texts = [f"[{c['index']}] {c['doc_title']} - {c['article']}: {c['content']}" for c in legal_ctx]
+            if not ctx_texts:
+                ctx_texts = ["Quy định pháp luật hiện hành tại Đà Nẵng."]
+
+            # Gọi node audit
+            report = contract_auditor.audit_contract_structured(q)
+            ans = contract_auditor.format_report_to_markdown(report, legal_ctx)
+
+            questions.append(q)
+            contexts_list.append(ctx_texts)
+            answers.append(ans)
+            ground_truths.append(ref)
+
+        data = {
+            "user_input": questions,
+            "retrieved_contexts": contexts_list,
+            "response": answers,
+            "reference": ground_truths
+        }
+        return Dataset.from_dict(data)
+
+    def evaluate_contract_audit_rag(self, dataset: Optional[Dataset] = None) -> Dict[str, Any]:
+        """Đánh giá định lượng RAG cho node Contract Audit."""
+        if dataset is None:
+            dataset = self.prepare_dataset_from_contract_audit()
+
+        metrics = [faithfulness, answer_relevancy]
+
+        try:
+            results = evaluate(
+                dataset=dataset,
+                metrics=metrics,
+                llm=self.llm,
+                embeddings=self.embeddings
+            )
+            df = results.to_pandas().fillna(0.0)
+            result_dict = df.to_dict(orient="records")
+            metrics_mean = {}
+            for col in df.columns:
+                if col in ["faithfulness", "answer_relevancy"]:
+                    val = df[col].mean()
+                    if val is not None and not (isinstance(val, float) and (val != val)):
+                        metrics_mean[col] = round(float(val), 4)
+
+            return {
+                "sample_count": len(dataset),
+                "metrics_mean": metrics_mean if metrics_mean else {"faithfulness": 0.0, "answer_relevancy": 0.0},
+                "details": result_dict,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "sample_count": len(dataset),
+                "metrics_mean": {"faithfulness": 0.0, "answer_relevancy": 0.0},
+                "status": f"error: {str(e)}"
+            }
 
     def prepare_dataset_from_legal_rag(self, samples: Optional[List[Dict[str, str]]] = None) -> Dataset:
         """Thu thập ngữ cảnh (contexts) từ Qdrant legal và sinh câu trả lời để tạo dataset Ragas."""
@@ -134,7 +238,7 @@ class RAGEvaluator:
                 embeddings=self.embeddings
             )
             # Chuyển đổi kết quả sang pandas và tính điểm trung bình
-            df = results.to_pandas()
+            df = results.to_pandas().fillna(0.0)
             result_dict = df.to_dict(orient="records")
             metrics_mean = {}
             for col in df.columns:
