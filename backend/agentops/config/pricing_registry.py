@@ -55,9 +55,9 @@ class PricingRegistry:
                 output_price_per_million_usd=0.0,
                 cached_input_price_per_million_usd=0.0
             ),
-            # Model OpenRouter / Judge Model
+            # Model Judge Model
             "gpt-6-luna": ModelPricing(
-                provider="openrouter",
+                provider="openai",
                 model_name="gpt-6-luna",
                 input_price_per_million_usd=0.50,
                 output_price_per_million_usd=1.50,
