@@ -87,6 +87,60 @@ class CostReportingService:
             cur.close()
             conn.close()
 
+    def get_thread_budget_status(self, thread_id: str, workload_type: str = "chat") -> Dict[str, Any]:
+        """Lấy thông tin tiêu dùng và hạn mức ngân sách của một thread cụ thể"""
+        conn = self._get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            # 1. Tính tổng đã tiêu trong thread
+            cur.execute("""
+                SELECT 
+                    COALESCE(SUM(cost_vnd), 0.0) AS spent_vnd,
+                    COALESCE(SUM(cost_usd), 0.0) AS spent_usd,
+                    COUNT(DISTINCT request_id) AS total_turns,
+                    COUNT(*) AS total_calls
+                FROM agentops_usage_events
+                WHERE thread_id = %s;
+            """, (thread_id,))
+            usage_row = cur.fetchone()
+            spent_vnd = float(usage_row["spent_vnd"]) if usage_row else 0.0
+            spent_usd = float(usage_row["spent_usd"]) if usage_row else 0.0
+            total_turns = int(usage_row["total_turns"]) if usage_row else 0
+            total_calls = int(usage_row["total_calls"]) if usage_row else 0
+
+            # 2. Lấy hạn mức thread_limit_vnd từ agentops_budgets
+            cur.execute("""
+                SELECT thread_limit_vnd, turn_limit_vnd 
+                FROM agentops_budgets 
+                WHERE workload_type = %s;
+            """, (workload_type,))
+            budget_row = cur.fetchone()
+            thread_limit = float(budget_row["thread_limit_vnd"]) if budget_row else 20000.0
+            turn_limit = float(budget_row["turn_limit_vnd"]) if budget_row else 5000.0
+
+            remaining_vnd = max(0.0, thread_limit - spent_vnd)
+            utilization_pct = round((spent_vnd / thread_limit) * 100, 1) if thread_limit > 0 else 0.0
+            is_near_limit = utilization_pct >= 75.0
+            is_exceeded = spent_vnd >= thread_limit
+
+            return {
+                "thread_id": thread_id,
+                "workload_type": workload_type,
+                "spent_vnd": spent_vnd,
+                "spent_usd": spent_usd,
+                "thread_limit_vnd": thread_limit,
+                "turn_limit_vnd": turn_limit,
+                "remaining_vnd": remaining_vnd,
+                "utilization_pct": utilization_pct,
+                "is_near_limit": is_near_limit,
+                "is_exceeded": is_exceeded,
+                "total_turns": total_turns,
+                "total_calls": total_calls
+            }
+        finally:
+            cur.close()
+            conn.close()
+
     def get_daily_cost_summary(self) -> Dict[str, Any]:
         conn = self._get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)

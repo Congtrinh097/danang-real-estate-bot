@@ -130,6 +130,28 @@ export default function App() {
   const [uploadingContract, setUploadingContract] = useState(false);
   const contractFileInputRef = useRef(null);
 
+  // AgentOps: Giám sát hạn mức ngân sách của Thread đang chọn
+  const [threadBudget, setThreadBudget] = useState(null);
+
+  const fetchThreadBudget = async (threadId) => {
+    if (!threadId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/agentops/thread/${threadId}/budget`);
+      if (res.ok) {
+        const data = await res.json();
+        setThreadBudget(data);
+      }
+    } catch (e) {
+      console.warn("Lỗi tải thông tin ngân sách thread:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeThreadId) {
+      fetchThreadBudget(activeThreadId);
+    }
+  }, [activeThreadId]);
+
   const handleContractFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -305,6 +327,10 @@ export default function App() {
               } else if (data.type === "citations") {
                 botMsg.citations = data.data;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "budget_update") {
+                if (data.data) {
+                  setThreadBudget(data.data);
+                }
               } else if (data.type === "error") {
                 botMsg.isThinking = false;
                 botMsg.text = "Lỗi xử lý: " + data.content;
@@ -750,6 +776,34 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Widget hiển thị ngân sách thread */}
+              {threadBudget && (
+                <div 
+                  className={`thread-budget-badge ${
+                    threadBudget.is_exceeded 
+                      ? "danger" 
+                      : threadBudget.is_near_limit 
+                      ? "warning" 
+                      : "normal"
+                  }`}
+                  title={`Đã dùng: ${Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / ${Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ (${threadBudget.utilization_pct}%)`}
+                >
+                  <div className="budget-progress-track">
+                    <div 
+                      className="budget-progress-bar" 
+                      style={{ width: `${Math.min(threadBudget.utilization_pct, 100)}%` }}
+                    />
+                  </div>
+                  <span className="budget-text">
+                    {threadBudget.is_exceeded
+                      ? "⛔ Hết hạn mức"
+                      : threadBudget.is_near_limit
+                      ? `⚠️ Sắp hết: ${Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ`
+                      : `Hạn mức: ${Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}/${Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ`}
+                  </span>
+                </div>
+              )}
+
               <div className="status-badge">
                 <div className="status-dot"></div> <span className="status-badge-text">Sẵn sàng</span>
               </div>
@@ -845,6 +899,26 @@ export default function App() {
               </div>
             )}
 
+            {/* Cảnh báo ngân sách thread đã vượt ngưỡng hoặc sắp hết */}
+            {threadBudget && threadBudget.is_exceeded && (
+              <div className="budget-alert-banner danger">
+                <AlertCircle size={16} />
+                <span>
+                  Phiên hội thoại này đã đạt hạn mức ({Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / {Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ). 
+                  Vui lòng bấm <strong>"Tạo đoạn chat mới"</strong> để tiếp tục trò chuyện.
+                </span>
+              </div>
+            )}
+            {threadBudget && !threadBudget.is_exceeded && threadBudget.is_near_limit && (
+              <div className="budget-alert-banner warning">
+                <AlertCircle size={16} />
+                <span>
+                  Hạn mức phiên hội thoại sắp hết (còn lại {Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ). 
+                  Bạn có thể tạo đoạn chat mới bất cứ lúc nào.
+                </span>
+              </div>
+            )}
+
             {/* Thẻ hiển thị file hợp đồng đính kèm */}
             {attachedContract && (
               <div className="attached-contract-chip">
@@ -896,15 +970,21 @@ export default function App() {
               <input
                 type="text"
                 placeholder={
-                  attachedContract
+                  threadBudget?.is_exceeded
+                    ? "⛔ Phiên hội thoại đã hết hạn mức. Vui lòng tạo đoạn chat mới..."
+                    : attachedContract
                     ? "Nhập thêm ghi chú hoặc nhấn gửi để thẩm định hợp đồng..."
                     : "Hỏi pháp lý, đính kèm hợp đồng, tính lãi vay, BĐS Đà Nẵng..."
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={loading}
+                disabled={loading || threadBudget?.is_exceeded}
               />
-              <button type="submit" className="btn-send" disabled={loading || uploadingContract}>
+              <button 
+                type="submit" 
+                className="btn-send" 
+                disabled={loading || uploadingContract || threadBudget?.is_exceeded}
+              >
                 <Send size={18} />
               </button>
             </form>

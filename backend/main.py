@@ -75,6 +75,11 @@ def get_thread_report(limit: int = 20):
     """Báo cáo chi phí theo từng phiên hội thoại (thread)"""
     return cost_reporting_service.get_cost_by_thread(limit=limit)
 
+@app.get("/api/agentops/thread/{thread_id}/budget")
+def get_thread_budget(thread_id: str):
+    """Lấy hạn mức và tiến độ chi tiêu của thread cụ thể để hiển thị trên UI"""
+    return cost_reporting_service.get_thread_budget_status(thread_id=thread_id)
+
 @app.get("/api/agentops/reports/model")
 def get_model_report():
     """Báo cáo chi phí theo từng mô hình LLM"""
@@ -116,6 +121,22 @@ async def chat_stream(req: ChatRequest):
     inputs = {"messages": [HumanMessage(content=req.message)]}
 
     async def event_generator():
+        # Kiểm tra trước hạn mức thread: nếu đã hết ngân sách thì chặn ngay từ đầu
+        try:
+            budget_status = cost_reporting_service.get_thread_budget_status(thread_id=req.thread_id)
+            if budget_status.get("is_exceeded"):
+                err_msg = (
+                    f"⚠️ [Thông báo Ngân sách] Phiên hội thoại này đã đạt hạn mức chi phí "
+                    f"({budget_status['spent_vnd']:,.0f}đ / {budget_status['thread_limit_vnd']:,.0f}đ). "
+                    f"Vui lòng bấm 'Tạo đoạn chat mới' để tiếp tục trò chuyện."
+                )
+                yield f"data: {json.dumps({'type': 'budget_update', 'data': budget_status})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'content': err_msg})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+        except Exception as check_err:
+            print(f"[WARN] Pre-check thread budget failed: {check_err}")
+
         try:
             # 1. Chạy Graph
             final_state = real_estate_agent.invoke(inputs, config=config)
@@ -142,9 +163,24 @@ async def chat_stream(req: ChatRequest):
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
                     await asyncio.sleep(0.015)
 
+            # Gửi cập nhật ngân sách thread sau khi kết thúc turn
+            try:
+                budget_status = cost_reporting_service.get_thread_budget_status(thread_id=req.thread_id)
+                yield f"data: {json.dumps({'type': 'budget_update', 'data': budget_status})}\n\n"
+            except Exception as b_err:
+                print(f"[WARN] Failed to send budget_update event: {b_err}")
+
             yield "data: [DONE]\n\n"
         except BudgetExceededException as be:
-            err_msg = f"⚠️ [Thông báo Ngân sách] Rất tiếc yêu cầu chưa thể thực hiện do {str(be)}. Quý khách vui lòng thử lại sau hoặc liên hệ quản trị viên."
+            err_msg = (
+                f"⚠️ [Thông báo Ngân sách] Phiên hội thoại này đã đạt hạn mức chi phí. "
+                f"Vui lòng bấm 'Tạo đoạn chat mới' để tiếp tục trò chuyện."
+            )
+            try:
+                budget_status = cost_reporting_service.get_thread_budget_status(thread_id=req.thread_id)
+                yield f"data: {json.dumps({'type': 'budget_update', 'data': budget_status})}\n\n"
+            except Exception:
+                pass
             yield f"data: {json.dumps({'type': 'token', 'content': err_msg})}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:

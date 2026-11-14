@@ -1791,3 +1791,116 @@ html, body {
   }
 }
 
+/* ==================== AGENTOPO THREAD BUDGET STYLES ==================== */
+.thread-budget-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.thread-budget-badge.normal {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.thread-budget-badge.warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  animation: pulseBudget 2s infinite ease-in-out;
+}
+
+.thread-budget-badge.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  animation: pulseBudget 1.2s infinite ease-in-out;
+}
+
+.budget-progress-track {
+  width: 36px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.thread-budget-badge.warning .budget-progress-track {
+  background: rgba(146, 64, 14, 0.15);
+}
+
+.thread-budget-badge.danger .budget-progress-track {
+  background: rgba(185, 28, 28, 0.15);
+}
+
+.budget-progress-bar {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.thread-budget-badge.warning .budget-progress-bar {
+  background: #f59e0b;
+}
+
+.thread-budget-badge.danger .budget-progress-bar {
+  background: #ef4444;
+}
+
+.budget-text {
+  font-size: 11.5px;
+  letter-spacing: 0.2px;
+}
+
+@keyframes pulseBudget {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.budget-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  animation: slideDownBanner 0.25s ease-out;
+}
+
+.budget-alert-banner.warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.budget-alert-banner.danger {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+@keyframes slideDownBanner {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
