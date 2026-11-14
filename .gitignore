@@ -71,9 +71,12 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & Traces
 logs/
 *.log
+*.jsonl
+backend/data/traces/
+data/traces/
 
 # Archify visual checks
 *.visual-check.*

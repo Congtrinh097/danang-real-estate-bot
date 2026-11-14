@@ -6,6 +6,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range
 from langchain_openai import OpenAIEmbeddings
 from config import settings
+from agentops import spend_ledger, UsageEvent, TraceContext
+import time
 
 class QdrantService:
     def __init__(self):
@@ -40,19 +42,47 @@ class QdrantService:
             base_url=settings.FALLBACK_OPENAI_BASE_URL or "https://api.openai.com/v1"
         )
 
+    def _track_embedding_usage(self, texts: List[str], latency_ms: int):
+        """Ghi nhận token và chi phí embedding vào AgentOps spend ledger"""
+        try:
+            total_chars = sum(len(t) for t in texts)
+            # Ước tính token cho embedding (tiếng Việt/Anh trung bình ~2 ký tự / token)
+            est_tokens = max(int(total_chars / 2.2), len(texts) * 8)
+            event = UsageEvent.from_llm_output(
+                request_id=TraceContext.get_request_id(),
+                thread_id=TraceContext.get_thread_id(),
+                agent_name="QdrantEmbeddingService",
+                model_name=settings.EMBEDDING_MODEL_NAME,
+                token_usage={"prompt_tokens": est_tokens, "completion_tokens": 0},
+                latency_ms=latency_ms,
+                workload_type=TraceContext.get_workload_type() or "chat",
+                execution_status="SUCCESS"
+            )
+            spend_ledger.record_usage_and_spend(event)
+        except Exception as e:
+            print(f"[WARN] Failed to record embedding usage: {e}")
+
     def embed_query_safe(self, text: str) -> List[float]:
         """Tạo vector với cơ chế fallback tự động nếu base_url lỗi"""
+        t0 = time.time()
         try:
-            return self.embeddings.embed_query(text)
+            vec = self.embeddings.embed_query(text)
         except Exception:
-            return self.fallback_embeddings.embed_query(text)
+            vec = self.fallback_embeddings.embed_query(text)
+        latency = int((time.time() - t0) * 1000)
+        self._track_embedding_usage([text], latency)
+        return vec
 
     def embed_documents_safe(self, texts: List[str]) -> List[List[float]]:
         """Tạo batch vector với cơ chế fallback tự động nếu base_url lỗi"""
+        t0 = time.time()
         try:
-            return self.embeddings.embed_documents(texts)
+            vecs = self.embeddings.embed_documents(texts)
         except Exception:
-            return self.fallback_embeddings.embed_documents(texts)
+            vecs = self.fallback_embeddings.embed_documents(texts)
+        latency = int((time.time() - t0) * 1000)
+        self._track_embedding_usage(texts, latency)
+        return vecs
 
     def ensure_collection(self):
         """Khởi tạo collection nếu chưa tồn tại"""

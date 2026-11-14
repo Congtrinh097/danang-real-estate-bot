@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "danang_properties")
     QDRANT_LEGAL_COLLECTION_NAME: str = os.getenv("QDRANT_LEGAL_COLLECTION_NAME", "danang_legal_docs")
     
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5435/danang_real_estate")
 
     # Tavily Web Search API (Cho nghiên cứu lãi suất ngân hàng và thị trường)
     TAVILY_API_KEY: Optional[str] = os.getenv("TAVILY_API_KEY", "")

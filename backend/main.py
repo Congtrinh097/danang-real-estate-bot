@@ -22,6 +22,14 @@ from agent import real_estate_agent
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from document_converter import DocumentConverter
+from agentops import (
+    TraceContext,
+    langfuse_manager,
+    AgentOpsCallbackHandler,
+    cost_reporting_service,
+    cost_alert_engine,
+    BudgetExceededException
+)
 
 app = FastAPI(title="Da Nang Real Estate AI Agent API")
 
@@ -56,13 +64,50 @@ async def startup_event():
 def health_check():
     return {"status": "ok", "city": "Đà Nẵng"}
 
+# ==================== PHÂN HỆ BÁO CÁO AGENTOPS ====================
+@app.get("/api/agentops/reports/workload")
+def get_workload_report():
+    """Báo cáo chi phí theo từng loại workload (chat, evaluation,...)"""
+    return cost_reporting_service.get_cost_by_workload()
+
+@app.get("/api/agentops/reports/thread")
+def get_thread_report(limit: int = 20):
+    """Báo cáo chi phí theo từng phiên hội thoại (thread)"""
+    return cost_reporting_service.get_cost_by_thread(limit=limit)
+
+@app.get("/api/agentops/reports/model")
+def get_model_report():
+    """Báo cáo chi phí theo từng mô hình LLM"""
+    return cost_reporting_service.get_cost_by_model()
+
+@app.get("/api/agentops/reports/summary")
+def get_cost_summary():
+    """Báo cáo tổng hợp chi tiêu ngày và tỷ lệ sử dụng ngân sách"""
+    return cost_reporting_service.get_daily_cost_summary()
+
+@app.get("/api/agentops/alerts")
+def get_alerts():
+    """Kiểm tra và kích hoạt cảnh báo ngân sách"""
+    return cost_alert_engine.evaluate_and_record_alerts()
+
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
+    # Thiết lập TraceContext cho AgentOps
+    request_id = f"req_{int(asyncio.get_event_loop().time() * 1000)}"
+    TraceContext.set_context(request_id=request_id, thread_id=req.thread_id, workload_type="chat")
+
+    callbacks = [AgentOpsCallbackHandler(agent_name="DaNangRealEstateBot")]
+    lf_cb = langfuse_manager.get_callback_handler(request_id=request_id, thread_id=req.thread_id)
+    if lf_cb:
+        callbacks.append(lf_cb)
+
     config = {
         "configurable": {"thread_id": req.thread_id},
+        "callbacks": callbacks,
         "metadata": {
             "thread_id": req.thread_id,
+            "request_id": request_id,
             "session_type": "user_chat",
         },
         "tags": ["da-nang-real-estate", req.thread_id],
@@ -97,6 +142,10 @@ async def chat_stream(req: ChatRequest):
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
                     await asyncio.sleep(0.015)
 
+            yield "data: [DONE]\n\n"
+        except BudgetExceededException as be:
+            err_msg = f"⚠️ [Thông báo Ngân sách] Rất tiếc yêu cầu chưa thể thực hiện do {str(be)}. Quý khách vui lòng thử lại sau hoặc liên hệ quản trị viên."
+            yield f"data: {json.dumps({'type': 'token', 'content': err_msg})}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"

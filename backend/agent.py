@@ -9,11 +9,19 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 from config import settings
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from mortgage_calculator import MortgageCalculator, MortgageInput
+from agentops import (
+    ModelCallGuard,
+    BudgetExceededException,
+    spend_ledger,
+    UsageEvent,
+    TraceContext
+)
 from mortgage_mcp_client import (
     mortgage_mcp_client,
     mortgage_langchain_tool,
@@ -191,8 +199,9 @@ router_llm = create_router_llm()
 # ==================== ĐỊNH NGHĨA CÁC LCEL CHAINS ====================
 
 def call_jev_decisions(model_name: str, api_key: str, messages: list) -> IntentClassification:
-    """Gọi chuyên biệt cho model decision TypeSafe Jev qua OpenRouter /api/alpha/decisions"""
+    """Gọi chuyên biệt cho model decision TypeSafe Jev qua OpenRouter /api/alpha/decisions và lưu vết AgentOps"""
     import httpx
+    import time
     last_msg = ""
     for m in reversed(messages):
         content = m.content if hasattr(m, "content") else (m.get("content") if isinstance(m, dict) else str(m))
@@ -226,10 +235,32 @@ def call_jev_decisions(model_name: str, api_key: str, messages: list) -> IntentC
             }
         }
     }
+    start_time = time.time()
     resp = httpx.post(url, json=payload, headers=headers, timeout=10.0)
+    latency_ms = int((time.time() - start_time) * 1000)
     data = resp.json()
     choice = data.get("answers", {}).get("intent", {}).get("choice", "general_chat")
     confidence = data.get("answers", {}).get("intent", {}).get("confidence", 1)
+
+    # Ghi nhận usage & chi phí vào AgentOps Spend Ledger
+    try:
+        usage = data.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens") or max(len(last_msg.split()) * 2, 25)
+        completion_tokens = usage.get("completion_tokens") or 10
+        event = UsageEvent.from_llm_output(
+            request_id=TraceContext.get_request_id(),
+            thread_id=TraceContext.get_thread_id(),
+            agent_name="DecisionRouterJev",
+            model_name=model_name,
+            token_usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens},
+            latency_ms=latency_ms,
+            workload_type=TraceContext.get_workload_type() or "chat",
+            execution_status="SUCCESS"
+        )
+        spend_ledger.record_usage_and_spend(event)
+    except Exception as e:
+        print(f"[WARN] Failed to record AgentOps usage for Jev router: {e}")
+
     return IntentClassification(
         intent=choice,
         reason=f"TypeSafe Jev Decision Engine classified as '{choice}' with confidence {confidence}"
@@ -367,7 +398,7 @@ property_recommendation_chain = property_recommendation_prompt | llm | StrOutput
 # ==================== ĐỊNH NGHĨA CÁC NODE WORKFLOW ====================
 
 # 3. Node 0: Router Agent điều phối ý định & Kiểm tra an toàn (Guardrail)
-def route_intent_node(state: AgentState) -> Dict[str, Any]:
+def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     last_user_message = all_messages[-1].content if all_messages else ""
     text_lower = last_user_message.lower()
@@ -413,7 +444,8 @@ def route_intent_node(state: AgentState) -> Dict[str, Any]:
         return {"intent": "out_of_scope", "citations": []}
 
     try:
-        result = router_chain.invoke({"messages": all_messages[-4:]})
+        invoke_kwargs = {"config": config} if config else {}
+        result = router_chain.invoke({"messages": all_messages[-4:]}, **invoke_kwargs)
         intent = result.intent
     except Exception:
         # Heuristic fallback an toàn
@@ -650,8 +682,14 @@ def property_agent_node(state: AgentState) -> Dict[str, Any]:
     last_user_message = all_messages[-1].content if all_messages else ""
 
     try:
-        # Gọi Property ReAct Agent được khởi tạo từ create_agent
-        agent_result = property_agent.invoke({"messages": list(all_messages[-6:])})
+        # Gọi Property ReAct Agent được bảo vệ qua ModelCallGuard
+        agent_result = ModelCallGuard.guard_call(
+            lambda: property_agent.invoke({"messages": list(all_messages[-6:])}),
+            model_name=settings.OPENAI_MODEL_NAME,
+            estimated_input_tokens=1500,
+            estimated_output_tokens=600,
+            workload_type="chat"
+        )
         agent_messages = agent_result.get("messages", [])
 
         found_properties: List[Dict[str, Any]] = []

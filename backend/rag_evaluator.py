@@ -6,6 +6,7 @@ from ragas.metrics import faithfulness, answer_relevancy
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from config import settings
 from legal_service import legal_service
+from agentops import AgentOpsCallbackHandler, TraceContext
 
 
 GOLDEN_LEGAL_EVAL_SAMPLES = [
@@ -97,7 +98,15 @@ class RAGEvaluator:
                     "HTTP-Referer": "http://localhost:8000",
                     "X-Title": "Da Nang Real Estate Bot (Ragas Judge)",
                 }
-        self.llm = llm or ChatOpenAI(**eval_llm_kwargs)
+        eval_llm_kwargs["callbacks"] = [AgentOpsCallbackHandler(agent_name="RagasJudge")]
+        base_chat_llm = llm or ChatOpenAI(**eval_llm_kwargs)
+        
+        # Nếu dùng reasoning model như luna, o1, o3, bọc LangchainLLMWrapper với bypass_temperature=True
+        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+            from ragas.llms.base import LangchainLLMWrapper
+            self.llm = LangchainLLMWrapper(base_chat_llm, bypass_temperature=True, bypass_n=True)
+        else:
+            self.llm = base_chat_llm
 
         embed_kwargs = {
             "model": settings.EMBEDDING_MODEL_NAME,
@@ -146,6 +155,12 @@ class RAGEvaluator:
 
     def evaluate_contract_audit_rag(self, dataset: Optional[Dataset] = None) -> Dict[str, Any]:
         """Đánh giá định lượng RAG cho node Contract Audit."""
+        import time
+        TraceContext.set_context(
+            request_id=f"eval_rag_audit_{int(time.time() * 1000)}",
+            thread_id="ragas_eval_audit_thread",
+            workload_type="evaluation"
+        )
         if dataset is None:
             dataset = self.prepare_dataset_from_contract_audit()
 
@@ -225,6 +240,12 @@ class RAGEvaluator:
 
     def evaluate_legal_rag(self, dataset: Optional[Dataset] = None) -> Dict[str, Any]:
         """Thực hiện đánh giá định lượng bằng Ragas: faithfulness & answer_relevancy."""
+        import time
+        TraceContext.set_context(
+            request_id=f"eval_rag_legal_{int(time.time() * 1000)}",
+            thread_id="ragas_eval_legal_thread",
+            workload_type="evaluation"
+        )
         if dataset is None:
             dataset = self.prepare_dataset_from_legal_rag()
 

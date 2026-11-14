@@ -10,6 +10,7 @@ from deepeval.metrics import (
 )
 from langchain_openai import ChatOpenAI
 from config import settings
+from agentops import AgentOpsCallbackHandler, TraceContext
 
 
 class CustomDeepEvalLLM(DeepEvalBaseLLM):
@@ -52,6 +53,7 @@ class CustomDeepEvalLLM(DeepEvalBaseLLM):
                     "HTTP-Referer": "http://localhost:8000",
                     "X-Title": "Da Nang Real Estate Bot (DeepEval Judge)",
                 }
+        llm_kwargs["callbacks"] = [AgentOpsCallbackHandler(agent_name="DeepEvalJudge")]
         return ChatOpenAI(**llm_kwargs)
 
     def generate(self, prompt: str, schema=None, **kwargs) -> str:
@@ -197,6 +199,12 @@ class DeepEvalAgentEvaluator:
         metrics: List[Any],
     ) -> Dict[str, Any]:
         """Thực thi đo đạc các metric trên một test case cụ thể."""
+        import time
+        TraceContext.set_context(
+            request_id=f"eval_deepeval_{int(time.time() * 1000)}",
+            thread_id="deepeval_eval_thread",
+            workload_type="evaluation"
+        )
         results = {}
         for metric in metrics:
             metric.measure(test_case)
