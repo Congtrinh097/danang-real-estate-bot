@@ -30,9 +30,12 @@ import {
   ChevronUp,
   Activity,
   BarChart3,
-  DollarSign
+  DollarSign,
+  Wallet,
+  CreditCard
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
+import TopupModal from "./components/TopupModal";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
 Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
@@ -93,6 +96,10 @@ export default function App() {
   const [adminSubTab, setAdminSubTab] = useState("legal");
   // Mobile Sidebar Drawer Toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Quản lý Ví và Ngân Sách Cá Nhân Người Dùng
+  const [userWallet, setUserWallet] = useState(null);
+  const [showTopupModal, setShowTopupModal] = useState(false);
 
   // 1. Quản lý danh sách threads & thread đang active
   const [threads, setThreads] = useState(() => {
@@ -229,6 +236,25 @@ export default function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load thông tin ví người dùng và hạn mức 5.000đ mỗi ngày
+  const fetchUserWallet = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/wallet?user_id=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data && data.user_id) {
+        setUserWallet(data);
+      }
+    } catch (err) {
+      console.error("Lỗi tải thông tin ví người dùng:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchUserWallet();
+    }
+  }, [userId]);
 
   // Load danh sách tài liệu khi mở tab admin
   useEffect(() => {
@@ -380,6 +406,19 @@ export default function App() {
                 if (data.data) {
                   setThreadBudget(data.data);
                 }
+              } else if (data.type === "wallet_update") {
+                if (data.data) {
+                  setUserWallet(data.data);
+                }
+              } else if (data.type === "user_budget_exceeded") {
+                botMsg.isThinking = false;
+                botMsg.text = data.message;
+                botMsg.isBudgetExceeded = true;
+                if (data.wallet) {
+                  setUserWallet(data.wallet);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+                setShowTopupModal(true);
               } else if (data.type === "error") {
                 botMsg.isThinking = false;
                 botMsg.text = "Lỗi xử lý: " + data.content;
@@ -755,6 +794,19 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* Nút mở Modal nạp tiền khi bot thông báo hết hạn mức */}
+        {(msg.isBudgetExceeded || msg.text?.includes("[Hết hạn mức]")) && !isStreaming && (
+          <div className="budget-exceeded-cta-box">
+            <button
+              type="button"
+              className="btn-msg-topup"
+              onClick={() => setShowTopupModal(true)}
+            >
+              <Wallet size={15} /> Nạp Thêm Tiền Vào Ví Ngay
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1006,6 +1058,39 @@ export default function App() {
                   onClick={() => setActiveTab("admin_legal")}
                 >
                   <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
+                </button>
+              </div>
+
+              {/* Widget Ví & Ngân Sách Cá Nhân User */}
+              <div 
+                className="user-wallet-header-widget"
+                onClick={() => setShowTopupModal(true)}
+                title={`Hạng: ${userWallet?.group_name || "Tiêu chuẩn"} | Số dư: ${userWallet?.balance_vnd != null ? Math.round(userWallet.balance_vnd).toLocaleString("vi-VN") : 0}đ | Free hôm nay: ${userWallet?.daily_free_remaining_vnd != null ? Math.round(userWallet.daily_free_remaining_vnd).toLocaleString("vi-VN") : "5.000"}đ / ${userWallet?.daily_free_limit_vnd != null ? Math.round(userWallet.daily_free_limit_vnd).toLocaleString("vi-VN") : "5.000"}đ. Bấm để nạp thêm tiền!`}
+              >
+                <div className="wallet-widget-icon">
+                  <Wallet size={14} />
+                </div>
+                <div className="wallet-widget-info">
+                  <div className="wallet-widget-balance">
+                    Ví: <b>{userWallet?.balance_vnd != null ? Math.round(userWallet.balance_vnd).toLocaleString("vi-VN") + "đ" : "0đ"}</b>
+                    {userWallet?.group_name && (
+                      <span className="wallet-header-tier-tag">{userWallet.group_name}</span>
+                    )}
+                  </div>
+                  <div className="wallet-widget-free">
+                    Free: <b>{userWallet?.daily_free_remaining_vnd != null ? Math.round(userWallet.daily_free_remaining_vnd).toLocaleString("vi-VN") + "đ" : "5.000đ"}</b>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-quick-topup"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTopupModal(true);
+                  }}
+                  title="Nạp tiền vào tài khoản"
+                >
+                  + Nạp
                 </button>
               </div>
 
@@ -1693,6 +1778,18 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Modal Nạp Tiền (Mock Topup) */}
+      <TopupModal
+        isOpen={showTopupModal}
+        onClose={() => setShowTopupModal(false)}
+        userId={userId}
+        wallet={userWallet}
+        onTopupSuccess={(updatedWallet) => {
+          setUserWallet(updatedWallet);
+        }}
+        API_BASE={API_BASE}
+      />
     </div>
   );
 }

@@ -16,7 +16,13 @@ import {
   Activity,
   Calendar,
   Zap,
-  ChevronRight
+  ChevronRight,
+  Users,
+  Plus,
+  Trash2,
+  Edit3,
+  UserCheck,
+  Shield
 } from "lucide-react";
 
 export default function AgentOpsAdmin({ API_BASE = "" }) {
@@ -32,11 +38,13 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
   const [recentEvents, setRecentEvents] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [budgets, setBudgets] = useState([]);
+  const [userWallets, setUserWallets] = useState([]);
+  const [userGroups, setUserGroups] = useState([]);
 
-  // Sub-view tab trong AgentOps: "models" | "workloads" | "threads" | "recent" | "alerts" | "budgets"
+  // Sub-view tab trong AgentOps: "models" | "workloads" | "threads" | "recent" | "alerts" | "budgets" | "user_limits"
   const [subView, setSubView] = useState("models");
 
-  // State Modal Cấu hình Ngân Sách
+  // State Modal Cấu hình Ngân Sách Hệ Thống
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState({
     workload_type: "chat",
@@ -46,6 +54,29 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
   });
   const [savingBudget, setSavingBudget] = useState(false);
   const [modalFeedback, setModalFeedback] = useState(null);
+
+  // State Modal Cấu hình Nhóm Người Dùng (Thêm / Sửa nhóm)
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [isEditingExistingGroup, setIsEditingExistingGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState({
+    group_code: "",
+    group_name: "",
+    daily_free_limit_vnd: 5000,
+    description: "",
+    is_default: false
+  });
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupFeedback, setGroupFeedback] = useState(null);
+
+  // State Modal Gán Nhóm cho User (Đổi nhóm người dùng)
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [editingAssign, setEditingAssign] = useState({
+    user_id: "",
+    current_group: "standard",
+    new_group_code: "standard"
+  });
+  const [savingAssign, setSavingAssign] = useState(false);
+  const [assignFeedback, setAssignFeedback] = useState(null);
 
   // Formatters
   const formatVND = (num) => {
@@ -90,7 +121,9 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
         threadsRes,
         recentRes,
         alertsRes,
-        budgetsRes
+        budgetsRes,
+        userWalletsRes,
+        userGroupsRes
       ] = await Promise.all([
         fetch(`${API_BASE}/api/agentops/reports/summary`).then(r => r.json()).catch(() => null),
         fetch(`${API_BASE}/api/agentops/reports/model`).then(r => r.json()).catch(() => []),
@@ -98,7 +131,9 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
         fetch(`${API_BASE}/api/agentops/reports/thread?limit=25`).then(r => r.json()).catch(() => []),
         fetch(`${API_BASE}/api/agentops/reports/recent-events?limit=25`).then(r => r.json()).catch(() => []),
         fetch(`${API_BASE}/api/agentops/alerts/history?limit=25`).then(r => r.json()).catch(() => []),
-        fetch(`${API_BASE}/api/agentops/budgets`).then(r => r.json()).catch(() => ({ budgets: [] }))
+        fetch(`${API_BASE}/api/agentops/budgets`).then(r => r.json()).catch(() => ({ budgets: [] })),
+        fetch(`${API_BASE}/api/admin/user-wallets`).then(r => r.json()).catch(() => ({ users: [] })),
+        fetch(`${API_BASE}/api/user/groups`).then(r => r.json()).catch(() => ({ groups: [] }))
       ]);
 
       if (summaryRes) setSummary(summaryRes);
@@ -108,6 +143,8 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
       if (Array.isArray(recentRes)) setRecentEvents(recentRes);
       if (Array.isArray(alertsRes)) setAlerts(alertsRes);
       if (budgetsRes && Array.isArray(budgetsRes.budgets)) setBudgets(budgetsRes.budgets);
+      if (userWalletsRes && Array.isArray(userWalletsRes.users)) setUserWallets(userWalletsRes.users);
+      if (userGroupsRes && Array.isArray(userGroupsRes.groups)) setUserGroups(userGroupsRes.groups);
     } catch (err) {
       console.error("Lỗi nạp dữ liệu AgentOps:", err);
     } finally {
@@ -181,6 +218,131 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
       setModalFeedback({ type: "error", message: "Lỗi kết nối: " + err.message });
     } finally {
       setSavingBudget(false);
+    }
+  };
+
+  // ================= QUẢN LÝ NHÓM NGƯỜI DÙNG & HẠN MỨC FREE =================
+  const handleOpenGroupModal = (group = null) => {
+    if (group) {
+      setIsEditingExistingGroup(true);
+      setEditingGroup({
+        group_code: group.group_code,
+        group_name: group.group_name || "",
+        daily_free_limit_vnd: group.daily_free_limit_vnd || 5000,
+        description: group.description || "",
+        is_default: Boolean(group.is_default)
+      });
+    } else {
+      setIsEditingExistingGroup(false);
+      setEditingGroup({
+        group_code: "",
+        group_name: "",
+        daily_free_limit_vnd: 5000,
+        description: "",
+        is_default: false
+      });
+    }
+    setGroupFeedback(null);
+    setShowGroupModal(true);
+  };
+
+  const handleSaveGroup = async (e) => {
+    e.preventDefault();
+    setSavingGroup(true);
+    setGroupFeedback(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/user/groups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_code: editingGroup.group_code.trim().toLowerCase(),
+          group_name: editingGroup.group_name.trim(),
+          daily_free_limit_vnd: Number(editingGroup.daily_free_limit_vnd),
+          description: editingGroup.description.trim(),
+          is_default: Boolean(editingGroup.is_default)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || "Không thể lưu cấu hình nhóm");
+      }
+      setGroupFeedback({
+        type: "success",
+        message: `Đã lưu nhóm "${editingGroup.group_name}" với hạn mức ${formatVND(editingGroup.daily_free_limit_vnd)}/ngày thành công!`
+      });
+      setTimeout(() => {
+        setShowGroupModal(false);
+        loadAgentOpsData(true);
+      }, 1000);
+    } catch (err) {
+      setGroupFeedback({ type: "error", message: `Lỗi: ${err.message}` });
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupCode, groupName) => {
+    if (groupCode === "standard") {
+      alert("Không thể xóa nhóm mặc định 'standard'. Nhóm này dùng làm nhóm cơ sở cho toàn bộ hệ thống.");
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc muốn xóa nhóm "${groupName}" (${groupCode})? Các thành viên thuộc nhóm này sẽ tự động chuyển về nhóm mặc định (standard).`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/user/groups/${encodeURIComponent(groupCode)}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || "Xóa nhóm thất bại");
+      }
+      loadAgentOpsData(true);
+    } catch (err) {
+      alert("Lỗi xóa nhóm: " + err.message);
+    }
+  };
+
+  // ================= GÁN NHÓM CHO NGƯỜI DÙNG =================
+  const handleOpenAssignModal = (userWallet) => {
+    setEditingAssign({
+      user_id: userWallet.user_id,
+      current_group: userWallet.user_group || "standard",
+      new_group_code: userWallet.user_group || "standard"
+    });
+    setAssignFeedback(null);
+    setShowAssignModal(true);
+  };
+
+  const handleSaveAssign = async (e) => {
+    e.preventDefault();
+    setSavingAssign(true);
+    setAssignFeedback(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/user/wallet/set-group`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: editingAssign.user_id,
+          group_code: editingAssign.new_group_code
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || "Không thể chuyển nhóm người dùng");
+      }
+      setAssignFeedback({
+        type: "success",
+        message: `Đã chuyển người dùng "${editingAssign.user_id}" sang nhóm mới thành công!`
+      });
+      setTimeout(() => {
+        setShowAssignModal(false);
+        loadAgentOpsData(true);
+      }, 1000);
+    } catch (err) {
+      setAssignFeedback({ type: "error", message: `Lỗi: ${err.message}` });
+    } finally {
+      setSavingAssign(false);
     }
   };
 
@@ -472,6 +634,14 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
           >
             <Settings size={15} />
             <span>Cấu Hình Hạn Mức ({budgets.length})</span>
+          </button>
+
+          <button
+            className={`agentops-tab-btn ${subView === "user_limits" ? "active" : ""}`}
+            onClick={() => setSubView("user_limits")}
+          >
+            <Users size={15} />
+            <span>Nhóm & Hạn Mức Free ({userGroups.length})</span>
           </button>
 
           {alerts.length > 0 && (
@@ -795,6 +965,197 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
           </div>
         )}
 
+        {/* Tab: Quản Lý Nhóm & Hạn Mức Miễn Phí User */}
+        {subView === "user_limits" && (
+          <div className="agentops-table-wrapper">
+            {/* PHẦN 1: BẢNG CẤU HÌNH CÁC NHÓM NGƯỜI DÙNG */}
+            <div className="budget-settings-header" style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <h3 className="budget-settings-title" style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 6px 0" }}>
+                  <Shield size={18} color="#2563eb" />
+                  Cấu Hình Hạn Mức Miễn Phí Theo Nhóm Người Dùng (User Groups)
+                </h3>
+                <p className="budget-settings-desc" style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>
+                  Chỉ cần thiết lập hạn mức hàng ngày theo nhóm (ví dụ: standard 5.000đ, VIP 10.000đ, PRO 20.000đ,...). Các nhóm mới được thêm và điều chỉnh linh động, toàn bộ người dùng thuộc nhóm sẽ tự động được áp dụng.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-agentops-primary"
+                onClick={() => handleOpenGroupModal(null)}
+                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", fontSize: "13px" }}
+              >
+                <Plus size={15} /> Thêm Nhóm Mới
+              </button>
+            </div>
+
+            <table className="agentops-data-table" style={{ marginBottom: "32px" }}>
+              <thead>
+                <tr>
+                  <th>Mã Nhóm</th>
+                  <th>Tên Nhóm</th>
+                  <th style={{ textAlign: "right" }}>Hạn Mức Free / Ngày</th>
+                  <th style={{ textAlign: "center" }}>Số Người Dùng</th>
+                  <th style={{ textAlign: "center" }}>Mặc Định</th>
+                  <th>Mô Tả Nhóm</th>
+                  <th style={{ textAlign: "center" }}>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-table-row">
+                      Đang tải danh sách nhóm người dùng...
+                    </td>
+                  </tr>
+                ) : (
+                  userGroups.map((g) => (
+                    <tr key={g.group_code}>
+                      <td>
+                        <span className="badge-user-group-code">
+                          <code>{g.group_code}</code>
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600, color: "#0f172a" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          {g.group_code === "vip" ? "⭐ " : g.group_code === "pro" ? "🚀 " : "👤 "}
+                          <span>{g.group_name}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 700, color: "#0284c7", fontSize: "14px" }}>
+                        {formatVND(g.daily_free_limit_vnd)}
+                      </td>
+                      <td style={{ textAlign: "center", fontWeight: 600, color: "#475569" }}>
+                        <span className="agentops-pill" style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "12px", fontSize: "12px" }}>
+                          {g.total_users || 0} user
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {g.is_default ? (
+                          <span className="badge-default-group">Mặc định</span>
+                        ) : (
+                          <span style={{ color: "#94a3b8" }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: "12px", color: "#64748b", maxWidth: "260px" }}>
+                        {g.description || "-"}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                          <button
+                            className="btn-action"
+                            style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", padding: "4px 8px", borderRadius: "6px", fontSize: "12px" }}
+                            onClick={() => handleOpenGroupModal(g)}
+                            title="Chỉnh sửa hạn mức & tên nhóm"
+                          >
+                            <Edit3 size={13} style={{ marginRight: "3px" }} /> Sửa
+                          </button>
+                          {g.group_code !== "standard" && (
+                            <button
+                              className="btn-action"
+                              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", padding: "4px 8px", borderRadius: "6px", fontSize: "12px" }}
+                              onClick={() => handleDeleteGroup(g.group_code, g.group_name)}
+                              title="Xóa nhóm này"
+                            >
+                              <Trash2 size={13} style={{ marginRight: "3px" }} /> Xóa
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* PHẦN 2: BẢNG DANH SÁCH NGƯỜI DÙNG & GÁN NHÓM */}
+            <div className="budget-settings-header" style={{ marginBottom: "16px" }}>
+              <div>
+                <h3 className="budget-settings-title" style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 6px 0" }}>
+                  <Users size={18} color="#0284c7" />
+                  Danh Sách Người Dùng & Phân Nhóm Hiện Tại ({userWallets.length} người dùng)
+                </h3>
+                <p className="budget-settings-desc" style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>
+                  Từng người dùng sẽ tự động nhận hạn mức free mỗi ngày theo nhóm được gán. Bấm "Đổi Nhóm" để phân lại nhóm (ví dụ nâng cấp VIP cho user).
+                </p>
+              </div>
+            </div>
+
+            <table className="agentops-data-table">
+              <thead>
+                <tr>
+                  <th>Mã Người Dùng (User ID)</th>
+                  <th>Nhóm Thành Viên</th>
+                  <th style={{ textAlign: "right" }}>Hạn Mức Theo Nhóm</th>
+                  <th style={{ textAlign: "right" }}>Đã Dùng Hôm Nay</th>
+                  <th style={{ textAlign: "right" }}>Còn Lại Hôm Nay</th>
+                  <th style={{ textAlign: "right" }}>Số Dư Ví Nạp</th>
+                  <th style={{ textAlign: "center" }}>Trạng Thái</th>
+                  <th style={{ textAlign: "center" }}>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userWallets.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="empty-table-row">
+                      Chưa có dữ liệu người dùng nào trong hệ thống.
+                    </td>
+                  </tr>
+                ) : (
+                  userWallets.map((u) => (
+                    <tr key={u.user_id}>
+                      <td style={{ fontWeight: 600, color: "#1e293b" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: u.can_chat ? "#10b981" : "#ef4444" }}></span>
+                          <code>{u.user_id}</code>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge-user-tier ${u.user_group || "standard"}`}>
+                          {u.group_name || u.user_group || "Người dùng thường"}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 700, color: "#0284c7" }}>
+                        {formatVND(u.daily_free_limit_vnd)}
+                      </td>
+                      <td style={{ textAlign: "right", color: u.daily_free_spent_vnd > 0 ? "#d97706" : "#64748b" }}>
+                        {formatVND(u.daily_free_spent_vnd)}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 600, color: u.daily_free_remaining_vnd > 0 ? "#10b981" : "#ef4444" }}>
+                        {formatVND(u.daily_free_remaining_vnd)}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 600 }}>
+                        {formatVND(u.balance_vnd)}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {u.can_chat ? (
+                          <span className="agentops-pill" style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0", padding: "3px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 }}>
+                            Sẵn sàng
+                          </span>
+                        ) : (
+                          <span className="agentops-pill" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", padding: "3px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 }}>
+                            Hết hạn mức
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <button
+                          className="btn-action"
+                          style={{ background: "#f0f9ff", color: "#0284c7", border: "1px solid #bae6fd", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}
+                          onClick={() => handleOpenAssignModal(u)}
+                          title="Đổi nhóm phân quyền cho người dùng này"
+                        >
+                          <UserCheck size={13} style={{ marginRight: "4px" }} /> Đổi Nhóm
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Tab 6: Lịch Sử Cảnh Báo (Alerts) */}
         {subView === "alerts" && (
           <div className="agentops-table-wrapper">
@@ -975,6 +1336,358 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
                   style={{ padding: "8px 20px" }}
                 >
                   {savingBudget ? "Đang lưu..." : "Lưu Hạn Mức"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1: Thêm / Sửa Nhóm Người Dùng & Hạn Mức */}
+      {showGroupModal && (
+        <div className="modal-overlay" onClick={() => setShowGroupModal(false)}>
+          <div className="budget-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "500px" }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Shield size={18} color="#2563eb" />
+                  {isEditingExistingGroup ? `Chỉnh Sửa Nhóm "${editingGroup.group_name}"` : "Thêm Nhóm Người Dùng Mới"}
+                </h3>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Hạn mức free hàng ngày sẽ áp dụng tự động cho toàn bộ user trong nhóm này.
+                </span>
+              </div>
+              <button
+                onClick={() => setShowGroupModal(false)}
+                style={{ border: "none", background: "transparent", cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {groupFeedback && (
+              <div
+                className={`budget-modal-feedback ${groupFeedback.type}`}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  margin: "12px 0",
+                  fontSize: "13px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: groupFeedback.type === "success" ? "#ecfdf5" : "#fef2f2",
+                  color: groupFeedback.type === "success" ? "#065f46" : "#991b1b",
+                  border: `1px solid ${groupFeedback.type === "success" ? "#a7f3d0" : "#fecaca"}`
+                }}
+              >
+                {groupFeedback.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{groupFeedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveGroup}>
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Mã Nhóm (Group Code)
+                </label>
+                <input
+                  type="text"
+                  required
+                  disabled={isEditingExistingGroup}
+                  value={editingGroup.group_code}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, group_code: e.target.value })}
+                  placeholder="ví dụ: vip, premium, partner..."
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    background: isEditingExistingGroup ? "#f8fafc" : "#ffffff",
+                    color: isEditingExistingGroup ? "#64748b" : "#0f172a",
+                    fontSize: "13px",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <span style={{ fontSize: "11px", color: "#94a3b8", marginTop: "3px", display: "block" }}>
+                  Mã định danh viết liền, không dấu (ví dụ: standard, vip, pro, enterprise)
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Tên Hiển Thị Nhóm (Group Name)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingGroup.group_name}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, group_name: e.target.value })}
+                  placeholder="ví dụ: Khách Hàng VIP, Người Dùng Thường..."
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Hạn Mức Miễn Phí Mỗi Ngày (VND)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  required
+                  value={editingGroup.daily_free_limit_vnd}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, daily_free_limit_vnd: Number(e.target.value) })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "#0284c7",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <span className="field-hint" style={{ display: "block", marginTop: "4px", fontSize: "12px", color: "#64748b" }}>
+                  Đang chọn: <b>{formatVND(editingGroup.daily_free_limit_vnd)}</b> / ngày cho mỗi user thuộc nhóm
+                </span>
+              </div>
+
+              {/* Mức gợi ý nhanh */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "12px", color: "#64748b" }}>
+                  Chọn nhanh các mức phổ biến:
+                </label>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {[5000, 10000, 20000, 50000, 100000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditingGroup({ ...editingGroup, daily_free_limit_vnd: preset })}
+                      style={{
+                        padding: "5px 12px",
+                        fontSize: "12px",
+                        borderRadius: "6px",
+                        border: editingGroup.daily_free_limit_vnd === preset ? "1.5px solid #0284c7" : "1px solid #e2e8f0",
+                        background: editingGroup.daily_free_limit_vnd === preset ? "#e0f2fe" : "#ffffff",
+                        color: editingGroup.daily_free_limit_vnd === preset ? "#0284c7" : "#475569",
+                        cursor: "pointer",
+                        fontWeight: editingGroup.daily_free_limit_vnd === preset ? 600 : 400
+                      }}
+                    >
+                      {preset === 5000 ? "5k (Standard)" : preset === 10000 ? "10k (VIP)" : `${preset / 1000}k`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Mô Tả Nhóm
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingGroup.description}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, description: e.target.value })}
+                  placeholder="Ghi chú về đối tượng người dùng hoặc quyền lợi của nhóm..."
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", color: "#334155" }}>
+                  <input
+                    type="checkbox"
+                    checked={editingGroup.is_default}
+                    onChange={(e) => setEditingGroup({ ...editingGroup, is_default: e.target.checked })}
+                    style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                  />
+                  <span>Đặt làm nhóm mặc định cho người dùng mới</span>
+                </label>
+              </div>
+
+              <div className="modal-actions" style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowGroupModal(false)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: "13px"
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn-book"
+                  disabled={savingGroup}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: "13px"
+                  }}
+                >
+                  {savingGroup ? "Đang lưu..." : isEditingExistingGroup ? "Cập Nhật Nhóm" : "Tạo Nhóm Mới"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Gán Nhóm Cho Người Dùng (Assign Group) */}
+      {showAssignModal && (
+        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+          <div className="budget-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px" }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <UserCheck size={18} color="#0284c7" />
+                  Đổi Nhóm Cho Người Dùng
+                </h3>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Chuyển người dùng sang nhóm mới để cập nhật hạn mức free tự động.
+                </span>
+              </div>
+              <button
+                onClick={() => setShowAssignModal(false)}
+                style={{ border: "none", background: "transparent", cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {assignFeedback && (
+              <div
+                className={`budget-modal-feedback ${assignFeedback.type}`}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  margin: "12px 0",
+                  fontSize: "13px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: assignFeedback.type === "success" ? "#ecfdf5" : "#fef2f2",
+                  color: assignFeedback.type === "success" ? "#065f46" : "#991b1b",
+                  border: `1px solid ${assignFeedback.type === "success" ? "#a7f3d0" : "#fecaca"}`
+                }}
+              >
+                {assignFeedback.type === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{assignFeedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAssign}>
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Mã Người Dùng (User ID)
+                </label>
+                <input
+                  type="text"
+                  value={editingAssign.user_id}
+                  disabled
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    background: "#f8fafc",
+                    color: "#64748b",
+                    fontSize: "13px",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "18px" }}>
+                <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "13px" }}>
+                  Chọn Nhóm Thành Viên Mới
+                </label>
+                <select
+                  value={editingAssign.new_group_code}
+                  onChange={(e) => setEditingAssign({ ...editingAssign, new_group_code: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "6px",
+                    border: "1.5px solid #0284c7",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#0f172a",
+                    background: "#fff",
+                    boxSizing: "border-box"
+                  }}
+                >
+                  {userGroups.map((g) => (
+                    <option key={g.group_code} value={g.group_code}>
+                      {g.group_name} ({g.group_code}) — {formatVND(g.daily_free_limit_vnd)}/ngày
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: "12px", color: "#64748b", marginTop: "6px", display: "block" }}>
+                  Người dùng sẽ nhận ngay hạn mức free của nhóm mới trong các lượt tương tác tiếp theo.
+                </span>
+              </div>
+
+              <div className="modal-actions" style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowAssignModal(false)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: "13px"
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn-book"
+                  disabled={savingAssign}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "#0284c7",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: "13px"
+                  }}
+                >
+                  {savingAssign ? "Đang lưu..." : "Xác Nhận Đổi Nhóm"}
                 </button>
               </div>
             </form>

@@ -33,6 +33,7 @@ from agentops import (
     cost_alert_engine,
     BudgetExceededException
 )
+from agentops.cost.user_wallet_service import user_wallet_service
 
 app = FastAPI(title="Da Nang Real Estate AI Agent API")
 
@@ -68,6 +69,26 @@ class BudgetUpdateRequest(BaseModel):
     turn_limit_vnd: float
     thread_limit_vnd: float
     daily_limit_vnd: float
+
+class TopupRequest(BaseModel):
+    user_id: str
+    amount_vnd: float
+    description: Optional[str] = None
+
+class UserFreeLimitUpdateRequest(BaseModel):
+    user_id: str
+    daily_free_limit_vnd: float
+
+class UserGroupRequest(BaseModel):
+    group_code: str
+    group_name: str
+    daily_free_limit_vnd: float
+    description: Optional[str] = ""
+    is_default: Optional[bool] = False
+
+class SetUserGroupRequest(BaseModel):
+    user_id: str
+    group_code: str
 
 @app.on_event("startup")
 async def startup_event():
@@ -138,6 +159,83 @@ def get_recent_usage_events(limit: int = 25):
     """Lấy danh sách các cuộc gọi LLM chi tiết gần đây"""
     return cost_reporting_service.get_recent_usage_events(limit=limit)
 
+# ==================== PHÂN HỆ VÍ & HẠN MỨC NGƯỜI DÙNG ====================
+@app.get("/api/user/wallet")
+def get_user_wallet(user_id: str = "default_user"):
+    """Lấy thông tin ví và hạn mức ngày 5.000đ của người dùng"""
+    return user_wallet_service.get_or_create_wallet(user_id=user_id)
+
+@app.post("/api/user/wallet/topup")
+def topup_user_wallet(req: TopupRequest):
+    """Nạp thêm tiền vào ví người dùng (hỗ trợ các gói 5k, 10k, 20k, 50k, 100k...)"""
+    wallet = user_wallet_service.topup_wallet(
+        user_id=req.user_id,
+        amount_vnd=req.amount_vnd,
+        description=req.description or ""
+    )
+    return {"success": True, "wallet": wallet}
+
+@app.get("/api/user/wallet/transactions")
+def get_user_wallet_transactions(user_id: str = "default_user", limit: int = 20):
+    """Lấy lịch sử giao dịch nạp và khấu trừ của ví người dùng"""
+    return user_wallet_service.get_user_transactions(user_id=user_id, limit=limit)
+
+# ==================== PHÂN HỆ QUẢN LÝ NHÓM NGƯỜI DÙNG & HẠN MỨC FREE ====================
+@app.get("/api/user/groups")
+def get_user_groups():
+    """Lấy danh sách các nhóm người dùng và hạn mức miễn phí mỗi ngày"""
+    return {"success": True, "groups": user_wallet_service.get_all_user_groups()}
+
+@app.post("/api/user/groups")
+def save_user_group(req: UserGroupRequest):
+    """Tạo mới hoặc cập nhật một nhóm người dùng (ví dụ: standard, vip, pro...)"""
+    try:
+        group = user_wallet_service.save_user_group(
+            group_code=req.group_code,
+            group_name=req.group_name,
+            daily_free_limit_vnd=req.daily_free_limit_vnd,
+            description=req.description or "",
+            is_default=bool(req.is_default)
+        )
+        return {"success": True, "group": group}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/user/groups/{group_code}")
+def delete_user_group(group_code: str):
+    """Xóa nhóm người dùng tùy chỉnh"""
+    try:
+        user_wallet_service.delete_user_group(group_code=group_code)
+        return {"success": True, "message": f"Đã xóa nhóm '{group_code}' thành công"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/user/wallet/set-group")
+def set_user_group(req: SetUserGroupRequest):
+    """Gán nhóm người dùng cho một user (ví dụ: chuyển user sang nhóm VIP)"""
+    try:
+        wallet = user_wallet_service.set_user_group(user_id=req.user_id, group_code=req.group_code)
+        return {"success": True, "wallet": wallet}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/admin/user-wallets")
+def get_admin_user_wallets():
+    """Lấy danh sách tất cả ví người dùng và hạn mức free (dành cho Admin)"""
+    return {"success": True, "users": user_wallet_service.get_all_user_wallets()}
+
+@app.post("/api/admin/user-wallets/free-limit")
+def update_user_free_limit(req: UserFreeLimitUpdateRequest):
+    """Admin điều chỉnh hạn mức miễn phí hàng ngày (daily_free_limit_vnd) cho user cụ thể"""
+    try:
+        updated = user_wallet_service.update_user_daily_free_limit(
+            user_id=req.user_id,
+            new_limit_vnd=req.daily_free_limit_vnd
+        )
+        return {"success": True, "wallet": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
@@ -165,7 +263,22 @@ async def chat_stream(req: ChatRequest):
     inputs = {"messages": [HumanMessage(content=req.message)]}
 
     async def event_generator():
-        # Kiểm tra trước hạn mức thread: nếu đã hết ngân sách thì chặn ngay từ đầu
+        # 1. Kiểm tra trước ngân sách cá nhân của user: 5.000đ miễn phí / ngày + số dư ví nạp
+        effective_user_id = req.user_id or "default_user"
+        try:
+            can_chat, user_budget_msg, user_wallet = user_wallet_service.check_user_can_chat(
+                user_id=effective_user_id,
+                estimated_cost_vnd=50.0
+            )
+            if not can_chat:
+                yield f"data: {json.dumps({'type': 'user_budget_exceeded', 'message': user_budget_msg, 'wallet': user_wallet})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'content': user_budget_msg})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+        except Exception as u_err:
+            print(f"[WARN] Pre-check user wallet budget failed: {u_err}")
+
+        # 2. Kiểm tra trước hạn mức thread: nếu đã hết ngân sách thì chặn ngay từ đầu
         try:
             budget_status = cost_reporting_service.get_thread_budget_status(thread_id=req.thread_id)
             if budget_status.get("is_exceeded"):
@@ -253,6 +366,16 @@ async def chat_stream(req: ChatRequest):
                 yield f"data: {json.dumps({'type': 'budget_update', 'data': budget_status})}\n\n"
             except Exception as b_err:
                 print(f"[WARN] Failed to send budget_update event: {b_err}")
+
+            # Khấu trừ chi phí vào ví user (ưu tiên 5.000đ free quota, vượt quá trừ balance)
+            try:
+                updated_wallet = user_wallet_service.deduct_request_cost(
+                    user_id=effective_user_id,
+                    request_id=request_id
+                )
+                yield f"data: {json.dumps({'type': 'wallet_update', 'data': updated_wallet})}\n\n"
+            except Exception as w_err:
+                print(f"[WARN] Failed to deduct user wallet cost: {w_err}")
 
             yield "data: [DONE]\n\n"
         except BudgetExceededException as be:
