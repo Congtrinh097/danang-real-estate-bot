@@ -37,7 +37,11 @@ from appointment_tools import (
     set_current_user_id,
     get_current_user_id
 )
-from langchain.agents.middleware import HumanInTheLoopMiddleware
+from langchain.agents.middleware import (
+    HumanInTheLoopMiddleware,
+    PIIMiddleware,
+    PIIDetectionError,
+)
 
 # 1. Định nghĩa Schema phân loại ý định (Router Agent & Input Guardrails)
 class IntentClassification(BaseModel):
@@ -234,6 +238,42 @@ appointment_hitl_middleware = HumanInTheLoopMiddleware(
     description_prefix="Yêu cầu người dùng xác nhận thông tin trước khi lưu lịch hẹn xem nhà vào cơ sở dữ liệu."
 )
 
+# Cấu hình PIIMiddleware bảo vệ dữ liệu khách hàng
+pii_middlewares = [
+    # Redact emails in user input before sending to model
+    PIIMiddleware(
+        "email",
+        strategy="redact",
+        apply_to_input=True,
+    ),
+    # Mask credit cards in user input
+    PIIMiddleware(
+        "credit_card",
+        strategy="mask",
+        apply_to_input=True,
+    ),
+    # Block API keys - raise error if detected
+    PIIMiddleware(
+        "api_key",
+        detector=r"sk-[a-zA-Z0-9]{32}",
+        strategy="block",
+        apply_to_input=True,
+    ),
+]
+
+
+def sanitize_messages_pii(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:
+    """Áp dụng các PIIMiddleware để làm sạch thông tin nhạy cảm (email, thẻ tín dụng, api key) trước khi xử lý."""
+    if not messages:
+        return messages
+    state = {"messages": list(messages)}
+    for mw in pii_middlewares:
+        res = mw.before_model(state, None)
+        if res and "messages" in res:
+            state["messages"] = res["messages"]
+    return state["messages"]
+
+
 property_agent_memory = MemorySaver()
 
 def create_property_search_agent(model: ChatOpenAI):
@@ -255,7 +295,7 @@ def create_property_search_agent(model: ChatOpenAI):
         "   - Nếu thiếu tên, số điện thoại hoặc giờ hẹn: Hãy hỏi khéo léo để khách bổ sung.\n"
         "   - KHI ĐÃ CÓ TÊN, SỐ ĐIỆN THOẠI VÀ GIỜ HẸN (kèm tên BĐS từ ngữ cảnh): BẮT BUỘC GỌI NGAY tool 'book_viewing_appointment' (note có thể để trống ''), KHÔNG ĐƯỢC tự ý trả lời bằng lời hứa suông hay cảm ơn mà không gọi tool! Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để hiển thị thẻ xác nhận cho khách hàng duyệt.\n"
         "3. QUẢN LÝ LỊCH HẸN ĐÃ ĐẶT:\n"
-        "   - Khi khách hỏi lại lịch hẹn ('Tôi có lịch hẹn nào không?', 'Xem lại lịch đã đặt'): Gọi ngay tool 'get_user_appointments'.\n"
+        "   - Khi khách hỏi lại lịch hẹn ('Tôi có lịch hẹn nào không?', 'Xem lại lịch đã đặt', 'Kiểm tra giúp tôi các lịch hẹn'): Gọi ngay tool 'get_user_appointments'. Lưu ý: Mặc định tool chỉ trả về các lịch hẹn còn hiệu lực (status='confirmed') và BẮT BUỘC KHÔNG trả về các lịch đã hủy trừ khi khách hàng hỏi đích danh về các lịch đã hủy.\n"
         "   - Khi khách muốn dời giờ, đổi ngày, sửa ghi chú: Hỏi mã lịch hẹn hoặc căn nhà, rồi gọi tool 'update_appointment'.\n"
         "   - Khi khách muốn hủy lịch hẹn: Hỏi mã lịch hẹn hoặc lý do hủy, rồi gọi tool 'cancel_appointment'.\n"
         "4. SAU KHI NHẬN KẾT QUẢ TỪ TOOL 'search_danang_properties':\n"
@@ -268,7 +308,7 @@ def create_property_search_agent(model: ChatOpenAI):
         model=model,
         tools=all_agent_tools,
         system_prompt=system_prompt,
-        middleware=[appointment_hitl_middleware],
+        middleware=[appointment_hitl_middleware, *pii_middlewares],
         checkpointer=property_agent_memory
     )
 
@@ -509,7 +549,29 @@ property_recommendation_chain = property_recommendation_prompt | llm | StrOutput
 # 3. Node 0: Router Agent điều phối ý định & Kiểm tra an toàn (Guardrail)
 def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
-    last_user_message = all_messages[-1].content if all_messages else ""
+    try:
+        sanitized_messages = sanitize_messages_pii(all_messages)
+    except PIIDetectionError as pii_err:
+        print(f"[SECURITY GUARD] Phát hiện vi phạm dữ liệu nhạy cảm (API Key): {pii_err}")
+        return {
+            "intent": "rule_violation",
+            "messages": [AIMessage(content="⚠️ [Cảnh báo An toàn & Bảo mật] Hệ thống phát hiện thông tin nhạy cảm (API key) trong tin nhắn của bạn. Vì sự an toàn bảo mật, yêu cầu này đã bị chặn. Vui lòng không chia sẻ mã khóa bí mật hoặc API key.")],
+            "citations": []
+        }
+
+    # Nếu có tin nhắn được làm sạch (redact email hoặc mask thẻ tín dụng), chuẩn bị cập nhật vào State
+    updated_messages = None
+    if sanitized_messages and all_messages:
+        if sanitized_messages[-1].content != all_messages[-1].content:
+            updated_messages = [sanitized_messages[-1]]
+
+    def make_result(intent_val: str) -> Dict[str, Any]:
+        ret = {"intent": intent_val, "citations": []}
+        if updated_messages:
+            ret["messages"] = updated_messages
+        return ret
+
+    last_user_message = sanitized_messages[-1].content if sanitized_messages else ""
     text_lower = last_user_message.lower()
 
     # Pre-check nhanh bằng heuristics đối với các trường hợp vi phạm quy tắc / prompt injection rõ ràng
@@ -519,7 +581,7 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         "jailbreak", "dan mode"
     ]
     if any(kw in text_lower for kw in jailbreak_keywords):
-        return {"intent": "rule_violation", "citations": []}
+        return make_result("rule_violation")
 
     danang_districts = ["sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "hòa vang", "đà nẵng"]
     other_locations = [
@@ -535,10 +597,11 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
     # Pre-check nhanh cho yêu cầu đặt lịch, tra cứu lịch hẹn xem nhà
     appointment_triggers = [
         "đặt lịch", "lịch hẹn", "hẹn xem nhà", "hẹn đi xem", "xem thực tế",
-        "hỏi lại lịch", "xem lịch", "lịch đã hẹn", "hủy lịch", "đổi lịch", "dời lịch"
+        "hỏi lại lịch", "xem lịch", "lịch đã hẹn", "hủy lịch", "đổi lịch", "dời lịch",
+        "kiểm tra lịch", "kiểm tra các lịch", "kiểm tra giúp tôi các lịch hẹn"
     ]
     if any(tr in text_lower for tr in appointment_triggers):
-        return {"intent": "search_property", "citations": []}
+        return make_result("search_property")
 
     # Pre-check nhanh cho yêu cầu rà soát / thẩm định hợp đồng
     contract_audit_triggers = [
@@ -551,18 +614,18 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         (any(t in text_lower for t in contract_audit_triggers) and ("rà soát" in text_lower or "thẩm định" in text_lower or "kiểm tra" in text_lower or "bẫy" in text_lower or "bắt cọc" in text_lower or "phạt" in text_lower))
     )
     if is_contract_text:
-        return {"intent": "contract_audit", "citations": []}
+        return make_result("contract_audit")
 
     # Nếu hỏi tỉnh thành khác mà không liên quan đến Đà Nẵng -> out_of_scope
     if any(loc in text_lower for loc in other_locations) and not any(dn in text_lower for dn in danang_districts):
-        return {"intent": "out_of_scope", "citations": []}
+        return make_result("out_of_scope")
 
     if any(kw in text_lower for kw in unrelated_keywords):
-        return {"intent": "out_of_scope", "citations": []}
+        return make_result("out_of_scope")
 
     try:
         invoke_kwargs = {"config": config} if config else {}
-        cleaned_router_msgs = sanitize_messages_for_prompt(all_messages, max_messages=4)
+        cleaned_router_msgs = sanitize_messages_for_prompt(sanitized_messages, max_messages=4)
         result = router_chain.invoke({"messages": cleaned_router_msgs}, **invoke_kwargs)
         intent = result.intent
     except Exception:
@@ -586,7 +649,7 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         else:
             intent = "general_chat"
 
-    return {"intent": intent, "citations": []}
+    return make_result(intent)
 
 # Conditional Edge router function
 def decide_route(state: AgentState) -> str:
@@ -618,6 +681,13 @@ def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
             reply = agent_messages[-1]
         else:
             raise ValueError("Mortgage agent không trả về tin nhắn")
+    except PIIDetectionError as pii_err:
+        print(f"[SECURITY GUARD] PIIDetectionError in mortgage_calc_node: {pii_err}")
+        return {
+            "messages": [AIMessage(content="⚠️ [Cảnh báo An toàn & Bảo mật] Hệ thống phát hiện thông tin nhạy cảm (API key) trong tin nhắn của bạn. Vì sự an toàn bảo mật, yêu cầu này đã bị chặn. Vui lòng không chia sẻ mã khóa bí mật hoặc API key.")],
+            "found_properties": [],
+            "citations": []
+        }
     except Exception:
         # Fallback an toàn qua MCP Client nếu agent gặp sự cố
         text_lower = last_user_message.lower()
@@ -668,6 +738,14 @@ def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
 def out_of_scope_response_node(state: AgentState) -> Dict[str, Any]:
     all_messages = state.get("messages", [])
     intent = state.get("intent")
+
+    # Nếu đã có phản hồi cảnh báo bảo mật từ Guardrail / PIIMiddleware thì trả về luôn
+    if all_messages and isinstance(all_messages[-1], AIMessage):
+        return {
+            "messages": [all_messages[-1]],
+            "found_properties": [],
+            "citations": []
+        }
 
     try:
         cleaned_msgs = sanitize_messages_for_prompt(all_messages, max_messages=6)
@@ -874,6 +952,15 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
             "criteria": merged,
             "citations": [],
             "hitl_interrupt": hitl_interrupt
+        }
+
+    except PIIDetectionError as pii_err:
+        print(f"[SECURITY GUARD] PIIDetectionError in property_agent_node: {pii_err}")
+        return {
+            "messages": [AIMessage(content="⚠️ [Cảnh báo An toàn & Bảo mật] Hệ thống phát hiện thông tin nhạy cảm (API key) trong tin nhắn của bạn. Vì sự an toàn bảo mật, yêu cầu này đã bị chặn. Vui lòng không chia sẻ mã khóa bí mật hoặc API key.")],
+            "found_properties": [],
+            "criteria": current_criteria,
+            "citations": []
         }
 
     except Exception as exc:

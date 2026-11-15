@@ -63,7 +63,7 @@ class AppointmentService:
         """Lấy danh sách các lịch hẹn của một user_id cụ thể"""
         query = "SELECT * FROM viewing_appointments WHERE user_id = %s"
         params = [user_id]
-        if status:
+        if status and status != "all":
             query += " AND status = %s"
             params.append(status)
         query += " ORDER BY id DESC"

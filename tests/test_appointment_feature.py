@@ -102,3 +102,41 @@ def test_appointment_tools():
     })
     assert "ĐÃ HỦY LỊCH HẸN" in cancel_res
     assert "Đã hủy" in cancel_res
+
+
+def test_get_user_appointments_excludes_cancelled():
+    """Kiểm tra khi tra cứu lịch hẹn xem nhà thì mặc định không trả về các lịch đã hủy"""
+    test_uid = "test_user_exclude_cancelled_999"
+    set_current_user_id(test_uid)
+
+    # 1. Tạo 1 lịch hẹn đang hiệu lực và 1 lịch hẹn đã hủy
+    a1 = appointment_service.create_appointment(
+        user_id=test_uid,
+        customer_name="Nguyễn Văn A",
+        customer_phone="0905111222",
+        viewing_time="10h sáng Thứ Hai",
+        property_title="Căn hộ Monarchy A",
+        note="Lịch còn hiệu lực"
+    )
+    a2 = appointment_service.create_appointment(
+        user_id=test_uid,
+        customer_name="Nguyễn Văn A",
+        customer_phone="0905111222",
+        viewing_time="15h chiều Thứ Ba",
+        property_title="Căn hộ Hiyori B",
+        note="Lịch sắp bị hủy"
+    )
+    # Hủy lịch a2
+    appointment_service.cancel_appointment(a2["id"], user_id=test_uid, reason="Bận việc cá nhân")
+
+    # 2. Mặc định tra cứu lịch hẹn (không truyền status hoặc status='confirmed')
+    default_res = get_user_appointments.invoke({})
+    assert "Căn hộ Monarchy A" in default_res
+    assert "Căn hộ Hiyori B" not in default_res
+    assert "Đã hủy" not in default_res
+
+    # 3. Tra cứu lịch khi truyền rõ status='cancelled'
+    cancelled_res = get_user_appointments.invoke({"status": "cancelled"})
+    assert "Căn hộ Hiyori B" in cancelled_res
+    assert "Căn hộ Monarchy A" not in cancelled_res
+    assert "Đã hủy" in cancelled_res

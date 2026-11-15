@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool, StructuredTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
+from langchain.agents.middleware import PIIMiddleware
 
 from mortgage_calculator import MortgageCalculator, MortgageInput
 from bank_research_service import bank_research_service
@@ -90,12 +91,35 @@ def get_mortgage_mcp_tools() -> List[BaseTool]:
 
 
 # ==================== CREATE AGENT BẰNG CREATE_AGENT ====================
-def create_mortgage_agent(model=None):
+def create_mortgage_agent(model=None, middleware: Optional[List[Any]] = None):
     """
     Khởi tạo Agent chuyên trách tính toán tài chính & lãi suất ngân hàng mua BĐS Đà Nẵng
     sử dụng `create_agent` chuẩn của LangChain kết hợp Tool Call từ MCP Adapter.
     """
     tools = get_mortgage_mcp_tools()
+
+    if middleware is None:
+        middleware = [
+            # Redact emails in user input before sending to model
+            PIIMiddleware(
+                "email",
+                strategy="redact",
+                apply_to_input=True,
+            ),
+            # Mask credit cards in user input
+            PIIMiddleware(
+                "credit_card",
+                strategy="mask",
+                apply_to_input=True,
+            ),
+            # Block API keys - raise error if detected
+            PIIMiddleware(
+                "api_key",
+                detector=r"sk-[a-zA-Z0-9]{32}",
+                strategy="block",
+                apply_to_input=True,
+            ),
+        ]
 
     system_prompt = (
         "Bạn là chuyên viên tài chính và ngân hàng cấp cao chuyên tư vấn vay vốn mua bất động sản tại TP. Đà Nẵng.\n"
@@ -113,7 +137,8 @@ def create_mortgage_agent(model=None):
     return create_agent(
         model=model,
         tools=tools,
-        system_prompt=system_prompt
+        system_prompt=system_prompt,
+        middleware=middleware
     )
 
 

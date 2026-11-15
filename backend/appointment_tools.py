@@ -54,18 +54,25 @@ def book_viewing_appointment(
         return f"❌ Lỗi khi lưu lịch hẹn vào cơ sở dữ liệu: {str(e)}"
 
 @tool
-def get_user_appointments(status: Optional[str] = None) -> str:
-    """Tra cứu tất cả các lịch hẹn xem nhà mà người dùng hiện tại đã đặt trong hệ thống.
+def get_user_appointments(status: str = "confirmed") -> str:
+    """Tra cứu các lịch hẹn xem nhà mà người dùng hiện tại đã đặt trong hệ thống.
     Args:
-        status: Lọc theo trạng thái ('confirmed' - đã xác nhận, 'cancelled' - đã hủy, hoặc để trống để lấy tất cả).
+        status: Trạng thái lịch hẹn cần tra cứu. Mặc định là 'confirmed' để chỉ lấy các lịch hẹn còn hiệu lực và KHÔNG trả về các lịch đã hủy.
+                Nếu người dùng yêu cầu rõ muốn xem các lịch đã hủy, truyền 'cancelled'. Nếu muốn xem toàn bộ lịch sử (bao gồm cả đã hủy), truyền 'all'.
     """
     user_id = get_current_user_id()
     try:
-        appts = appointment_service.get_user_appointments(user_id=user_id, status=status)
+        target_status = None if status == "all" else (status or "confirmed")
+        appts = appointment_service.get_user_appointments(user_id=user_id, status=target_status)
         if not appts:
+            if target_status == "confirmed":
+                return "Dạ hiện tại anh/chị không có lịch hẹn xem nhà nào đang hoạt động (hoặc các lịch hẹn trước đó đều đã được hủy) ạ."
+            elif target_status == "cancelled":
+                return "Dạ hiện tại anh/chị không có lịch hẹn nào đã hủy ạ."
             return "Dạ hiện tại anh/chị chưa có lịch hẹn xem nhà nào được lưu trong hệ thống ạ."
         
-        result_lines = [f"📋 DANH SÁCH LỊCH HẸN CỦA ANH/CHỊ ({len(appts)} lịch):"]
+        header_text = "CÁC LỊCH HẸN ĐANG HOẠT ĐỘNG" if target_status == "confirmed" else ("CÁC LỊCH HẸN ĐÃ HỦY" if target_status == "cancelled" else "TẤT CẢ LỊCH HẸN")
+        result_lines = [f"📋 DANH SÁCH LỊCH HẸN CỦA ANH/CHỊ ({header_text} - {len(appts)} lịch):"]
         for a in appts:
             st_text = "Đã xác nhận" if a["status"] == "confirmed" else ("Đã hủy" if a["status"] == "cancelled" else a["status"])
             result_lines.append(
