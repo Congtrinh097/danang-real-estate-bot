@@ -180,4 +180,108 @@ class CostReportingService:
             cur.close()
             conn.close()
 
+    def get_all_budgets(self) -> List[Dict[str, Any]]:
+        """Lấy toàn bộ cấu hình hạn mức chi phí các workload"""
+        conn = self._get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute("""
+                SELECT workload_type, 
+                       turn_limit_vnd, 
+                       thread_limit_vnd, 
+                       daily_limit_vnd, 
+                       currency, 
+                       updated_at 
+                FROM agentops_budgets 
+                ORDER BY workload_type;
+            """)
+            rows = cur.fetchall()
+            result = []
+            for r in rows:
+                result.append({
+                    "workload_type": r["workload_type"],
+                    "turn_limit_vnd": float(r["turn_limit_vnd"]),
+                    "thread_limit_vnd": float(r["thread_limit_vnd"]),
+                    "daily_limit_vnd": float(r["daily_limit_vnd"]),
+                    "currency": r.get("currency", "VND"),
+                    "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None
+                })
+            return result
+        finally:
+            cur.close()
+            conn.close()
+
+    def update_budget(
+        self, 
+        workload_type: str, 
+        turn_limit_vnd: float, 
+        thread_limit_vnd: float, 
+        daily_limit_vnd: float
+    ) -> Dict[str, Any]:
+        """Cập nhật hạn mức chi phí cho một workload cụ thể"""
+        conn = self._get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute("""
+                INSERT INTO agentops_budgets (workload_type, turn_limit_vnd, thread_limit_vnd, daily_limit_vnd, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (workload_type) DO UPDATE SET
+                    turn_limit_vnd = EXCLUDED.turn_limit_vnd,
+                    thread_limit_vnd = EXCLUDED.thread_limit_vnd,
+                    daily_limit_vnd = EXCLUDED.daily_limit_vnd,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING workload_type, turn_limit_vnd, thread_limit_vnd, daily_limit_vnd, currency, updated_at;
+            """, (workload_type, turn_limit_vnd, thread_limit_vnd, daily_limit_vnd))
+            conn.commit()
+            row = cur.fetchone()
+            return {
+                "workload_type": row["workload_type"],
+                "turn_limit_vnd": float(row["turn_limit_vnd"]),
+                "thread_limit_vnd": float(row["thread_limit_vnd"]),
+                "daily_limit_vnd": float(row["daily_limit_vnd"]),
+                "currency": row.get("currency", "VND"),
+                "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None
+            }
+        finally:
+            cur.close()
+            conn.close()
+
+    def get_recent_usage_events(self, limit: int = 25) -> List[Dict[str, Any]]:
+        """Lấy danh sách các sự kiện gọi LLM gần nhất"""
+        conn = self._get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute("""
+                SELECT event_id, request_id, thread_id, agent_name, provider, model_name,
+                       workload_type, input_tokens, output_tokens, total_tokens, latency_ms,
+                       cost_vnd, cost_usd, execution_status, created_at
+                FROM agentops_usage_events
+                ORDER BY created_at DESC
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+            result = []
+            for r in rows:
+                result.append({
+                    "event_id": r["event_id"],
+                    "request_id": r["request_id"],
+                    "thread_id": r["thread_id"],
+                    "agent_name": r["agent_name"],
+                    "provider": r["provider"],
+                    "model_name": r["model_name"],
+                    "workload_type": r["workload_type"],
+                    "input_tokens": int(r["input_tokens"] or 0),
+                    "output_tokens": int(r["output_tokens"] or 0),
+                    "total_tokens": int(r["total_tokens"] or 0),
+                    "latency_ms": int(r["latency_ms"] or 0),
+                    "cost_vnd": float(r["cost_vnd"] or 0.0),
+                    "cost_usd": float(r["cost_usd"] or 0.0),
+                    "execution_status": r["execution_status"],
+                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None
+                })
+            return result
+        finally:
+            cur.close()
+            conn.close()
+
 cost_reporting_service = CostReportingService()

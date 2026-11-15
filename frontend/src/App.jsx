@@ -27,8 +27,12 @@ import {
   Sparkles,
   Loader2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Activity,
+  BarChart3,
+  DollarSign
 } from "lucide-react";
+import AgentOpsAdmin from "./components/AgentOpsAdmin";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
 Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
@@ -85,6 +89,8 @@ export default function App() {
   const [userId] = useState(() => getOrCreateUserId());
   // Navigation: "chat" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
+  // Admin Sub-Navigation: "legal" | "agentops"
+  const [adminSubTab, setAdminSubTab] = useState("legal");
   // Mobile Sidebar Drawer Toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -1218,7 +1224,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* ==================== MÀN HÌNH QUẢN TRỊ TÀI LIỆU PHÁP LÝ ==================== */
+        /* ==================== MÀN HÌNH QUẢN TRỊ HỆ THỐNG ==================== */
         <div className="admin-view-container">
           <div className="admin-header">
             <div className="admin-header-title-group">
@@ -1231,10 +1237,14 @@ export default function App() {
               </button>
               <div>
                 <h2 className="admin-title">
-                  Quản Trị Cơ Sở Dữ Liệu Pháp Lý
+                  {adminSubTab === "legal"
+                    ? "Quản Trị Cơ Sở Dữ Liệu Pháp Lý"
+                    : "Quản Trị Chi Phí & Giám Sát AgentOps"}
                 </h2>
                 <p className="admin-subtitle">
-                  Tải lên file PDF, Word (.docx), Markdown (.md) và nạp vector Qdrant.
+                  {adminSubTab === "legal"
+                    ? "Tải lên file PDF, Word (.docx), Markdown (.md) và nạp vector Qdrant."
+                    : "Giám sát chi phí LLM, tokens, hiệu năng mô hình AI và kiểm soát ngân sách theo thời gian thực."}
                 </p>
               </div>
             </div>
@@ -1249,185 +1259,209 @@ export default function App() {
             </div>
           </div>
 
-          {/* Thông báo Admin */}
-          {adminMessage && (
-            <div
-              style={{
-                padding: "12px 16px",
-                borderRadius: "10px",
-                marginBottom: "20px",
-                fontSize: "13px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background:
-                  adminMessage.type === "success" ? "#ecfdf5" : adminMessage.type === "error" ? "#fef2f2" : "#eff6ff",
-                color:
-                  adminMessage.type === "success" ? "#065f46" : adminMessage.type === "error" ? "#991b1b" : "#1e40af",
-                border: `1px solid ${
-                  adminMessage.type === "success" ? "#a7f3d0" : adminMessage.type === "error" ? "#fecaca" : "#bfdbfe"
-                }`
-              }}
+          {/* Thanh Chuyển Tab Phân Hệ Quản Trị */}
+          <div className="admin-subnav-bar">
+            <button
+              className={`admin-subnav-btn ${adminSubTab === "legal" ? "active" : ""}`}
+              onClick={() => setAdminSubTab("legal")}
             >
-              <span>{adminMessage.text}</span>
-              <button
-                onClick={() => setAdminMessage(null)}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit" }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
+              <Scale size={15} />
+              <span>Cơ Sở Dữ Liệu Pháp Lý</span>
+            </button>
+            <button
+              className={`admin-subnav-btn ${adminSubTab === "agentops" ? "active" : ""}`}
+              onClick={() => setAdminSubTab("agentops")}
+            >
+              <Activity size={15} />
+              <span>Quản Trị Chi Phí & AgentOps</span>
+            </button>
+          </div>
 
-          {/* Stats Grid */}
-          <div className="admin-stats-grid">
-            <div className="admin-stat-card">
-              <div style={{ background: "#dbeafe", color: "#2563eb", padding: "10px", borderRadius: "10px" }}>
-                <FileText size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số tài liệu</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>{legalDocs.length}</div>
-              </div>
-            </div>
+          {adminSubTab === "agentops" ? (
+            <AgentOpsAdmin API_BASE={API_BASE} />
+          ) : (
+            <>
+              {/* Thông báo Admin */}
+              {adminMessage && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "10px",
+                    marginBottom: "20px",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background:
+                      adminMessage.type === "success" ? "#ecfdf5" : adminMessage.type === "error" ? "#fef2f2" : "#eff6ff",
+                    color:
+                      adminMessage.type === "success" ? "#065f46" : adminMessage.type === "error" ? "#991b1b" : "#1e40af",
+                    border: `1px solid ${
+                      adminMessage.type === "success" ? "#a7f3d0" : adminMessage.type === "error" ? "#fecaca" : "#bfdbfe"
+                    }`
+                  }}
+                >
+                  <span>{adminMessage.text}</span>
+                  <button
+                    onClick={() => setAdminMessage(null)}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit" }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
 
-            <div className="admin-stat-card">
-              <div style={{ background: "#dcfce7", color: "#16a34a", padding: "10px", borderRadius: "10px" }}>
-                <Database size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số đoạn (Chunks)</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
-                  {legalDocs.reduce((acc, d) => acc + (d.chunks_count || 0), 0)}
+              {/* Stats Grid */}
+              <div className="admin-stats-grid">
+                <div className="admin-stat-card">
+                  <div style={{ background: "#dbeafe", color: "#2563eb", padding: "10px", borderRadius: "10px" }}>
+                    <FileText size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số tài liệu</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>{legalDocs.length}</div>
+                  </div>
+                </div>
+
+                <div className="admin-stat-card">
+                  <div style={{ background: "#dcfce7", color: "#16a34a", padding: "10px", borderRadius: "10px" }}>
+                    <Database size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số đoạn (Chunks)</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
+                      {legalDocs.reduce((acc, d) => acc + (d.chunks_count || 0), 0)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-stat-card">
+                  <div style={{ background: "#fef3c7", color: "#d97706", padding: "10px", borderRadius: "10px" }}>
+                    <Scale size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Vector Collection</div>
+                    <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>danang_legal_docs</div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="admin-stat-card">
-              <div style={{ background: "#fef3c7", color: "#d97706", padding: "10px", borderRadius: "10px" }}>
-                <Scale size={22} />
+              {/* Vùng Upload Dropzone */}
+              <div className="admin-upload-zone" onClick={() => fileInputRef.current?.click()}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  accept=".pdf,.docx,.md,.markdown,.txt"
+                  onChange={handleFileUpload}
+                />
+                <UploadCloud size={40} color="#2563eb" style={{ margin: "0 auto 10px" }} />
+                <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a", marginBottom: "6px" }}>
+                  {uploading ? "Đang xử lý tài liệu..." : "Tải lên văn bản pháp lý mới"}
+                </h4>
+                <p style={{ fontSize: "13px", color: "#64748b" }}>
+                  Hỗ trợ định dạng <b>.pdf</b>, <b>.docx</b> (Word) và <b>.md</b> (Markdown). Hệ thống tự động chuyển đổi sang Markdown chuẩn.
+                </p>
               </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Vector Collection</div>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>danang_legal_docs</div>
-              </div>
-            </div>
-          </div>
 
-          {/* Vùng Upload Dropzone */}
-          <div className="admin-upload-zone" onClick={() => fileInputRef.current?.click()}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: "none" }}
-              accept=".pdf,.docx,.md,.markdown,.txt"
-              onChange={handleFileUpload}
-            />
-            <UploadCloud size={40} color="#2563eb" style={{ margin: "0 auto 10px" }} />
-            <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a", marginBottom: "6px" }}>
-              {uploading ? "Đang xử lý tài liệu..." : "Tải lên văn bản pháp lý mới"}
-            </h4>
-            <p style={{ fontSize: "13px", color: "#64748b" }}>
-              Hỗ trợ định dạng <b>.pdf</b>, <b>.docx</b> (Word) và <b>.md</b> (Markdown). Hệ thống tự động chuyển đổi sang Markdown chuẩn.
-            </p>
-          </div>
+              {/* Bảng danh sách tài liệu */}
+              <div className="legal-table-container">
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>
+                    Danh Sách Văn Bản Quy Phạm Pháp Luật
+                  </h4>
+                  <button
+                    onClick={fetchLegalDocs}
+                    style={{
+                      background: "#f1f5f9",
+                      border: "none",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Làm mới
+                  </button>
+                </div>
 
-          {/* Bảng danh sách tài liệu */}
-          <div className="legal-table-container">
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>
-                Danh Sách Văn Bản Quy Phạm Pháp Luật
-              </h4>
-              <button
-                onClick={fetchLegalDocs}
-                style={{
-                  background: "#f1f5f9",
-                  border: "none",
-                  padding: "6px 12px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  fontWeight: "600"
-                }}
-              >
-                Làm mới
-              </button>
-            </div>
-
-            <table className="legal-table">
-              <thead>
-                <tr>
-                  <th>Tên văn bản</th>
-                  <th>Tập tin gốc</th>
-                  <th>Kích thước</th>
-                  <th>Ngày nạp</th>
-                  <th>Trạng thái</th>
-                  <th>Số Chunks</th>
-                  <th style={{ textAlign: "right" }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {legalDocs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "30px", color: "#94a3b8" }}>
-                      Chưa có tài liệu pháp lý nào. Hãy tải lên tài liệu đầu tiên!
-                    </td>
-                  </tr>
-                ) : (
-                  legalDocs.map((doc) => (
-                    <tr key={doc.id}>
-                      <td style={{ fontWeight: "600", color: "#0f172a" }}>{doc.title || doc.filename}</td>
-                      <td>
-                        <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" }}>
-                          {doc.filename}
-                        </span>
-                      </td>
-                      <td>{(doc.size / 1024).toFixed(1)} KB</td>
-                      <td>{doc.uploaded_at}</td>
-                      <td>
-                        {doc.status === "indexed" ? (
-                          <span className="badge-status badge-indexed">
-                            <Check size={12} style={{ marginRight: "3px" }} /> Đã Index
-                          </span>
-                        ) : (
-                          <span className="badge-status badge-pending">
-                            <AlertCircle size={12} style={{ marginRight: "3px" }} /> Chờ Index
-                          </span>
-                        )}
-                      </td>
-                      <td><b>{doc.chunks_count || 0}</b></td>
-                      <td style={{ textAlign: "right" }}>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#e0f2fe", color: "#0369a1" }}
-                          onClick={() => handlePreviewDoc(doc.id, doc.title || doc.filename)}
-                          title="Xem trước Markdown"
-                        >
-                          <Eye size={12} /> Xem
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#dcfce7", color: "#15803d" }}
-                          onClick={() => handleIndexDoc(doc.id)}
-                          title="Cắt đoạn và nạp Vector vào Qdrant"
-                        >
-                          <Database size={12} /> Nạp Vector
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#fee2e2", color: "#b91c1c" }}
-                          onClick={() => handleDeleteDoc(doc.id, doc.title || doc.filename)}
-                          title="Xóa tài liệu"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </td>
+                <table className="legal-table">
+                  <thead>
+                    <tr>
+                      <th>Tên văn bản</th>
+                      <th>Tập tin gốc</th>
+                      <th>Kích thước</th>
+                      <th>Ngày nạp</th>
+                      <th>Trạng thái</th>
+                      <th>Số Chunks</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {legalDocs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: "center", padding: "30px", color: "#94a3b8" }}>
+                          Chưa có tài liệu pháp lý nào. Hãy tải lên tài liệu đầu tiên!
+                        </td>
+                      </tr>
+                    ) : (
+                      legalDocs.map((doc) => (
+                        <tr key={doc.id}>
+                          <td style={{ fontWeight: "600", color: "#0f172a" }}>{doc.title || doc.filename}</td>
+                          <td>
+                            <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" }}>
+                              {doc.filename}
+                            </span>
+                          </td>
+                          <td>{(doc.size / 1024).toFixed(1)} KB</td>
+                          <td>{doc.uploaded_at}</td>
+                          <td>
+                            {doc.status === "indexed" ? (
+                              <span className="badge-status badge-indexed">
+                                <Check size={12} style={{ marginRight: "3px" }} /> Đã Index
+                              </span>
+                            ) : (
+                              <span className="badge-status badge-pending">
+                                <AlertCircle size={12} style={{ marginRight: "3px" }} /> Chờ Index
+                              </span>
+                            )}
+                          </td>
+                          <td><b>{doc.chunks_count || 0}</b></td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#e0f2fe", color: "#0369a1" }}
+                              onClick={() => handlePreviewDoc(doc.id, doc.title || doc.filename)}
+                              title="Xem trước Markdown"
+                            >
+                              <Eye size={12} /> Xem
+                            </button>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#dcfce7", color: "#15803d" }}
+                              onClick={() => handleIndexDoc(doc.id)}
+                              title="Cắt đoạn và nạp Vector vào Qdrant"
+                            >
+                              <Database size={12} /> Nạp Vector
+                            </button>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#fee2e2", color: "#b91c1c" }}
+                              onClick={() => handleDeleteDoc(doc.id, doc.title || doc.filename)}
+                              title="Xóa tài liệu"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

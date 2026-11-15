@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from config import settings
 from ..reporting.cost_summary import cost_reporting_service
 
@@ -79,5 +80,35 @@ class CostAlertEngine:
                 conn.close()
 
         return alerts
+
+    def get_alert_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Lấy lịch sử các cảnh báo chi phí và vận hành từ cơ sở dữ liệu"""
+        conn = self._get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute("""
+                SELECT alert_id, alert_type, severity, workload_type, actual_value,
+                       threshold_value, message, created_at
+                FROM agentops_alert_events
+                ORDER BY created_at DESC
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+            result = []
+            for r in rows:
+                result.append({
+                    "alert_id": r["alert_id"],
+                    "alert_type": r["alert_type"],
+                    "severity": r["severity"],
+                    "workload_type": r["workload_type"],
+                    "actual_value": float(r["actual_value"]) if r.get("actual_value") is not None else None,
+                    "threshold_value": float(r["threshold_value"]) if r.get("threshold_value") is not None else None,
+                    "message": r["message"],
+                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None
+                })
+            return result
+        finally:
+            cur.close()
+            conn.close()
 
 cost_alert_engine = CostAlertEngine()

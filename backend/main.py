@@ -63,6 +63,12 @@ class LeadRequest(BaseModel):
     property_id: str
     note: str = ""
 
+class BudgetUpdateRequest(BaseModel):
+    workload_type: str
+    turn_limit_vnd: float
+    thread_limit_vnd: float
+    daily_limit_vnd: float
+
 @app.on_event("startup")
 async def startup_event():
     # Tự động nạp dữ liệu mẫu vào Qdrant khi backend khởi động
@@ -105,6 +111,32 @@ def get_cost_summary():
 def get_alerts():
     """Kiểm tra và kích hoạt cảnh báo ngân sách"""
     return cost_alert_engine.evaluate_and_record_alerts()
+
+@app.get("/api/agentops/alerts/history")
+def get_alert_history(limit: int = 20):
+    """Lấy lịch sử các cảnh báo chi phí và vận hành đã ghi nhận"""
+    return cost_alert_engine.get_alert_history(limit=limit)
+
+@app.get("/api/agentops/budgets")
+def get_budgets():
+    """Lấy danh sách cấu hình hạn mức chi phí (agentops_budgets)"""
+    return {"success": True, "budgets": cost_reporting_service.get_all_budgets()}
+
+@app.post("/api/agentops/budgets")
+def update_budget(req: BudgetUpdateRequest):
+    """Cập nhật hạn mức chi phí cho workload (chat, evaluation,...)"""
+    updated = cost_reporting_service.update_budget(
+        workload_type=req.workload_type,
+        turn_limit_vnd=req.turn_limit_vnd,
+        thread_limit_vnd=req.thread_limit_vnd,
+        daily_limit_vnd=req.daily_limit_vnd
+    )
+    return {"success": True, "budget": updated}
+
+@app.get("/api/agentops/reports/recent-events")
+def get_recent_usage_events(limit: int = 25):
+    """Lấy danh sách các cuộc gọi LLM chi tiết gần đây"""
+    return cost_reporting_service.get_recent_usage_events(limit=limit)
 
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
