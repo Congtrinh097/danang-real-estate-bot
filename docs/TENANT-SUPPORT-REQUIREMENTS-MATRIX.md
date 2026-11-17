@@ -14,6 +14,8 @@ Quy ước trạng thái:
 
 | Commit | Nội dung liên quan | Áp dụng |
 |---|---|---|
+| `3549ff1` | Merge `origin/master`, resolve integration regressions, add live RAGAS evidence và CI PostgreSQL service | Integration/baseline verification |
+| `f0e433a` | Requirements matrix, checklist và governance evidence | Audit/documentation |
 | `59c289d` | Tenant Support/SLA workflow, hybrid RAG, ticketing MCP, HITL, SLA sensor, UI, tests và CI | Implementation chính cho ma trận này |
 | `918ef98` | Mở rộng legal RAGAS golden samples và test coverage | Baseline RAG evaluation |
 | `e1de5e9` | Thêm RAGAS evaluation API/CLI | Baseline RAG evaluation |
@@ -32,7 +34,7 @@ Quy ước trạng thái:
 | `b9af291` | DeepEval evaluator và contract audit tests | Ứng viên để hoàn thành DeepEval checklist |
 | `d7f2f3b` | AgentOps & Cost Management dashboard | Ứng viên cho dashboard/reporting |
 
-Không tìm thấy merge-request refs được publish qua `refs/merge-requests/*/head` trên remote tại thời điểm kiểm tra. Vì vậy tài liệu không gán số PR khi chưa có bằng chứng.
+Merge request đã tạo: [!1 — feat: tenant support and SLA assurance](https://git.fsoft-academy.edu.vn/ai-program/ai-application-engineer/workshop-hackathon-2.0/flezi_e3_aie04_flezi-engineering_nhom1_real_estate_bot/-/merge_requests/1).
 
 ## Ma trận đối chiếu
 
