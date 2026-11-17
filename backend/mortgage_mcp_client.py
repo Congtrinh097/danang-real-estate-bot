@@ -1,8 +1,20 @@
+import sys
 import asyncio
+import concurrent.futures
+from pathlib import Path
 from typing import Optional, Dict, Any, List
-from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from mortgage_mcp_server import mortgage_mcp_server
+from langchain_core.tools import BaseTool, StructuredTool
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain.agents import create_agent
+from langchain.agents.middleware import PIIMiddleware
+
+from mortgage_calculator import MortgageCalculator, MortgageInput
+from bank_research_service import bank_research_service
+
+# Thư mục gốc backend & đường dẫn tới mortgage_mcp_server.py
+backend_dir = Path(__file__).resolve().parent
+server_script_path = str(backend_dir / "mortgage_mcp_server.py")
 
 
 class MortgageToolArgs(BaseModel):
@@ -16,69 +28,156 @@ class MortgageToolArgs(BaseModel):
     method: str = Field("reducing_balance", description="'reducing_balance' (dư nợ giảm dần) hoặc 'flat' (trả đều)")
 
 
-class MortgageMCPClient:
-    """MCP Client kết nối tới Mortgage MCP Server và điều phối thực thi Tool cho LLM."""
+# ==================== MCP CLIENT ADAPTER ====================
+_MCP_CLIENT: Optional[MultiServerMCPClient] = None
+_CACHED_MCP_TOOLS: Optional[List[BaseTool]] = None
 
+
+def get_mcp_client() -> MultiServerMCPClient:
+    """Khởi tạo hoặc lấy instance MultiServerMCPClient kết nối tới Mortgage MCP Server qua stdio transport."""
+    global _MCP_CLIENT
+    if _MCP_CLIENT is None:
+        _MCP_CLIENT = MultiServerMCPClient({
+            "mortgage": {
+                "transport": "stdio",
+                "command": sys.executable,
+                "args": [server_script_path],
+            }
+        })
+    return _MCP_CLIENT
+
+
+def _wrap_tool_for_sync(tool: BaseTool) -> BaseTool:
+    """Hỗ trợ cả gọi đồng bộ (.invoke) và bất đồng bộ (.ainvoke) cho LangChain Tool tạo từ MCP Adapter."""
+    if hasattr(tool, "coroutine") and tool.coroutine and not getattr(tool, "func", None):
+        def _sync_func(*args, **kwargs):
+            tool_input = kwargs if kwargs else (args[0] if args else {})
+            def _call():
+                return asyncio.run(tool.coroutine(**tool_input))
+            try:
+                res = _call()
+            except RuntimeError:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    res = pool.submit(_call).result()
+
+            if getattr(tool, "response_format", None) == "content_and_artifact":
+                return (res, res)
+            return res
+
+        tool.func = _sync_func
+    return tool
+
+
+async def a_get_mortgage_mcp_tools() -> List[BaseTool]:
+    """Lấy danh sách LangChain Tools từ Mortgage MCP Server bất đồng bộ thông qua langchain-mcp-adapters."""
+    global _CACHED_MCP_TOOLS
+    if _CACHED_MCP_TOOLS is None:
+        client = get_mcp_client()
+        raw_tools = await client.get_tools()
+        _CACHED_MCP_TOOLS = [_wrap_tool_for_sync(t) for t in raw_tools]
+    return _CACHED_MCP_TOOLS
+
+
+def get_mortgage_mcp_tools() -> List[BaseTool]:
+    """Lấy danh sách LangChain Tools từ Mortgage MCP Server đồng bộ."""
+    global _CACHED_MCP_TOOLS
+    if _CACHED_MCP_TOOLS is not None:
+        return _CACHED_MCP_TOOLS
+    try:
+        return asyncio.run(a_get_mortgage_mcp_tools())
+    except RuntimeError:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(lambda: asyncio.run(a_get_mortgage_mcp_tools())).result()
+
+
+# ==================== CREATE AGENT BẰNG CREATE_AGENT ====================
+def create_mortgage_agent(model=None, middleware: Optional[List[Any]] = None):
+    """
+    Khởi tạo Agent chuyên trách tính toán tài chính & lãi suất ngân hàng mua BĐS Đà Nẵng
+    sử dụng `create_agent` chuẩn của LangChain kết hợp Tool Call từ MCP Adapter.
+    """
+    tools = get_mortgage_mcp_tools()
+
+    if middleware is None:
+        middleware = [
+            # Redact emails in user input before sending to model
+            PIIMiddleware(
+                "email",
+                strategy="redact",
+                apply_to_input=True,
+            ),
+            # Mask credit cards in user input
+            PIIMiddleware(
+                "credit_card",
+                strategy="mask",
+                apply_to_input=True,
+            ),
+            # Block API keys - raise error if detected
+            PIIMiddleware(
+                "api_key",
+                detector=r"sk-[a-zA-Z0-9]{32}",
+                strategy="block",
+                apply_to_input=True,
+            ),
+        ]
+
+    system_prompt = (
+        "Bạn là chuyên viên tài chính và ngân hàng cấp cao chuyên tư vấn vay vốn mua bất động sản tại TP. Đà Nẵng.\n"
+        "Nhiệm vụ trọng tâm:\n"
+        "1. KHI NGƯỜI DÙNG HỎI SO SÁNH CÁC GÓI VAY, LÃI SUẤT NGÂN HÀNG HIỆN TẠI, HOẶC NÊN CHỌN NGÂN HÀNG NÀO (Vietcombank, BIDV, Techcombank, MBBank, ACB...):\n"
+        "   - BẮT BUỘC phải gọi tool 'search_bank_mortgage_rates' để có bảng dữ liệu lãi suất thị trường thực tế và tính toán lãi suất bình quân theo số năm vay.\n"
+        "   - Cung cấp bảng so sánh rõ ràng: Lãi ưu đãi, Thời hạn ưu đãi, Lãi thả nổi, Lãi bình quân cả kỳ, Phí phạt trả trước hạn.\n"
+        "   - Đưa ra đề xuất cụ thể theo mục đích: An cư lâu dài (ưu tiên Big 4 biên độ thấp), Đầu tư lướt sóng tất toán sớm (ưu tiên phí phạt thấp/miễn phí sớm), hoặc Tối ưu dòng tiền trả nợ.\n"
+        "2. KHI NGƯỜI DÙNG CẦN TÍNH TOÁN CHI TIẾT SỐ TIỀN TRẢ GÓP HÀNG THÁNG CỤ THỂ:\n"
+        "   - BẮT BUỘC gọi tool 'calculate_mortgage_loan' để nhận bảng tính toán chuẩn xác.\n"
+        "Quy đổi tiền tệ sang VNĐ chính xác: '2 tỷ' -> 2000000000, '1.5 tỷ' -> 1500000000, '800 triệu' -> 800000000.\n"
+        "Thái độ giao tiếp luôn nhã nhặn, chuyên nghiệp, đồng hành và hỗ trợ khách hàng tối ưu chi phí lãi vay."
+    )
+
+    return create_agent(
+        model=model,
+        tools=tools,
+        system_prompt=system_prompt,
+        middleware=middleware
+    )
+
+
+# ==================== BACKWARD COMPATIBILITY ====================
+class MortgageMCPClientLegacy:
+    """Wrapper tương thích ngược cho code cũ khi cần gọi trực tiếp call_tool."""
     def __init__(self, server=None):
-        self.server = server or mortgage_mcp_server
-
-    async def a_call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
-        """Gọi thực thi Tool bất đồng bộ trên MCP Server theo giao thức MCP."""
-        call_result = await self.server.call_tool(tool_name, arguments)
-        if call_result.content:
-            texts = [c.text for c in call_result.content if hasattr(c, "text")]
-            return "\n".join(texts)
-        return ""
+        self.server = server
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
-        """Gọi thực thi Tool đồng bộ cho LangChain Tool execution."""
-        try:
-            return asyncio.run(self.a_call_tool(tool_name, arguments))
-        except RuntimeError:
-            import concurrent.futures
+        if tool_name == "search_bank_mortgage_rates":
+            packages, insights = bank_research_service.research_market(
+                tenure_years=arguments.get("tenure_years", 20) or 20,
+                bank_names=arguments.get("bank_names")
+            )
+            report = bank_research_service.format_comparison_report(
+                packages=packages,
+                tenure_years=arguments.get("tenure_years", 20) or 20,
+                loan_amount=arguments.get("loan_amount"),
+                loan_purpose=arguments.get("loan_purpose", "mua_nha_o") or "mua_nha_o"
+            )
+            if insights:
+                report += "\n\n📌 **Dữ liệu & Cập nhật thị trường:**\n" + "\n".join(insights[:2])
+            return report
 
-            def _run() -> str:
-                return asyncio.run(self.a_call_tool(tool_name, arguments))
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(_run).result()
-
-    def get_langchain_tool(self) -> StructuredTool:
-        """Chuyển đổi MCP Tool thành LangChain StructuredTool để LLM bind và gọi."""
-        def _execute_tool(
-            property_price: Optional[float] = None,
-            loan_amount: Optional[float] = None,
-            loan_ratio: Optional[float] = 70.0,
-            tenure_years: int = 20,
-            annual_interest_rate: float = 8.5,
-            preferential_rate: Optional[float] = None,
-            preferential_months: int = 0,
-            method: str = "reducing_balance"
-        ) -> str:
-            args = {
-                "property_price": property_price,
-                "loan_amount": loan_amount,
-                "loan_ratio": loan_ratio,
-                "tenure_years": tenure_years,
-                "annual_interest_rate": annual_interest_rate,
-                "preferential_rate": preferential_rate,
-                "preferential_months": preferential_months,
-                "method": method
-            }
-            return self.call_tool("calculate_mortgage_loan", args)
-
-        return StructuredTool.from_function(
-            func=_execute_tool,
-            name="calculate_mortgage_loan",
-            description=(
-                "Công cụ tính lãi suất vay ngân hàng mua nhà đất tại Đà Nẵng qua MCP Client.\n"
-                "Sử dụng khi người dùng hỏi mua nhà trả góp, vay ngân hàng bao nhiêu tiền mỗi tháng, "
-                "bảng tính dư nợ giảm dần hoặc trả đều."
-            ),
-            args_schema=MortgageToolArgs
+        inp = MortgageInput(
+            property_price=arguments.get("property_price"),
+            loan_amount=arguments.get("loan_amount"),
+            loan_ratio=arguments.get("loan_ratio", 70.0) or 70.0,
+            tenure_years=arguments.get("tenure_years", 20) or 20,
+            annual_interest_rate=arguments.get("annual_interest_rate", 8.5) or 8.5,
+            preferential_rate=arguments.get("preferential_rate"),
+            preferential_months=arguments.get("preferential_months", 0) or 0,
+            method=arguments.get("method", "reducing_balance") or "reducing_balance"
         )
+        return MortgageCalculator.calculate(inp).summary_markdown
 
 
-# Singleton instance MCP Client
-mortgage_mcp_client = MortgageMCPClient()
-mortgage_langchain_tool = mortgage_mcp_client.get_langchain_tool()
+MortgageMCPClient = MortgageMCPClientLegacy
+mortgage_mcp_client = MortgageMCPClientLegacy()
+mortgage_tools_list = get_mortgage_mcp_tools()
+mortgage_langchain_tool = mortgage_tools_list[0] if mortgage_tools_list else None

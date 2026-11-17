@@ -42,6 +42,7 @@ venv.bak/
 # Database & Local Storage
 data/postgres_data/
 data/qdrant_storage/
+data/qdrant_local/
 backend/data/qdrant_local/
 *.sqlite3
 *.db
@@ -70,9 +71,15 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & Traces
 logs/
 *.log
+*.jsonl
+backend/data/traces/
+data/traces/
 
 # Archify visual checks
 *.visual-check.*
+
+# Cloudflare
+.cloudflared*

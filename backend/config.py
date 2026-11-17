@@ -28,12 +28,20 @@ class Settings(BaseSettings):
     ROUTER_MODEL_NAME: Optional[str] = os.getenv("ROUTER_MODEL_NAME", None)
     ROUTER_BASE_URL: Optional[str] = os.getenv("ROUTER_BASE_URL", None)
     ROUTER_API_KEY: Optional[str] = os.getenv("ROUTER_API_KEY", None)
+
+    # Configurable Judge Model cho Ragas và DeepEval (Mặc định: gpt-6-luna)
+    JUDGE_MODEL_NAME: str = os.getenv("JUDGE_MODEL_NAME", "gpt-6-luna")
+    JUDGE_BASE_URL: Optional[str] = os.getenv("JUDGE_BASE_URL", None)
+    JUDGE_API_KEY: Optional[str] = os.getenv("JUDGE_API_KEY", None)
     
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "danang_properties")
     QDRANT_LEGAL_COLLECTION_NAME: str = os.getenv("QDRANT_LEGAL_COLLECTION_NAME", "danang_legal_docs")
     
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://admin:danang_realestate_secret@localhost:5435/danang_real_estate")
+
+    # Tavily Web Search API (Cho nghiên cứu lãi suất ngân hàng và thị trường)
+    TAVILY_API_KEY: Optional[str] = os.getenv("TAVILY_API_KEY", "")
 
     # Tenant Support / API security. Keep ADMIN_API_KEY empty only for local development.
     ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
@@ -62,5 +70,7 @@ if settings.LANGCHAIN_API_KEY:
     os.environ["LANGCHAIN_API_KEY"] = settings.LANGCHAIN_API_KEY
 if settings.LANGCHAIN_PROJECT:
     os.environ["LANGCHAIN_PROJECT"] = settings.LANGCHAIN_PROJECT
+if settings.TAVILY_API_KEY:
+    os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
 
 

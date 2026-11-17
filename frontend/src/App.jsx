@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import {
   Send,
   Building2,
@@ -18,13 +21,73 @@ import {
   AlertCircle,
   Database,
   ArrowRight,
+  Menu,
+  Paperclip,
+  Copy,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  BarChart3,
+  DollarSign,
   LifeBuoy,
   Clock,
   ShieldCheck,
   RefreshCw
 } from "lucide-react";
+import AgentOpsAdmin from "./components/AgentOpsAdmin";
 
-const API_BASE = "http://localhost:8000";
+const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
+Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
+- Bên A (Bên Bán): Công ty Cổ phần Đầu tư Bất động sản XYZ (Chủ đầu tư dự án căn hộ The Ocean View Đà Nẵng).
+- Bên B (Bên Mua): Ông Nguyễn Văn A, CCCD số 04809000xxxx.
+
+Hai bên thống nhất ký thỏa thuận đặt cọc với các điều khoản sau:
+Điều 1: Căn hộ số A12-05 tại dự án The Ocean View, quận Sơn Trà, TP. Đà Nẵng. Dự án đang hoàn thiện móng cọc. Giá bán: 2.000.000.000 VNĐ (Hai tỷ đồng).
+Điều 2: Tiền đặt cọc: Bên B đồng ý đặt cọc cho Bên A số tiền là 300.000.000 VNĐ (Ba trăm triệu đồng, tương đương 15% tổng giá trị căn hộ) ngay sau khi ký thỏa thuận này.
+Điều 3: Phạt vi phạm:
+- Nếu Bên B (Bên mua) không tiếp tục ký Hợp đồng mua bán đúng thời hạn thì Bên B sẽ mất toàn bộ số tiền đặt cọc 300.000.000 VNĐ cho Bên A.
+- Nếu Bên A (Bên bán) không tiếp tục bán căn hộ cho Bên B thì Bên A chỉ có trách nhiệm hoàn trả lại số tiền đặt cọc gốc 300.000.000 VNĐ cho Bên B trong vòng 30 ngày mà không phải chịu bất kỳ khoản phạt cọc hay bồi thường nào khác.
+Điều 4: Nghĩa vụ thuế phí: Mọi khoản thuế TNCN, lệ phí trước bạ và phí cấp sổ hồng do Bên B (Bên mua) tự chịu chi phí.
+
+Nhờ AI thẩm định các điều khoản, bẫy cọc và tính hợp pháp của bản thỏa thuận đặt cọc này giúp tôi!`;
+
+const INITIAL_GREETING = {
+  sender: "bot",
+  text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản và Pháp lý nhà ở tại Đà Nẵng. Anh/chị đang có nhu cầu thuê/mua nhà đất hay cần tư vấn về thủ tục pháp lý, sổ đỏ, hợp đồng đặt cọc ạ?",
+  properties: [],
+  citations: []
+};
+
+const createNewThreadObject = () => {
+  const id = "session_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 6);
+  return {
+    id,
+    title: "Cuộc trò chuyện mới",
+    messages: [INITIAL_GREETING],
+    createdAt: Date.now()
+  };
+};
+
+const USER_ID_KEY = "danang_re_user_id";
+
+const getOrCreateUserId = () => {
+  try {
+    let uid = localStorage.getItem(USER_ID_KEY);
+    if (!uid) {
+      uid = "usr_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem(USER_ID_KEY, uid);
+    }
+    return uid;
+  } catch (e) {
+    return "usr_guest_" + Math.random().toString(36).substring(2, 8);
+  }
+};
+
+const STORAGE_KEY = "danang_re_threads";
+const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 function TenantSupportPanel({ onNavigate }) {
   const [form, setForm] = useState({
@@ -84,10 +147,9 @@ function TenantSupportPanel({ onNavigate }) {
         <div className="header-nav">
           <button className="nav-tab-btn" onClick={() => onNavigate("chat")}><MessageSquare size={14} /> Tư vấn BĐS</button>
           <button className="nav-tab-btn active"><LifeBuoy size={14} /> Tenant Support</button>
-          <button className="nav-tab-btn" onClick={() => onNavigate("admin_legal")}><Scale size={14} /> Pháp lý</button>
+          <button className="nav-tab-btn" onClick={() => onNavigate("admin_legal")}><Scale size={14} /> Quản trị</button>
         </div>
       </div>
-
       <div className="tenant-metrics">
         {[
           ["Tổng ticket", metrics?.total ?? 0, <FileText size={20} />],
@@ -99,7 +161,6 @@ function TenantSupportPanel({ onNavigate }) {
         ))}
         <button className="tenant-refresh" onClick={loadDashboard} title="Làm mới"><RefreshCw size={16} /></button>
       </div>
-
       <div className="tenant-grid">
         <form className="tenant-form" onSubmit={submit}>
           <h3>Gửi yêu cầu hỗ trợ</h3>
@@ -123,7 +184,6 @@ function TenantSupportPanel({ onNavigate }) {
             </div>
           )}
         </form>
-
         <div className="tenant-ticket-list">
           <h3>Ticket gần đây</h3>
           {tickets.length === 0 ? <p className="tenant-empty">Chưa có ticket.</p> : tickets.map((ticket) => (
@@ -139,29 +199,14 @@ function TenantSupportPanel({ onNavigate }) {
   );
 }
 
-const INITIAL_GREETING = {
-  sender: "bot",
-  text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản và Pháp lý nhà ở tại Đà Nẵng. Anh/chị đang có nhu cầu thuê/mua nhà đất hay cần tư vấn về thủ tục pháp lý, sổ đỏ, hợp đồng đặt cọc ạ?",
-  properties: [],
-  citations: []
-};
-
-const createNewThreadObject = () => {
-  const id = "session_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 6);
-  return {
-    id,
-    title: "Cuộc trò chuyện mới",
-    messages: [INITIAL_GREETING],
-    createdAt: Date.now()
-  };
-};
-
-const STORAGE_KEY = "danang_re_threads";
-const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
-
 export default function App() {
+  const [userId] = useState(() => getOrCreateUserId());
   // Navigation: "chat" | "tenant" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
+  // Admin Sub-Navigation: "legal" | "agentops"
+  const [adminSubTab, setAdminSubTab] = useState("legal");
+  // Mobile Sidebar Drawer Toggle
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // 1. Quản lý danh sách threads & thread đang active
   const [threads, setThreads] = useState(() => {
@@ -220,6 +265,67 @@ export default function App() {
   const [activeDrawerCitations, setActiveDrawerCitations] = useState(null);
   const [selectedCitationIndex, setSelectedCitationIndex] = useState(1);
 
+  // Đính kèm file hợp đồng rà soát trong Chat
+  const [attachedContract, setAttachedContract] = useState(null);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const contractFileInputRef = useRef(null);
+
+  // AgentOps: Giám sát hạn mức ngân sách của Thread đang chọn
+  const [threadBudget, setThreadBudget] = useState(null);
+
+  const fetchThreadBudget = async (threadId) => {
+    if (!threadId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/agentops/thread/${threadId}/budget`);
+      if (res.ok) {
+        const data = await res.json();
+        setThreadBudget(data);
+      }
+    } catch (e) {
+      console.warn("Lỗi tải thông tin ngân sách thread:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeThreadId) {
+      fetchThreadBudget(activeThreadId);
+    }
+  }, [activeThreadId]);
+
+  const handleContractFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingContract(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/contract/upload`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Không thể đọc file hợp đồng");
+
+      if (data.is_contract === false) {
+        alert(`⚠️ Chú ý: Tệp "${file.name}" dường như không phải hợp đồng hay thỏa thuận mua bán/đặt cọc BĐS. Trợ lý AI sẽ kiểm tra và từ chối thẩm định nếu không đúng định dạng hợp đồng.`);
+      }
+
+      setAttachedContract({
+        name: file.name,
+        size: (file.size / 1024).toFixed(1) + " KB",
+        content: data.content,
+        isContract: data.is_contract
+      });
+    } catch (err) {
+      alert("Lỗi tải file hợp đồng: " + err.message);
+    } finally {
+      setUploadingContract(false);
+      if (contractFileInputRef.current) contractFileInputRef.current.value = "";
+    }
+  };
+
   // Quản trị tài liệu pháp lý (Admin)
   const [legalDocs, setLegalDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -248,7 +354,7 @@ export default function App() {
   const fetchLegalDocs = async () => {
     setLoadingDocs(true);
     try {
-      const res = await fetch("http://localhost:8000/api/legal/documents");
+      const res = await fetch(`${API_BASE}/api/legal/documents`);
       const json = await res.json();
       if (json.success) {
         setLegalDocs(json.data || []);
@@ -265,6 +371,8 @@ export default function App() {
     setThreads((prev) => [newThread, ...prev]);
     setActiveThreadId(newThread.id);
     setInput("");
+    setActiveTab("chat");
+    setIsMobileSidebarOpen(false);
   };
 
   const handleDeleteThread = (e, threadIdToDelete) => {
@@ -303,11 +411,28 @@ export default function App() {
   };
 
   const handleSend = async (textToSend) => {
-    const query = textToSend || input;
-    if (!query.trim() || loading || !activeThreadId) return;
+    let query = textToSend || input;
+    if ((!query.trim() && !attachedContract) || loading || !activeThreadId) return;
 
-    const userMsg = { sender: "user", text: query, properties: [], citations: [] };
-    let botMsg = { sender: "bot", text: "", properties: [], citations: [], isThinking: true };
+    let userDisplayText = query;
+    let backendPayloadText = query;
+
+    if (attachedContract) {
+      userDisplayText = `📄 **Đính kèm hợp đồng:** \`${attachedContract.name}\` (${attachedContract.size})\n\n${query || "Nhờ chuyên gia AI thẩm định các điều khoản, bẫy cọc và tính an toàn pháp lý của hợp đồng này."}`;
+      backendPayloadText = `[HỢP ĐỒNG ĐÍNH KÈM TỪ TỆP: ${attachedContract.name}]\n${attachedContract.content}\n\n[YÊU CẦU CỦA KHÁCH HÀNG]:\n${query || "Nhờ chuyên gia thẩm định và chỉ ra các rủi ro, bẫy cọc, vi phạm pháp luật trong hợp đồng này giúp tôi."}`;
+      setAttachedContract(null);
+    }
+
+    const userMsg = { sender: "user", text: userDisplayText, properties: [], citations: [] };
+    let botMsg = {
+      sender: "bot",
+      text: "",
+      properties: [],
+      citations: [],
+      isThinking: true,
+      thinkingStatus: "Đang phân tích yêu cầu...",
+      thinkingHistory: ["Đang phân tích yêu cầu..."]
+    };
 
     // Thêm câu hỏi người dùng và bubble bot đang suy nghĩ vào ngay lập tức
     updateActiveThreadMessages((prev) => [...prev, userMsg, botMsg]);
@@ -315,10 +440,14 @@ export default function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat/stream", {
+      const response = await fetch(`${API_BASE}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query, thread_id: activeThreadId }),
+        body: JSON.stringify({
+          message: backendPayloadText,
+          thread_id: activeThreadId,
+          user_id: userId
+        }),
       });
 
       if (!response.body) throw new Error("Không nhận được luồng stream");
@@ -340,7 +469,14 @@ export default function App() {
 
             try {
               const data = JSON.parse(raw);
-              if (data.type === "token") {
+              if (data.type === "status") {
+                botMsg.thinkingStatus = data.message;
+                if (!botMsg.thinkingHistory) botMsg.thinkingHistory = [];
+                if (!botMsg.thinkingHistory.includes(data.message)) {
+                  botMsg.thinkingHistory.push(data.message);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "token") {
                 botMsg.isThinking = false;
                 botMsg.text += data.content;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
@@ -350,6 +486,14 @@ export default function App() {
               } else if (data.type === "citations") {
                 botMsg.citations = data.data;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "hitl_approval_request") {
+                botMsg.hitlRequest = data.data;
+                botMsg.isThinking = false;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "budget_update") {
+                if (data.data) {
+                  setThreadBudget(data.data);
+                }
               } else if (data.type === "error") {
                 botMsg.isThinking = false;
                 botMsg.text = "Lỗi xử lý: " + data.content;
@@ -373,6 +517,95 @@ export default function App() {
     }
   };
 
+  const handleHITLDecision = async (decision, editedArgs = null, rejectReason = null) => {
+    if (loading || !activeThreadId) return;
+    setLoading(true);
+
+    // Xóa hitlRequest khỏi botMsg trước đó để ẩn nút duyệt
+    updateActiveThreadMessages((prev) => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].hitlRequest) {
+          copy[i] = { ...copy[i], hitlResolved: decision };
+          break;
+        }
+      }
+      return copy;
+    });
+
+    let followupMsg = {
+      sender: "bot",
+      text: "",
+      properties: [],
+      citations: [],
+      isThinking: true,
+      thinkingStatus: "Đang ghi nhận quyết định...",
+      thinkingHistory: ["Đang ghi nhận quyết định..."]
+    };
+    updateActiveThreadMessages((prev) => [...prev, followupMsg]);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/chat/hitl-decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: activeThreadId,
+          user_id: userId,
+          decision: decision,
+          edited_args: editedArgs,
+          reject_message: rejectReason
+        })
+      });
+
+      if (!response.body) throw new Error("Không nhận được response stream");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const raw = line.replace("data: ", "").trim();
+            if (raw === "[DONE]") break;
+            try {
+              const data = JSON.parse(raw);
+              if (data.type === "status") {
+                followupMsg.thinkingStatus = data.message;
+                if (!followupMsg.thinkingHistory) followupMsg.thinkingHistory = [];
+                if (!followupMsg.thinkingHistory.includes(data.message)) {
+                  followupMsg.thinkingHistory.push(data.message);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              } else if (data.type === "token") {
+                followupMsg.isThinking = false;
+                followupMsg.text += data.content;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              } else if (data.type === "error") {
+                followupMsg.isThinking = false;
+                followupMsg.text = "Lỗi: " + data.content;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      followupMsg.isThinking = false;
+      followupMsg.text = "Có lỗi xảy ra khi xác nhận: " + e.message;
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg }]);
+    } finally {
+      followupMsg.isThinking = false;
+      updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...followupMsg, isThinking: false }]);
+      setLoading(false);
+    }
+  };
+
   const handleBookVisit = (prop) => {
     setSelectedProperty(prop);
     setLeadSuccess(false);
@@ -384,7 +617,7 @@ export default function App() {
     if (!leadForm.name || !leadForm.phone) return;
 
     try {
-      await fetch("http://localhost:8000/api/leads", {
+      await fetch(`${API_BASE}/api/leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -408,81 +641,157 @@ export default function App() {
     setSelectedCitationIndex(index);
   };
 
-  // Helper render text hỗ trợ Markdown in đậm (**text**), in nghiêng (*text*) và badge citation ([1], [2])
-  const renderFormattedText = (text, citations) => {
-    if (!text) return null;
-
-    // Bước 1: Tách theo citations [1], [2]...
-    const citationParts = text.split(/(\[\d+\])/g);
-
-    return citationParts.map((part, i) => {
-      const match = part.match(/^\[(\d+)\]$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        // Chỉ biến thành clickable badge nếu số đó thực sự tồn tại trong danh sách citations của message này
-        const hasMatchingCitation = Array.isArray(citations) && citations.some((c) => (c.index || 0) === num);
-        if (hasMatchingCitation) {
-          return (
-            <button
-              key={i}
-              className="citation-badge"
-              onClick={() => handleOpenCitation(num, citations)}
-              title="Bấm để xem căn cứ pháp lý đối chiếu"
-            >
-              [{num}]
-            </button>
-          );
+  // Helper thay thế citations [1], [2] thành interactive badge button trong các phần tử React
+  const replaceCitations = (node, citations) => {
+    if (typeof node === "string") {
+      const parts = node.split(/(\[\d+\])/g);
+      if (parts.length === 1) return node;
+      return parts.map((part, i) => {
+        const m = part.match(/^\[(\d+)\]$/);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          const hasMatchingCitation = Array.isArray(citations) && citations.some((c) => (c.index || 0) === num);
+          if (hasMatchingCitation) {
+            return (
+              <button
+                key={i}
+                className="citation-badge"
+                onClick={() => handleOpenCitation(num, citations)}
+                title="Bấm để xem căn cứ pháp lý đối chiếu"
+              >
+                [{num}]
+              </button>
+            );
+          }
         }
         return part;
-      }
-
-      // Bước 2: Tách theo định dạng Markdown: **in đậm** hoặc *in nghiêng*
-      const inlineParts = part.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-      return (
-        <React.Fragment key={i}>
-          {inlineParts.map((subPart, j) => {
-            if (subPart.startsWith("**") && subPart.endsWith("**") && subPart.length >= 4) {
-              return <strong key={j} style={{ fontWeight: "700" }}>{subPart.slice(2, -2)}</strong>;
-            }
-            if (subPart.startsWith("*") && subPart.endsWith("*") && subPart.length >= 2) {
-              return <em key={j}>{subPart.slice(1, -1)}</em>;
-            }
-            return subPart;
-          })}
+      });
+    }
+    if (React.isValidElement(node) && node.props && node.props.children) {
+      return React.cloneElement(node, {}, replaceCitations(node.props.children, citations));
+    }
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>
+          {replaceCitations(child, citations)}
         </React.Fragment>
-      );
-    });
+      ));
+    }
+    return node;
   };
+
+  const createMarkdownComponents = (citations) => ({
+    table: ({ node, ...props }) => (
+      <div className="markdown-table-wrapper">
+        <table className="markdown-table" {...props} />
+      </div>
+    ),
+    th: ({ node, children, ...props }) => (
+      <th {...props}>{replaceCitations(children, citations)}</th>
+    ),
+    td: ({ node, children, ...props }) => (
+      <td {...props}>{replaceCitations(children, citations)}</td>
+    ),
+    p: ({ node, children, ...props }) => (
+      <p {...props}>{replaceCitations(children, citations)}</p>
+    ),
+    li: ({ node, children, ...props }) => (
+      <li {...props}>{replaceCitations(children, citations)}</li>
+    ),
+    h1: ({ node, children, ...props }) => (
+      <h1 {...props}>{replaceCitations(children, citations)}</h1>
+    ),
+    h2: ({ node, children, ...props }) => (
+      <h2 {...props}>{replaceCitations(children, citations)}</h2>
+    ),
+    h3: ({ node, children, ...props }) => (
+      <h3 {...props}>{replaceCitations(children, citations)}</h3>
+    ),
+    h4: ({ node, children, ...props }) => (
+      <h4 {...props}>{replaceCitations(children, citations)}</h4>
+    ),
+    strong: ({ node, children, ...props }) => (
+      <strong {...props}>{replaceCitations(children, citations)}</strong>
+    ),
+    em: ({ node, children, ...props }) => (
+      <em {...props}>{replaceCitations(children, citations)}</em>
+    ),
+    blockquote: ({ node, children, ...props }) => (
+      <blockquote className="markdown-blockquote" {...props}>
+        {replaceCitations(children, citations)}
+      </blockquote>
+    ),
+    a: ({ node, children, href, ...props }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link" {...props}>
+        {replaceCitations(children, citations)}
+      </a>
+    )
+  });
 
   // Render text có chèn các badge trích dẫn [1], [2] tương tác, trạng thái đang suy nghĩ và hiệu ứng stream cursor
   const renderMessageContent = (msg, isStreaming = false) => {
-    // 1. Trạng thái Đang suy nghĩ: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking
-    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0)) {
+    // 1. Trạng thái Đang suy nghĩ / Xử lý: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking (và không có hitlRequest hoặc properties)
+    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0) && !msg.hitlRequest) {
+      const currentStatus = msg.thinkingStatus || "Đang phân tích yêu cầu...";
+      const history = msg.thinkingHistory || [currentStatus];
+
       return (
-        <div className="thinking-bubble">
-          <div className="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div className="thinking-card-wrapper">
+          <div className="thinking-status-box">
+            <div className="thinking-status-header">
+              <div className="thinking-icon-pulse">
+                <Sparkles size={16} className="sparkle-icon" />
+              </div>
+              <div className="thinking-status-details">
+                <span className="thinking-status-title">Agent Workflow</span>
+                <span className="thinking-status-desc">{currentStatus}</span>
+              </div>
+              <div className="thinking-spinner">
+                <Loader2 size={16} className="spin-icon" />
+              </div>
+            </div>
+
+            {history.length > 1 && (
+              <div className="thinking-steps-track">
+                {history.map((step, sIdx) => {
+                  const isCurrent = sIdx === history.length - 1;
+                  return (
+                    <div key={sIdx} className={`thinking-step-item ${isCurrent ? "current" : "completed"}`}>
+                      <div className="step-indicator">
+                        {isCurrent ? <span className="step-dot-active" /> : <Check size={11} />}
+                      </div>
+                      <span className="step-text">{step}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <span className="thinking-text">Đang suy nghĩ...</span>
         </div>
       );
     }
 
-    if (!msg.text) return null;
     const citations = msg.citations || [];
 
     // Nút footer chỉ hiển thị khi có citations hợp lệ VÀ tin nhắn thực sự có chứa trích dẫn pháp lý
-    const hasCitationsInText = /\[\d+\]/.test(msg.text);
+    const hasCitationsInText = msg.text ? /\[\d+\]/.test(msg.text) : false;
     const hasValidCitations = citations.length > 0 && hasCitationsInText;
 
     return (
       <div>
-        <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>
-          {renderFormattedText(msg.text, citations)}
-          {isStreaming && <span className="streaming-cursor" />}
-        </div>
+        {msg.text && (
+          <div className="bubble bot-bubble">
+            <div className="markdown-body">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={createMarkdownComponents(citations)}
+              >
+                {msg.text}
+              </ReactMarkdown>
+              {isStreaming && <span className="streaming-cursor" />}
+            </div>
+          </div>
+        )}
 
         {/* Nút footer xem căn cứ pháp lý chỉ hiện khi message thực sự có trích dẫn pháp lý và đã stream xong */}
         {hasValidCitations && !isStreaming && (
@@ -492,6 +801,73 @@ export default function App() {
           >
             <Scale size={14} /> Xem {citations.length} căn cứ pháp lý đã trích dẫn
           </button>
+        )}
+
+        {/* Thẻ xác nhận đặt lịch xem nhà qua Human-In-The-Loop */}
+        {msg.hitlRequest && (
+          <div className="hitl-approval-card">
+            <div className="hitl-header">
+              <CheckCircle2 size={18} className="hitl-icon" />
+              <h4>
+                {msg.hitlResolved === "approve"
+                  ? "Đã xác nhận đặt lịch xem nhà"
+                  : msg.hitlResolved === "reject"
+                  ? "Đã hủy yêu cầu đặt lịch"
+                  : "Xác nhận thông tin đặt lịch xem nhà"}
+              </h4>
+            </div>
+            <p className="hitl-description">
+              {msg.hitlResolved
+                ? "Thông tin đặt lịch đã được gửi xử lý:"
+                : "Vui lòng kiểm tra lại thông tin dưới đây trước khi trợ lý lưu vào hệ thống:"}
+            </p>
+            {msg.hitlRequest.action_requests?.map((act, actIdx) => (
+              <div key={actIdx} className="hitl-action-details">
+                <div className="hitl-row">
+                  <span className="hitl-label">Khách hàng:</span>
+                  <span className="hitl-val">{act.args?.name || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">Số điện thoại:</span>
+                  <span className="hitl-val">{act.args?.phone || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">Thời gian:</span>
+                  <span className="hitl-val hitl-time">{act.args?.viewing_time || "Chưa rõ"}</span>
+                </div>
+                <div className="hitl-row">
+                  <span className="hitl-label">BĐS quan tâm:</span>
+                  <span className="hitl-val">{act.args?.property_title || "Theo trao đổi"}</span>
+                </div>
+                {act.args?.note && (
+                  <div className="hitl-row">
+                    <span className="hitl-label">Ghi chú:</span>
+                    <span className="hitl-val">{act.args?.note}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {!msg.hitlResolved && (
+              <div className="hitl-actions">
+                <button
+                  type="button"
+                  className="btn-hitl-approve"
+                  disabled={loading}
+                  onClick={() => handleHITLDecision("approve")}
+                >
+                  <Check size={16} /> Xác nhận & Đặt lịch ngay
+                </button>
+                <button
+                  type="button"
+                  className="btn-hitl-reject"
+                  disabled={loading}
+                  onClick={() => handleHITLDecision("reject", null, "Khách hàng đổi ý, không muốn đặt lịch nữa.")}
+                >
+                  <X size={16} /> Hủy bỏ
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -509,7 +885,7 @@ export default function App() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/legal/upload", {
+      const res = await fetch(`${API_BASE}/api/legal/upload`, {
         method: "POST",
         body: formData
       });
@@ -532,7 +908,7 @@ export default function App() {
   const handleIndexDoc = async (docId) => {
     setAdminMessage({ type: "info", text: "Đang cắt đoạn theo Điều/Khoản và tính embeddings nạp vào Qdrant..." });
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}/index`, {
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}/index`, {
         method: "POST"
       });
       const data = await res.json();
@@ -549,7 +925,7 @@ export default function App() {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu: "${title}" cùng toàn bộ vector liên quan?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}`, {
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}`, {
         method: "DELETE"
       });
       const data = await res.json();
@@ -564,7 +940,7 @@ export default function App() {
 
   const handlePreviewDoc = async (docId, title) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/legal/documents/${docId}/preview`);
+      const res = await fetch(`${API_BASE}/api/legal/documents/${docId}/preview`);
       const data = await res.json();
       if (data.success) {
         setPreviewDoc({ id: docId, title, content: data.data.content });
@@ -576,16 +952,33 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <div className="sidebar">
+      {/* Mobile Backdrop for Sidebar Drawer */}
+      {isMobileSidebarOpen && (
+        <div
+          className="sidebar-backdrop active"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar (Desktop cố định, Mobile dạng Drawer) */}
+      <div className={`sidebar ${isMobileSidebarOpen ? "mobile-open" : ""}`}>
         <div className="brand-header">
-          <div className="brand-badge">
-            <Building2 size={24} />
+          <div className="brand-header-left">
+            <div className="brand-badge">
+              <Building2 size={24} />
+            </div>
+            <div>
+              <div className="brand-title">Đà Nẵng BĐS & Luật AI</div>
+              <div className="brand-subtitle">Tư vấn Nhà đất & Pháp lý</div>
+            </div>
           </div>
-          <div>
-            <div className="brand-title">Đà Nẵng BĐS & Luật AI</div>
-            <div className="brand-subtitle">Tư vấn Nhà đất & Pháp lý</div>
-          </div>
+          <button
+            className="btn-close-sidebar-mobile"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            title="Đóng menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Quản lý Thread */}
@@ -606,6 +999,7 @@ export default function App() {
                 onClick={() => {
                   setActiveThreadId(t.id);
                   setActiveTab("chat");
+                  setIsMobileSidebarOpen(false);
                 }}
               >
                 <div className="thread-info">
@@ -629,40 +1023,60 @@ export default function App() {
         {/* Gợi ý tìm nhanh & Câu hỏi pháp lý */}
         <div className="quick-prompts">
           <h4>Gợi ý tra cứu nhanh</h4>
-          <button className="prompt-btn" onClick={() => setActiveTab("tenant")}>
+          <button
+            className="prompt-btn prompt-btn-highlight"
+            onClick={() => {
+              setActiveTab("tenant");
+              setIsMobileSidebarOpen(false);
+            }}
+          >
             🛟 Báo sự cố & theo dõi SLA
           </button>
           <button
+            className="prompt-btn prompt-btn-highlight"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend("Tôi muốn đặt lịch xem nhà tại dự án Monarchy Sơn Trà");
+            }}
+          >
+            📅 Đặt lịch xem căn hộ Monarchy
+          </button>
+          <button
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend("Kiểm tra giúp tôi các lịch hẹn xem nhà đã đặt");
+            }}
+          >
+            📋 Xem lại các lịch đã hẹn
+          </button>
+          <button
+            className="prompt-btn"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend(SAMPLE_CONTRACT_PROMPT);
+            }}
+          >
+            ⚖️ Rà soát Hợp đồng cọc mẫu (bẫy cọc 15%)
+          </button>
+          <button
+            className="prompt-btn"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?");
             }}
           >
-            ⚖️ Người nước ngoài mua chung cư ĐN
+            📜 Người nước ngoài mua chung cư ĐN
           </button>
           <button
             className="prompt-btn"
             onClick={() => {
               setActiveTab("chat");
-              handleSend("Điều kiện để nhà ở thương mại được phép mua bán theo Luật Nhà ở mới nhất?");
-            }}
-          >
-            📜 Điều kiện mua bán nhà ở thương mại
-          </button>
-          <button
-            className="prompt-btn"
-            onClick={() => {
-              setActiveTab("chat");
-              handleSend("Quy định về mức tiền đặt cọc tối đa khi mua nhà dự án?");
-            }}
-          >
-            📝 Quy định tiền đặt cọc mua nhà
-          </button>
-          <button
-            className="prompt-btn"
-            onClick={() => {
-              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
               handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu");
             }}
           >
@@ -676,39 +1090,84 @@ export default function App() {
         <div className="chat-main">
           {/* Header với Navigation Switcher */}
           <div className="chat-header">
-            <div>
-              <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
-                {activeThread?.title || "Trợ lý AI Nhà Đất & Pháp Lý Đà Nẵng"}
-              </h3>
-              <p style={{ fontSize: "12px", color: "#64748b" }}>
-                ID phiên: <code style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px" }}>{activeThreadId}</code>
-              </p>
+            <div className="header-left">
+              <button
+                className="btn-mobile-menu"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                title="Mở menu & lịch sử hội thoại"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="header-title-wrapper">
+                <h3 className="header-title">
+                  {activeThread?.title || "Trợ lý AI Nhà Đất & Pháp Lý Đà Nẵng"}
+                </h3>
+                <p className="header-session-id">
+                  ID: <code>{activeThreadId ? activeThreadId.slice(0, 16) + (activeThreadId.length > 16 ? "..." : "") : ""}</code> | Khách: <code title={userId}>{userId.slice(0, 12)}...</code>
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div className="header-right">
+              <button
+                className="btn-mobile-new-thread"
+                onClick={handleCreateNewThread}
+                title="Tạo đoạn chat mới"
+              >
+                <Plus size={18} />
+              </button>
+
               <div className="header-nav">
                 <button
                   className={`nav-tab-btn ${activeTab === "chat" ? "active" : ""}`}
                   onClick={() => setActiveTab("chat")}
                 >
-                  <MessageSquare size={14} /> Tư Vấn BĐS
+                  <MessageSquare size={14} /> <span className="nav-btn-text">Tư Vấn BĐS</span>
                 </button>
                 <button
                   className={`nav-tab-btn ${activeTab === "tenant" ? "active" : ""}`}
                   onClick={() => setActiveTab("tenant")}
                 >
-                  <LifeBuoy size={14} /> Tenant Support
+                  <LifeBuoy size={14} /> <span className="nav-btn-text">Tenant</span>
                 </button>
                 <button
                   className={`nav-tab-btn ${activeTab === "admin_legal" ? "active" : ""}`}
                   onClick={() => setActiveTab("admin_legal")}
                 >
-                  <Scale size={14} /> Quản Trị Pháp Lý
+                  <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
                 </button>
               </div>
 
+              {/* Widget hiển thị ngân sách thread */}
+              {threadBudget && (
+                <div
+                  className={`thread-budget-badge ${
+                    threadBudget.is_exceeded
+                      ? "danger"
+                      : threadBudget.is_near_limit
+                      ? "warning"
+                      : "normal"
+                  }`}
+                  title={`Đã dùng: ${Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / ${Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ (${threadBudget.utilization_pct}%)`}
+                >
+                  <div className="budget-progress-track">
+                    <div
+                      className="budget-progress-bar"
+                      style={{ width: `${Math.min(threadBudget.utilization_pct, 100)}%` }}
+                    />
+                  </div>
+                  <span className="budget-text">
+                    {threadBudget.is_exceeded
+                      ? "⛔ Hết hạn mức"
+                      : threadBudget.is_near_limit
+                      ? `⚠️ Sắp hết: ${Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ`
+                      : `Hạn mức: ${Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}/${Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ`}
+                  </span>
+                </div>
+              )}
+
               <div className="status-badge">
-                <div className="status-dot"></div> Sẵn sàng tư vấn
+                <div className="status-dot"></div> <span className="status-badge-text">Sẵn sàng</span>
               </div>
             </div>
           </div>
@@ -769,6 +1228,78 @@ export default function App() {
 
           {/* Input Bar */}
           <div className="chat-input-bar">
+            {messages.length <= 2 && (
+              <div className="mobile-quick-chips">
+                <button
+                  type="button"
+                  className="quick-chip-btn quick-chip-highlight"
+                  onClick={() => handleSend(SAMPLE_CONTRACT_PROMPT)}
+                >
+                  📋 Rà soát Hợp đồng cọc mẫu
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Người nước ngoài có được mua và sở hữu căn hộ chung cư tại Đà Nẵng không?")}
+                >
+                  ⚖️ Người nước ngoài mua chung cư
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Tính lãi vay ngân hàng mua nhà 2 tỷ, vay 70% trong 20 năm trả bao nhiêu?")}
+                >
+                  💰 Tính lãi vay 2 tỷ
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn"
+                  onClick={() => handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu")}
+                >
+                  🏢 Căn hộ 2PN Sơn Trà
+                </button>
+              </div>
+            )}
+
+            {/* Cảnh báo ngân sách thread đã vượt ngưỡng hoặc sắp hết */}
+            {threadBudget && threadBudget.is_exceeded && (
+              <div className="budget-alert-banner danger">
+                <AlertCircle size={16} />
+                <span>
+                  Phiên hội thoại này đã đạt hạn mức ({Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / {Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ).
+                  Vui lòng bấm <strong>"Tạo đoạn chat mới"</strong> để tiếp tục trò chuyện.
+                </span>
+              </div>
+            )}
+            {threadBudget && !threadBudget.is_exceeded && threadBudget.is_near_limit && (
+              <div className="budget-alert-banner warning">
+                <AlertCircle size={16} />
+                <span>
+                  Hạn mức phiên hội thoại sắp hết (còn lại {Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ).
+                  Bạn có thể tạo đoạn chat mới bất cứ lúc nào.
+                </span>
+              </div>
+            )}
+
+            {/* Thẻ hiển thị file hợp đồng đính kèm */}
+            {attachedContract && (
+              <div className="attached-contract-chip">
+                <div className="attached-contract-info">
+                  <FileText size={15} className="attached-contract-icon" />
+                  <span className="attached-contract-name">{attachedContract.name}</span>
+                  <span className="attached-contract-size">({attachedContract.size})</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-remove-attachment"
+                  onClick={() => setAttachedContract(null)}
+                  title="Hủy đính kèm"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
             <form
               className="input-container"
               onSubmit={(e) => {
@@ -776,14 +1307,46 @@ export default function App() {
                 handleSend();
               }}
             >
+              {/* Input file ẩn cho chức năng đính kèm hợp đồng */}
+              <input
+                type="file"
+                ref={contractFileInputRef}
+                style={{ display: "none" }}
+                accept=".pdf,.docx,.doc,.txt,.md"
+                onChange={handleContractFileUpload}
+              />
+              <button
+                type="button"
+                className={`btn-attach ${attachedContract ? "has-file" : ""}`}
+                onClick={() => contractFileInputRef.current?.click()}
+                disabled={loading || uploadingContract}
+                title="Đính kèm file hợp đồng (.pdf, .docx, .txt, .md)"
+              >
+                {uploadingContract ? (
+                  <div className="btn-spinner-small" />
+                ) : (
+                  <Paperclip size={18} />
+                )}
+              </button>
+
               <input
                 type="text"
-                placeholder="Hỏi về pháp lý, sổ đỏ, đặt cọc hoặc tìm thuê/mua nhà đất Đà Nẵng..."
+                placeholder={
+                  threadBudget?.is_exceeded
+                    ? "⛔ Phiên hội thoại đã hết hạn mức. Vui lòng tạo đoạn chat mới..."
+                    : attachedContract
+                    ? "Nhập thêm ghi chú hoặc nhấn gửi để thẩm định hợp đồng..."
+                    : "Hỏi pháp lý, đính kèm hợp đồng, tính lãi vay, BĐS Đà Nẵng..."
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={loading}
+                disabled={loading || threadBudget?.is_exceeded}
               />
-              <button type="submit" className="btn-send" disabled={loading}>
+              <button
+                type="submit"
+                className="btn-send"
+                disabled={loading || uploadingContract || threadBudget?.is_exceeded}
+              >
                 <Send size={18} />
               </button>
             </form>
@@ -792,210 +1355,247 @@ export default function App() {
       ) : activeTab === "tenant" ? (
         <TenantSupportPanel onNavigate={setActiveTab} />
       ) : (
-        /* ==================== MÀN HÌNH QUẢN TRỊ TÀI LIỆU PHÁP LÝ ==================== */
+        /* ==================== MÀN HÌNH QUẢN TRỊ HỆ THỐNG ==================== */
         <div className="admin-view-container">
           <div className="admin-header">
-            <div>
-              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
-                Quản Trị Cơ Sở Dữ Liệu Pháp Lý Nhà Ở
-              </h2>
-              <p style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
-                Tải lên file PDF, Word (.docx) hoặc Markdown (.md). Hệ thống tự động chuyển đổi sang Markdown và nạp vector vào Qdrant.
-              </p>
+            <div className="admin-header-title-group">
+              <button
+                className="btn-mobile-menu"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                title="Mở menu"
+              >
+                <Menu size={20} />
+              </button>
+              <div>
+                <h2 className="admin-title">
+                  {adminSubTab === "legal"
+                    ? "Quản Trị Cơ Sở Dữ Liệu Pháp Lý"
+                    : "Quản Trị Chi Phí & Giám Sát AgentOps"}
+                </h2>
+                <p className="admin-subtitle">
+                  {adminSubTab === "legal"
+                    ? "Tải lên file PDF, Word (.docx), Markdown (.md) và nạp vector Qdrant."
+                    : "Giám sát chi phí LLM, tokens, hiệu năng mô hình AI và kiểm soát ngân sách theo thời gian thực."}
+                </p>
+              </div>
             </div>
 
             <div className="header-nav">
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
-                <MessageSquare size={14} /> Về Khung Chat
+                <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
               </button>
               <button className="nav-tab-btn" onClick={() => setActiveTab("tenant")}>
-                <LifeBuoy size={14} /> Tenant Support
+                <LifeBuoy size={14} /> <span className="nav-btn-text">Tenant Support</span>
               </button>
               <button className="nav-tab-btn active">
-                <Scale size={14} /> Quản Trị Pháp Lý
+                <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
               </button>
             </div>
           </div>
 
-          {/* Thông báo Admin */}
-          {adminMessage && (
-            <div
-              style={{
-                padding: "12px 16px",
-                borderRadius: "10px",
-                marginBottom: "20px",
-                fontSize: "13px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background:
-                  adminMessage.type === "success" ? "#ecfdf5" : adminMessage.type === "error" ? "#fef2f2" : "#eff6ff",
-                color:
-                  adminMessage.type === "success" ? "#065f46" : adminMessage.type === "error" ? "#991b1b" : "#1e40af",
-                border: `1px solid ${
-                  adminMessage.type === "success" ? "#a7f3d0" : adminMessage.type === "error" ? "#fecaca" : "#bfdbfe"
-                }`
-              }}
+          {/* Thanh Chuyển Tab Phân Hệ Quản Trị */}
+          <div className="admin-subnav-bar">
+            <button
+              className={`admin-subnav-btn ${adminSubTab === "legal" ? "active" : ""}`}
+              onClick={() => setAdminSubTab("legal")}
             >
-              <span>{adminMessage.text}</span>
-              <button
-                onClick={() => setAdminMessage(null)}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit" }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
+              <Scale size={15} />
+              <span>Cơ Sở Dữ Liệu Pháp Lý</span>
+            </button>
+            <button
+              className={`admin-subnav-btn ${adminSubTab === "agentops" ? "active" : ""}`}
+              onClick={() => setAdminSubTab("agentops")}
+            >
+              <Activity size={15} />
+              <span>Quản Trị Chi Phí & AgentOps</span>
+            </button>
+          </div>
 
-          {/* Stats Grid */}
-          <div className="admin-stats-grid">
-            <div className="admin-stat-card">
-              <div style={{ background: "#dbeafe", color: "#2563eb", padding: "10px", borderRadius: "10px" }}>
-                <FileText size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số tài liệu</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>{legalDocs.length}</div>
-              </div>
-            </div>
+          {adminSubTab === "agentops" ? (
+            <AgentOpsAdmin API_BASE={API_BASE} />
+          ) : (
+            <>
+              {/* Thông báo Admin */}
+              {adminMessage && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "10px",
+                    marginBottom: "20px",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background:
+                      adminMessage.type === "success" ? "#ecfdf5" : adminMessage.type === "error" ? "#fef2f2" : "#eff6ff",
+                    color:
+                      adminMessage.type === "success" ? "#065f46" : adminMessage.type === "error" ? "#991b1b" : "#1e40af",
+                    border: `1px solid ${
+                      adminMessage.type === "success" ? "#a7f3d0" : adminMessage.type === "error" ? "#fecaca" : "#bfdbfe"
+                    }`
+                  }}
+                >
+                  <span>{adminMessage.text}</span>
+                  <button
+                    onClick={() => setAdminMessage(null)}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit" }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
 
-            <div className="admin-stat-card">
-              <div style={{ background: "#dcfce7", color: "#16a34a", padding: "10px", borderRadius: "10px" }}>
-                <Database size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số đoạn (Chunks)</div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
-                  {legalDocs.reduce((acc, d) => acc + (d.chunks_count || 0), 0)}
+              {/* Stats Grid */}
+              <div className="admin-stats-grid">
+                <div className="admin-stat-card">
+                  <div style={{ background: "#dbeafe", color: "#2563eb", padding: "10px", borderRadius: "10px" }}>
+                    <FileText size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số tài liệu</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>{legalDocs.length}</div>
+                  </div>
+                </div>
+
+                <div className="admin-stat-card">
+                  <div style={{ background: "#dcfce7", color: "#16a34a", padding: "10px", borderRadius: "10px" }}>
+                    <Database size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Tổng số đoạn (Chunks)</div>
+                    <div style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a" }}>
+                      {legalDocs.reduce((acc, d) => acc + (d.chunks_count || 0), 0)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-stat-card">
+                  <div style={{ background: "#fef3c7", color: "#d97706", padding: "10px", borderRadius: "10px" }}>
+                    <Scale size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>Vector Collection</div>
+                    <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>danang_legal_docs</div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="admin-stat-card">
-              <div style={{ background: "#fef3c7", color: "#d97706", padding: "10px", borderRadius: "10px" }}>
-                <Scale size={22} />
+              {/* Vùng Upload Dropzone */}
+              <div className="admin-upload-zone" onClick={() => fileInputRef.current?.click()}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  accept=".pdf,.docx,.md,.markdown,.txt"
+                  onChange={handleFileUpload}
+                />
+                <UploadCloud size={40} color="#2563eb" style={{ margin: "0 auto 10px" }} />
+                <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a", marginBottom: "6px" }}>
+                  {uploading ? "Đang xử lý tài liệu..." : "Tải lên văn bản pháp lý mới"}
+                </h4>
+                <p style={{ fontSize: "13px", color: "#64748b" }}>
+                  Hỗ trợ định dạng <b>.pdf</b>, <b>.docx</b> (Word) và <b>.md</b> (Markdown). Hệ thống tự động chuyển đổi sang Markdown chuẩn.
+                </p>
               </div>
-              <div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>Vector Collection</div>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>danang_legal_docs</div>
-              </div>
-            </div>
-          </div>
 
-          {/* Vùng Upload Dropzone */}
-          <div className="admin-upload-zone" onClick={() => fileInputRef.current?.click()}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: "none" }}
-              accept=".pdf,.docx,.md,.markdown,.txt"
-              onChange={handleFileUpload}
-            />
-            <UploadCloud size={40} color="#2563eb" style={{ margin: "0 auto 10px" }} />
-            <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a", marginBottom: "6px" }}>
-              {uploading ? "Đang xử lý tài liệu..." : "Tải lên văn bản pháp lý mới"}
-            </h4>
-            <p style={{ fontSize: "13px", color: "#64748b" }}>
-              Hỗ trợ định dạng <b>.pdf</b>, <b>.docx</b> (Word) và <b>.md</b> (Markdown). Hệ thống tự động chuyển đổi sang Markdown chuẩn.
-            </p>
-          </div>
+              {/* Bảng danh sách tài liệu */}
+              <div className="legal-table-container">
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>
+                    Danh Sách Văn Bản Quy Phạm Pháp Luật
+                  </h4>
+                  <button
+                    onClick={fetchLegalDocs}
+                    style={{
+                      background: "#f1f5f9",
+                      border: "none",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Làm mới
+                  </button>
+                </div>
 
-          {/* Bảng danh sách tài liệu */}
-          <div className="legal-table-container">
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h4 style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>
-                Danh Sách Văn Bản Quy Phạm Pháp Luật
-              </h4>
-              <button
-                onClick={fetchLegalDocs}
-                style={{
-                  background: "#f1f5f9",
-                  border: "none",
-                  padding: "6px 12px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  fontWeight: "600"
-                }}
-              >
-                Làm mới
-              </button>
-            </div>
-
-            <table className="legal-table">
-              <thead>
-                <tr>
-                  <th>Tên văn bản</th>
-                  <th>Tập tin gốc</th>
-                  <th>Kích thước</th>
-                  <th>Ngày nạp</th>
-                  <th>Trạng thái</th>
-                  <th>Số Chunks</th>
-                  <th style={{ textAlign: "right" }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {legalDocs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "30px", color: "#94a3b8" }}>
-                      Chưa có tài liệu pháp lý nào. Hãy tải lên tài liệu đầu tiên!
-                    </td>
-                  </tr>
-                ) : (
-                  legalDocs.map((doc) => (
-                    <tr key={doc.id}>
-                      <td style={{ fontWeight: "600", color: "#0f172a" }}>{doc.title || doc.filename}</td>
-                      <td>
-                        <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" }}>
-                          {doc.filename}
-                        </span>
-                      </td>
-                      <td>{(doc.size / 1024).toFixed(1)} KB</td>
-                      <td>{doc.uploaded_at}</td>
-                      <td>
-                        {doc.status === "indexed" ? (
-                          <span className="badge-status badge-indexed">
-                            <Check size={12} style={{ marginRight: "3px" }} /> Đã Index
-                          </span>
-                        ) : (
-                          <span className="badge-status badge-pending">
-                            <AlertCircle size={12} style={{ marginRight: "3px" }} /> Chờ Index
-                          </span>
-                        )}
-                      </td>
-                      <td><b>{doc.chunks_count || 0}</b></td>
-                      <td style={{ textAlign: "right" }}>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#e0f2fe", color: "#0369a1" }}
-                          onClick={() => handlePreviewDoc(doc.id, doc.title || doc.filename)}
-                          title="Xem trước Markdown"
-                        >
-                          <Eye size={12} /> Xem
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#dcfce7", color: "#15803d" }}
-                          onClick={() => handleIndexDoc(doc.id)}
-                          title="Cắt đoạn và nạp Vector vào Qdrant"
-                        >
-                          <Database size={12} /> Nạp Vector
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ background: "#fee2e2", color: "#b91c1c" }}
-                          onClick={() => handleDeleteDoc(doc.id, doc.title || doc.filename)}
-                          title="Xóa tài liệu"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </td>
+                <table className="legal-table">
+                  <thead>
+                    <tr>
+                      <th>Tên văn bản</th>
+                      <th>Tập tin gốc</th>
+                      <th>Kích thước</th>
+                      <th>Ngày nạp</th>
+                      <th>Trạng thái</th>
+                      <th>Số Chunks</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {legalDocs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: "center", padding: "30px", color: "#94a3b8" }}>
+                          Chưa có tài liệu pháp lý nào. Hãy tải lên tài liệu đầu tiên!
+                        </td>
+                      </tr>
+                    ) : (
+                      legalDocs.map((doc) => (
+                        <tr key={doc.id}>
+                          <td style={{ fontWeight: "600", color: "#0f172a" }}>{doc.title || doc.filename}</td>
+                          <td>
+                            <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" }}>
+                              {doc.filename}
+                            </span>
+                          </td>
+                          <td>{(doc.size / 1024).toFixed(1)} KB</td>
+                          <td>{doc.uploaded_at}</td>
+                          <td>
+                            {doc.status === "indexed" ? (
+                              <span className="badge-status badge-indexed">
+                                <Check size={12} style={{ marginRight: "3px" }} /> Đã Index
+                              </span>
+                            ) : (
+                              <span className="badge-status badge-pending">
+                                <AlertCircle size={12} style={{ marginRight: "3px" }} /> Chờ Index
+                              </span>
+                            )}
+                          </td>
+                          <td><b>{doc.chunks_count || 0}</b></td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#e0f2fe", color: "#0369a1" }}
+                              onClick={() => handlePreviewDoc(doc.id, doc.title || doc.filename)}
+                              title="Xem trước Markdown"
+                            >
+                              <Eye size={12} /> Xem
+                            </button>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#dcfce7", color: "#15803d" }}
+                              onClick={() => handleIndexDoc(doc.id)}
+                              title="Cắt đoạn và nạp Vector vào Qdrant"
+                            >
+                              <Database size={12} /> Nạp Vector
+                            </button>
+                            <button
+                              className="btn-action"
+                              style={{ background: "#fee2e2", color: "#b91c1c" }}
+                              onClick={() => handleDeleteDoc(doc.id, doc.title || doc.filename)}
+                              title="Xóa tài liệu"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

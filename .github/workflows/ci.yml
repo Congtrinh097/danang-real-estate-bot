@@ -7,10 +7,26 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: danang_realestate_secret
+          POSTGRES_DB: danang_real_estate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d danang_real_estate"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
+      DATABASE_URL: postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate
       OPENAI_API_KEY: your_test_key
       LANGCHAIN_TRACING_V2: "false"
       TENANT_STORAGE_MODE: memory
+      CHECKPOINT_BACKEND: memory
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,7 +34,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r backend/requirements.txt
-      - run: python -m pytest -q
+      - run: PYTHONPATH=backend python backend/agentops/migrations/init_agentops_schema.py
+      - run: python -m pytest -q -p no:rerunfailures
 
   frontend:
     runs-on: ubuntu-latest

@@ -1,12 +1,12 @@
 from typing import Any, Dict
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from tenant_models import TenantTicket
 from tenant_store import tenant_ticket_store
 
 
-ticketing_mcp_server = MCPServer("tenant-support-ticketing-server")
+ticketing_mcp_server = FastMCP("tenant-support-ticketing-server")
 
 
 @ticketing_mcp_server.tool(

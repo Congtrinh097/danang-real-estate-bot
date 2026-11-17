@@ -38,10 +38,15 @@ class TenantRAGEvaluator:
         try:
             from ragas import evaluate
             from ragas.metrics import answer_relevancy, context_precision, faithfulness
+            from rag_evaluator import RAGEvaluator
+
+            judge = RAGEvaluator()
 
             result = evaluate(
                 dataset=target,
                 metrics=[faithfulness, answer_relevancy, context_precision],
+                llm=judge.llm,
+                embeddings=judge.embeddings,
             )
             frame = result.to_pandas()
             metrics_mean = {

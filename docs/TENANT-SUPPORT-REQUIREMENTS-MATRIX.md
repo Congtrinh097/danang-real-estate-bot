@@ -21,7 +21,7 @@ Quy ước trạng thái:
 | `ae0e14c` | Input guardrails cho out-of-scope và rule violation | Baseline security guardrails |
 | `852bf51` | UI streaming/thinking state | Baseline frontend chat |
 
-### Commit tìm thấy trên `origin/master` nhưng chưa có trong branch hiện tại
+### Commit từ `origin/master` đã được tích hợp trong lần merge hiện tại
 
 | Commit | Nội dung có thể tái sử dụng | Ghi chú |
 |---|---|---|
@@ -42,8 +42,8 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 | 1 | LangGraph RAG | ✅ | Supervisor graph trong `backend/tenant_agent.py` | Theo dõi chất lượng retrieval bằng dữ liệu production |
 | 1 | Structured ticket output: intent, urgency | ✅ | `TenantTicket`, `TicketIntent`, `TicketUrgency` trong `backend/tenant_models.py` | Không |
 | 1 | Vector database | ✅ | Qdrant in-memory cho tenant knowledge; hỗ trợ index tài liệu upload | Chuyển tenant collection sang Qdrant persistent trong production nếu cần |
-| 1 | RAGAS evaluation | 🟡 | `backend/tenant_rag_evaluator.py`; evaluator trả lỗi thật thay vì điểm giả | Cài dependency đã pin, cấu hình model credentials và xuất benchmark report thật |
-| 1 | LangSmith traces | 🟡 | LangSmith đã được cấu hình qua environment | Xác nhận project/dashboard và lưu trace evidence cho demo |
+| 1 | RAGAS evaluation | ✅ | Live smoke report tại `docs/TENANT-RAGAS-LIVE-REPORT-2026-11-17.md`; evaluator trả lỗi thật thay vì điểm giả | Chạy đủ toàn bộ golden dataset trước nghiệm thu |
+| 1 | LangSmith traces | 🟡 | Tenant graph có run name/tags/PII-safe metadata; live API trả `401 Invalid token` ngày 2026-11-17 | Cấp lại `LANGCHAIN_API_KEY`, chạy lại và lưu trace link |
 | 1 | Demo tenant FAQ | ✅ | Web UI Tenant Support và API `/api/tenant/intake` | Chuẩn bị kịch bản demo chính thức |
 | 2 | Web-form intake | ✅ | Tenant Support form trong `frontend/src/App.jsx` | Không |
 | 2 | Email intake normalization | 🟡 | API `/api/tenant/email` chuẩn hóa về `TenantIntake` | Kết nối mailbox/provider webhook thực tế |
@@ -51,7 +51,7 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 | 2 | MCP ticketing | ✅ | `ticketing_mcp_server.py` và `ticketing_mcp_client.py` | Kết nối ticket platform thật nếu dự án sử dụng Jira/ServiceNow/Zendesk |
 | 2 | Conversation/escalation context | ✅ | Ticket liên kết theo `thread_id`; high/critical chuyển `awaiting_human` | Bổ sung UI timeline nhiều lượt nếu cần |
 | 2 | Short-term memory | ✅ | LangGraph checkpointer hỗ trợ MemorySaver | Không |
-| 2 | Long-term memory | 🟡 | PostgreSQL ticket store và tùy chọn PostgreSQL checkpointer | Cài `psycopg[binary]`, bật `CHECKPOINT_BACKEND=postgres`, kiểm thử restart |
+| 2 | Long-term memory | 🟡 | PostgreSQL ticket store, PostgreSQL checkpointer và dependency `psycopg` đã cài | Bật Docker daemon và kiểm thử restart |
 | 2 | Hybrid retrieval | ✅ | Dense hashed-vector Qdrant + lexical score | Không |
 | 2 | Reranking | ✅ | Hybrid reranking trong `TenantKnowledgeService.search()` | Có thể thay bằng cross-encoder khi corpus lớn |
 | 2 | Query rewriting | ✅ | Tenant synonym/query expansion | Mở rộng synonym từ log thực tế |
@@ -62,8 +62,8 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 | 3 | API authentication | 🟡 | Staff API được bảo vệ bằng `X-Admin-Key` khi cấu hình | Thay shared key bằng SSO/RBAC |
 | 3 | Restricted CORS | ✅ | `ALLOWED_ORIGINS`, không dùng wildcard credentials | Cấu hình origin theo từng môi trường |
 | 3 | Responsible AI | ✅ | Boundaries và risk register trong `docs/TENANT-SUPPORT-GOVERNANCE.md` | Review/sign-off bởi người phụ trách dự án |
-| 3 | LangFuse | ⬜ | Chưa tích hợp | Thêm tracing/cost dashboard nếu bắt buộc đúng công cụ LangFuse |
-| 3 | DeepEval regression in CI/CD | 🟡 | Có pytest regression và GitHub Actions CI | Thêm DeepEval package/metrics nếu bắt buộc đúng framework DeepEval |
+| 3 | LangFuse | 🟡 | AgentOps có LangFuse client và local trace fallback | Cấu hình credentials và lưu dashboard evidence |
+| 3 | DeepEval regression in CI/CD | ✅ | DeepEval package, offline regression và opt-in live test (`RUN_LIVE_EVALS=1`) | Chạy live suite trong protected/manual CI job |
 | 3 | Security observation/reporting | 🟡 | Có controls, audit events và governance document | Thêm dashboard/log sink và báo cáo từ môi trường chạy thật |
 | 3 | Vulnerability remediation/red team | 🟡 | Có input guardrails, typed tools và security tests cơ bản | Chạy red-team suite và lưu findings/remediation evidence |
 | 3 | Token/context optimization | ✅ | Tenant path deterministic, không dùng LLM token; context giới hạn top-k | Đo latency và chi phí trong production |
@@ -87,9 +87,9 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 - [x] Sửa property collection tự khởi tạo khi test/runtime cần tìm kiếm.
 - [x] Thêm lexical reranking cho legal RAG offline tests.
 - [x] Cô lập legal test data để không ghi đè metadata local.
-- [x] Đưa backend suite về trạng thái xanh: 49 tests passed.
+- [x] Đưa backend suite local về trạng thái xanh: 76 passed, 20 skipped khi PostgreSQL/Docker không chạy.
 - [x] Thêm GitHub Actions cho backend tests và frontend build.
-- [ ] Cài lại môi trường từ dependency đã pin và chạy live RAGAS thành công.
+- [x] Cài lại môi trường từ dependency đã pin và chạy live RAGAS thành công.
 
 ### P1 — Week 1: Tenant FAQ và RAG
 
@@ -98,7 +98,7 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 - [x] Xây tenant LangGraph RAG workflow.
 - [x] Thêm Qdrant vector retrieval.
 - [x] Thêm tenant RAG evaluation dataset.
-- [ ] Xuất và lưu RAGAS report thật.
+- [x] Xuất và lưu RAGAS smoke report thật.
 - [ ] Lưu LangSmith trace/link làm evidence.
 - [ ] Mở rộng corpus bằng tài liệu chính sách thực tế.
 
@@ -127,8 +127,8 @@ Không tìm thấy merge-request refs được publish qua `refs/merge-requests/
 - [x] Viết governance, Responsible AI và risk register.
 - [x] Thêm CI regression tests.
 - [ ] Thay admin key bằng SSO/RBAC production.
-- [ ] Tích hợp LangFuse dashboard.
-- [ ] Tích hợp DeepEval regression metrics.
+- [x] Tích hợp LangFuse client và local fallback.
+- [x] Tích hợp DeepEval regression metrics và opt-in live test.
 - [ ] Chạy red-team suite và lưu remediation report.
 - [ ] Kết nối SLA alerts với paging/notification system.
 

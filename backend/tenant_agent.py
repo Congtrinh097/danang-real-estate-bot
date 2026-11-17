@@ -182,7 +182,18 @@ tenant_support_agent = workflow.compile()
 
 
 def process_tenant_intake(intake: TenantIntake) -> TenantSupportResult:
-    state = tenant_support_agent.invoke({"intake": intake.model_dump(mode="json")})
+    state = tenant_support_agent.invoke(
+        {"intake": intake.model_dump(mode="json")},
+        config={
+            "run_name": "tenant-support-supervisor",
+            "tags": ["tenant-support", f"channel:{intake.channel.value}"],
+            "metadata": {
+                "thread_id": intake.thread_id,
+                "channel": intake.channel.value,
+                "contains_pii": bool(intake.email or intake.phone),
+            },
+        },
+    )
     return TenantSupportResult(
         reply=state["reply"],
         ticket=TenantTicket.model_validate(state["ticket"]),

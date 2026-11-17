@@ -5085,7 +5085,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       </div>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"property-search","label":"1. Tìm kiếm BĐS","focus":["user","fastapi","router","extract_criteria","search_props","generate_resp","sse_output"],"note":"Nhận diện nhu cầu thuê/mua nhà, bóc tách tiêu chí quận/giá/loại hình và tra cứu Qdrant."},{"id":"legal-rag","label":"2. Tư vấn Pháp lý RAG","focus":["user","fastapi","router","legal_advisory","sse_output"],"note":"Tra cứu Luật Đất đai 2024 \u0026 Luật Nhà ở từ danang_legal_docs, trích dẫn chính xác [1], [2]."},{"id":"mortgage-calc","label":"3. Tính Lãi Vay (MCP)","focus":["user","fastapi","router","mortgage_calc","sse_output"],"note":"Gọi Tool qua MCP Client tính toán lịch trả góp dư nợ giảm dần hoặc niên kim cố định."},{"id":"guardrail-safety","label":"4. Guardrail \u0026 An toàn","focus":["user","fastapi","router","guardrail_node","sse_output"],"note":"Chặn prompt injection/jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng."},{"id":"general-chat","label":"5. Hội thoại Xã giao","focus":["user","fastapi","router","general_chat","sse_output"],"note":"Chào hỏi lịch sự, tư vấn thời tiết Đà Nẵng và khéo léo giới thiệu dịch vụ nhà đất."}]</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"property-search","label":"1. Tìm kiếm BĐS","focus":["user","fastapi","router","extract_criteria","search_props","generate_resp","sse_output"],"note":"Nhận diện nhu cầu thuê/mua nhà, bóc tách tiêu chí quận/giá/loại hình và tra cứu Qdrant."},{"id":"contract-audit","label":"2. Thẩm định Hợp đồng BĐS","focus":["user","fastapi","router","contract_audit","sse_output"],"note":"Xác thực hợp đồng, quét bẫy cọc 5%, phạt cọc 1 chiều và đối chiếu quy định luật kèm trích dẫn."},{"id":"legal-rag","label":"3. Tư vấn Pháp lý RAG","focus":["user","fastapi","router","legal_advisory","sse_output"],"note":"Tra cứu Luật Đất đai 2024 \u0026 Luật Nhà ở từ danang_legal_docs, trích dẫn chính xác [1], [2]."},{"id":"mortgage-calc","label":"4. Lãi Vay \u0026 So Sánh Ngân Hàng","focus":["user","fastapi","router","mortgage_calc","sse_output"],"note":"ReAct Agent gọi FastMCP Client tính dư nợ giảm dần/niên kim và research so sánh lãi suất ngân hàng."},{"id":"guardrail-safety","label":"5. Guardrail \u0026 An toàn","focus":["user","fastapi","router","guardrail_node","general_chat","sse_output"],"note":"Chặn prompt injection/jailbreak, lịch sự từ chối câu hỏi ngoài Đà Nẵng và giao tiếp chào hỏi."}]</script>
 
     <script id="archify-i18n-data" type="application/json">{"locale":"en","messages":{"viewer.kind.frontend":"Frontend","viewer.kind.backend":"Backend","viewer.kind.database":"Database","viewer.kind.cloud":"Cloud","viewer.kind.security":"Security","viewer.kind.messagebus":"Message bus","viewer.kind.external":"External","viewer.kind.neutral":"Neutral","viewer.kind.node":"Node","viewer.kind.start":"Start","viewer.kind.active":"Active","viewer.kind.waiting":"Waiting","viewer.kind.decision":"Decision","viewer.kind.success":"Success","viewer.kind.failure":"Failure","viewer.toolbar.actions":"Diagram actions","viewer.theme.toggle.title":"Toggle theme (T)","viewer.theme.toggle":"Toggle color theme","viewer.theme.dark":"Dark","viewer.theme.light":"Light","viewer.preset.choose.title":"Choose visual style (S cycles)","viewer.preset.choose":"Choose visual style","viewer.preset.style":"Style","viewer.preset.menu":"Visual style","viewer.preset.identity":"Visual identity","viewer.preset.cycles":"S cycles","viewer.preset.classic":"Classic","viewer.preset.classic.short":"Classic","viewer.preset.classic.hint":"Stable technical default","viewer.preset.flow":"Signal Flow","viewer.preset.flow.short":"Flow","viewer.preset.flow.hint":"Motion-forward presentation","viewer.preset.blueprint":"Blueprint","viewer.preset.blueprint.hint":"Engineering review","viewer.preset.editorial":"Editorial","viewer.preset.editorial.hint":"Publication and launch notes","viewer.preset.badge.signalFlow":"SIGNAL FLOW","viewer.preset.badge.blueprint":"BLUEPRINT / REV 01","viewer.preset.badge.editorial":"EDITORIAL / FIELD NOTE","viewer.preset.badge.editorialPlate":"ARCHIFY / PLATE 04","viewer.preset.current":"Visual style: {style}. Choose visual style","viewer.motion.live":"Live","viewer.motion.still":"Still","viewer.motion.pause":"Pause motion","viewer.motion.resume":"Resume motion","viewer.motion.reduced":"Motion paused by reduced-motion preference","viewer.motion.hidden":"Motion paused while this page is hidden","viewer.motion.yielding":"Pause motion; currently yielding to {owner}","viewer.motion.yielding.title":"Live preview enabled · yielding to {owner}","viewer.owner.story":"the guided story","viewer.owner.chapter":"the active chapter","viewer.owner.chapterPreview":"the chapter delta preview","viewer.owner.handoff":"the chapter handoff","viewer.owner.route":"Route Probe","viewer.owner.lens":"Semantic Lens","viewer.owner.relationship":"Relationship Preview","viewer.owner.intent":"Intent Trace","viewer.owner.focus":"semantic focus","viewer.owner.legend":"legend preview","viewer.owner.reader":"reader interaction","viewer.present.enter":"Enter presentation stage","viewer.present.enter.title":"Presentation stage (F)","viewer.present.exit":"Exit presentation stage","viewer.present.exit.title":"Exit presentation stage (F or Escape)","viewer.present.present":"Present","viewer.present.exit.label":"Exit","viewer.export.button":"Export","viewer.export.button.title":"Export diagram (E)","viewer.export.diagram":"Export diagram","viewer.export.menu":"Export","viewer.export.subtitle":"Portable, clean outputs","viewer.export.share":"Share","viewer.export.shareCard":"Share Card","viewer.export.routeShareCard":"Route Share Card","viewer.export.reachShareCard":"Reach Share Card","viewer.export.copyShareCard":"Copy Share Card","viewer.export.copyDiagram":"Copy diagram","viewer.export.clipboardPng":"PNG to clipboard","viewer.export.raster":"Raster images","viewer.export.image":"Image","viewer.export.lossless":"Lossless image","viewer.export.compact":"Compact image","viewer.export.modern":"Modern image","viewer.export.vectorMotion":"Vector and motion","viewer.export.vectorMotion.heading":"Vector \u0026 motion","viewer.export.editable":"Editable vector","viewer.export.motion6s":"6s motion","viewer.export.unsupported":"Not supported by this browser","viewer.export.clipboardUnsupported":"Clipboard image write not supported by this browser","viewer.export.clipboardUnsupported.period":"Clipboard image write not supported by this browser.","viewer.export.clipboardUnsupported.short":"Clipboard image write not supported in this browser.","viewer.export.motionUnavailable":"Motion capture unavailable in this browser","viewer.export.webmUnavailable":"WebM unavailable in this browser","viewer.export.failed":"Export failed: {message}","viewer.export.unknownVariant":"Unknown Share Card variant: {variant}","viewer.export.routeRequired":"Trace a route before exporting a Route Share Card","viewer.export.reachRequired":"Trace authored reach before exporting a Reach Share Card","viewer.export.unknown":"unknown","viewer.export.routeFailed":"Route Share Card export failed: {message}","viewer.export.reachFailed":"Reach Share Card export failed: {message}","viewer.export.copyFailed":"Copy failed: {message}","viewer.export.copiedPng":"Copied PNG to clipboard","viewer.export.copiedShare":"Copied Share Card","viewer.export.downloadedShare":"Downloaded Share Card","viewer.export.downloadedRoute":"Downloaded Route Share Card","viewer.export.downloadedReach":"Downloaded Reach Share Card","viewer.export.downloadedWebm":"Downloaded WebM","viewer.export.recording":"Recording 6 seconds of motion…","viewer.export.card.routeSummary.one":"Route: {source} → {target} · {count} directed hop","viewer.export.card.routeSummary.other":"Route: {source} → {target} · {count} directed hops","viewer.export.card.reachSummary":"Authored {direction} from {origin} · {nodes} · {links} · max {hops}","viewer.export.card.node.one":"{count} node","viewer.export.card.node.other":"{count} nodes","viewer.export.card.link.one":"{count} link","viewer.export.card.link.other":"{count} links","viewer.export.card.hop.one":"{count} hop","viewer.export.card.hop.other":"{count} hops","viewer.export.card.routeBadge":"ARCHIFY · ROUTE · {hops}","viewer.export.card.reachBadge":"ARCHIFY · {direction} REACH","viewer.export.card.defaultBadge":"ARCHIFY · {preset} · {theme}","viewer.export.direction.upstream":"Upstream","viewer.export.direction.downstream":"Downstream","viewer.export.error.canvasUnavailable":"Canvas unavailable for {label}","viewer.export.error.contextUnavailable":"2D canvas context unavailable for {label}","viewer.export.error.toBlobUnavailable":"canvas.toBlob unavailable for {label}","viewer.export.error.toBlobNull":"canvas.toBlob returned no data for {label}","viewer.export.error.variantsCombined":"Share Card variants cannot be combined","viewer.export.error.viewerState":"Share Card export could not remove temporary viewer state","viewer.export.error.routeState":"Route Card export could not preserve the resolved route safely","viewer.export.error.reachState":"Reach Card export could not preserve authored reach safely","viewer.export.error.webmRequirements":"WebM motion export requires a trace animation and browser MediaRecorder support","viewer.export.error.mediaRecorder":"MediaRecorder failed","viewer.export.error.emptyWebm":"MediaRecorder produced an empty WebM","viewer.export.error.webmBackground":"SVG background could not be loaded for WebM export","viewer.guided.region":"Guided diagram views","viewer.guided.previous":"Previous guided view","viewer.guided.previous.title":"Previous guided view ([)","viewer.guided.next":"Next guided view","viewer.guided.next.title":"Next guided view (])","viewer.guided.views":"Guided views","viewer.guided.explore":"Explore this system","viewer.guided.intro":"Step through curated paths without changing the source diagram.","viewer.guided.trail":"Story trail","viewer.guided.beat":"Beat","viewer.guided.nextBeat":"Next","viewer.guided.play":"Play guided story","viewer.guided.play.title":"Play guided story (P)","viewer.guided.pause":"Pause guided story","viewer.guided.pause.title":"Pause guided story (P)","viewer.guided.replay":"Replay guided story","viewer.guided.replay.title":"Replay guided story (P)","viewer.guided.playStory":"Play story","viewer.guided.pauseStory":"Pause","viewer.guided.replayStory":"Replay story","viewer.guided.motionUnavailable":"Story playback unavailable while motion is Still","viewer.guided.enableMotion":"Switch motion to Live to play the guided story","viewer.guided.selectBeatLink":"Select a Story Beat to copy its exact link","viewer.guided.copyMoment":"Copy moment","viewer.guided.momentCopied":"Moment link copied","viewer.guided.momentCopyFailed":"Could not copy story moment link","viewer.guided.copied":"Copied","viewer.guided.copyFailed":"Copy failed","viewer.guided.showAll":"Show all","viewer.guided.showAll.aria":"Show entire diagram","viewer.guided.chapters":"Story chapters","viewer.guided.storyTrail":"Story trail for {label}: {count} beats","viewer.guided.chapter.open":"Open chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.current":"Current chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.selectedNodes":"{count} selected nodes","viewer.guided.chapter.stops":"{count} stops","viewer.guided.chapter.stop.one":"{count} stop","viewer.guided.chapter.stop.other":"{count} stops","viewer.guided.chapter.current.title":"{label} — current chapter, {count} stops","viewer.guided.chapter.delta.expanded":"{stay} stay, {enter} enter, {leave} leave","viewer.guided.chapter.delta.aria":"Open chapter {index} of {total}: {label}. Chapter focus delta: {delta}","viewer.guided.chapter.delta.title":"{label} — {delta} chapter focus","viewer.guided.handoff":"{from} → {to} · via {label}","viewer.guided.share.chapter":"Chapter {index} / {total}","viewer.guided.share.initial":"Chapter 01 / 01","viewer.guided.share.default":"Guided chapter","viewer.guided.state.ready":"Ready","viewer.guided.state.playing":"Playing","viewer.guided.state.settled":"Settled","viewer.guided.state.paused":"Paused","viewer.guided.state.pinned":"Pinned","viewer.guided.state.still":"Still","viewer.guided.share.step":"Step {index} / {total} · {label}","viewer.guided.share.staticMoment":"{step} · Static moment","viewer.guided.share.complete":"{count} steps complete · {note}","viewer.guided.share.settled":"Path settled for reading.","viewer.guided.share.staticPath":"{count} steps · Static path","viewer.guided.share.ready":"{count} steps · Ready","viewer.guided.share.aria":"{state} chapter {index} of {total}: {label}. {beat}. {route}","viewer.guided.beat.start":"Beat {index} / {total} · {label} · starting point","viewer.guided.beat.forward":"Beat {index} / {total} · {from} → {to}","viewer.guided.beat.reverse":"Beat {index} / {total} · {from} → {to} · reverse authored link","viewer.guided.beat.multiple":"Beat {index} / {total} · {from} ⇄ {to} · {count} authored links","viewer.guided.beat.group":"Beat {index} / {total} · {from} · {to} · grouped · no direct link","viewer.guided.beat.aria.prefix":"Story beat {index} of {total}: {label}. ","viewer.guided.beat.aria.start":"Starting point.","viewer.guided.beat.aria.forward":"From {from} through one authored forward relationship.","viewer.guided.beat.aria.reverse":"From {from}; the authored relationship points from {to} to {from}.","viewer.guided.beat.aria.multiple":"From {from} through {count} authored relationships; shown without arbitrary motion.","viewer.guided.beat.aria.group":"Grouped from {from} with no direct authored relationship.","viewer.guided.caption.start":"Starting point","viewer.guided.caption.grouped":"Grouped transition · no direct authored link","viewer.guided.caption.more":" +{count} more","viewer.guided.caption.reverse":"Reverse authored relationship","viewer.guided.caption.relationships":"{count} authored relationships","viewer.guided.caption.relationship":"Authored relationship","viewer.guided.caption.direction":"authored direction: {from} → {to}","viewer.guided.caption.starting":"Authored starting point","viewer.guided.beatLink":"Copy link to current story moment: Beat {index} of {total}: {label}","viewer.guided.noStory":"This diagram has no authored guided story.","viewer.guide.eyebrow":"Diagram guide","viewer.guide.close":"Close diagram guide","viewer.guide.inspecting":"Inspecting compiled semantics","viewer.guide.actions":"Diagram exploration actions","viewer.guide.find":"Find any node","viewer.guide.find.hint":"Search labels, responsibilities, kinds, and stable IDs.","viewer.guide.route":"Trace a route","viewer.guide.route.aria":"Trace a directed route","viewer.guide.route.hint":"Ask how two semantic nodes connect in authored direction.","viewer.guide.map":"See the whole system","viewer.guide.map.hint":"Open Semantic Radar with a live viewport and stable nodes.","viewer.guide.lens":"Compare semantic kinds","viewer.guide.lens.hint":"Count roles, reveal their traffic, and compare direct authored links.","viewer.guide.story":"Play the guided story","viewer.guide.story.hint":"Walk the authored chapters and real relationships.","viewer.guide.present":"Enter Presentation Stage","viewer.guide.present.hint":"Give the live diagram the viewport without changing export.","viewer.guide.shortcuts":"Additional keyboard shortcuts","viewer.guide.shortcut.export":"Export","viewer.guide.shortcut.theme":"Theme","viewer.guide.shortcut.style":"Style","viewer.guide.shortcut.reset":"Reset","viewer.guide.shortcut.zoomIn":"Zoom in","viewer.guide.shortcut.zoomOut":"Zoom out","viewer.guide.shortcut.close":"Close","viewer.guide.facts":"{nodes} · {relationships} · {views}","viewer.guide.fact.node.one":"{count} semantic node","viewer.guide.fact.node.other":"{count} semantic nodes","viewer.guide.fact.relationship.one":"{count} relationship","viewer.guide.fact.relationship.other":"{count} relationships","viewer.guide.fact.view.one":"{count} guided view","viewer.guide.fact.view.other":"{count} guided views","viewer.guide.story.available.one":"Walk {count} authored chapter and its real relationships.","viewer.guide.story.available.other":"Walk {count} authored chapters and their real relationships.","viewer.guide.story.unavailable":"No authored guided story in this diagram.","viewer.guide.open":"Open diagram guide","viewer.guide.noStory":"This diagram has no authored guided story.","viewer.finder.title":"Find a node","viewer.finder.close":"Close node finder","viewer.finder.placeholder":"Search labels or IDs","viewer.finder.search":"Search diagram nodes","viewer.finder.results":"Diagram nodes","viewer.finder.empty":"No matching nodes","viewer.finder.result.focus":"Focus {label}","viewer.finder.result.routeStart":"Choose {label} as route start","viewer.finder.result.routeTarget":"Choose {label} as route destination, {links}","viewer.finder.status.empty":"No matching nodes","viewer.finder.status.count.one":"{count} matching node","viewer.finder.status.count.other":"{count} matching nodes","viewer.finder.noun.nodes":"nodes","viewer.finder.link.one":"{count} link","viewer.finder.link.other":"{count} links","viewer.finder.result.focus.one":"Focus {label}, {count} related connection","viewer.finder.result.focus.other":"Focus {label}, {count} related connections","viewer.finder.status.filtered":"{visible} of {available} {noun}","viewer.finder.status.all":"{available} {noun}","viewer.passport.eyebrow":"Semantic passport","viewer.passport.metadata":"Node metadata","viewer.passport.evidence":"Verified source evidence","viewer.passport.verified":"Verified source","viewer.passport.verificationScope":"Verified against local Git at the pinned revision. Remote access has not been checked.","viewer.passport.reach":"Authored reach","viewer.passport.reach.trace":"Trace authored reachability","viewer.passport.upstream":"Upstream","viewer.passport.downstream":"Downstream","viewer.passport.upstream.trace":"Trace upstream authored reachability","viewer.passport.downstream.trace":"Trace downstream authored reachability","viewer.passport.close":"Close semantic passport","viewer.passport.copy":"Copy link","viewer.passport.copy.focus":"Copy link to focused node","viewer.passport.relations":"Relations","viewer.passport.relations.show":"Show connected relationships","viewer.passport.relations.hide":"Hide connected relationships","viewer.passport.relations.list":"Connected relationships","viewer.passport.copyRelation":"Copy relation","viewer.passport.copyNode":"Copy node","viewer.passport.copyPinned":"Copy link to pinned relationship","viewer.passport.copySource":"Copy link to source node","viewer.passport.copy.focused.success":"Focused node link copied","viewer.passport.copy.pinned.success":"Pinned relationship link copied","viewer.passport.copy.focused.failed":"Could not copy focused node link","viewer.passport.copy.pinned.failed":"Could not copy pinned relationship link","viewer.passport.relationship.none":"No connected relationships","viewer.passport.relationship.count.one":"{count} relation","viewer.passport.relationship.count.other":"{count} relations","viewer.passport.relationship.show.one":"Show {count} connected relationship","viewer.passport.relationship.show.other":"Show {count} connected relationships","viewer.passport.relationship.summary":"{out} outgoing · {in} incoming{loops}","viewer.passport.relationship.loops":" · {count} loop","viewer.passport.relationship.explorer":"Direct relationship explorer","viewer.passport.relationship.help":"Use arrow keys to explore relationships. Press Enter or Space to pin details; Escape clears.","viewer.passport.relationship.loopsBack":"loops back","viewer.passport.relationship.connectsTo":"connects to","viewer.passport.relationship.connectsFrom":"connects from","viewer.passport.relationship.pinned":"Pinned relationship · {from} → {to} · {label}","viewer.passport.relationship.inspect":"Inspect relationship {index} of {total}: {from} to {to}, {label}. Press Enter for details.","viewer.passport.relationship.group.out":"Outgoing","viewer.passport.relationship.group.in":"Incoming","viewer.passport.relationship.group.loop":"Self loops","viewer.passport.relationship.row":"{group}: {relationship}, {neighbor}","viewer.passport.relationship.direction.out":"OUT →","viewer.passport.relationship.direction.in":"← IN","viewer.passport.relationship.direction.loop":"LOOP","viewer.passport.sourceCount.one":"{count} verified source reference","viewer.passport.sourceCount.other":"{count} verified source references","viewer.passport.sourceMarker":"SRC","viewer.passport.beacon.one":"{count} verified source; focus this node to inspect","viewer.passport.beacon.other":"{count} verified sources; focus this node to inspect","viewer.passport.repository.open":"Open verified repository revision {revision}","viewer.passport.source.open":"Open verified source {path} at revision {revision}","viewer.passport.source.openLink":"Open ↗","viewer.passport.reach.upstream.one":"Trace {count} upstream authored node","viewer.passport.reach.upstream.other":"Trace {count} upstream authored nodes","viewer.passport.reach.downstream.one":"Trace {count} downstream authored node","viewer.passport.reach.downstream.other":"Trace {count} downstream authored nodes","viewer.passport.reach.noUpstream":"No upstream authored nodes","viewer.passport.reach.noDownstream":"No downstream authored nodes","viewer.passport.reach.status":"{direction} · {nodes} nodes · {links} links · max {hops} hops","viewer.route.eyebrow":"Route probe","viewer.route.start":"Choose a start node","viewer.route.start.find":"Find start","viewer.route.start.find.aria":"Find a route start","viewer.route.copy":"Copy link","viewer.route.copy.aria":"Copy link to traced route","viewer.route.clear":"Clear","viewer.route.clear.aria":"Clear route probe","viewer.route.traced":"Traced route","viewer.route.pickTwo":"Pick two semantic nodes on the diagram","viewer.route.pickOne":"Pick a semantic node on the diagram","viewer.route.controls":"Route journey controls","viewer.route.previous":"Previous route position","viewer.route.play":"Play route journey","viewer.route.pause":"Pause route journey","viewer.route.replay":"Replay route journey","viewer.route.next":"Next route position","viewer.route.journey":"Journey","viewer.route.pause.label":"Pause","viewer.route.replay.label":"Replay","viewer.route.overview":"Overview","viewer.route.overview.aria":"Show complete route overview","viewer.route.instructions":"Choose the source, then the destination. Direction matters.","viewer.route.destination":"Choose a destination from {label}","viewer.route.destination.find":"Find target","viewer.route.destination.find.aria":"Find a reachable route destination","viewer.route.differentDestination":"Choose a different destination","viewer.route.distinct":"A route needs two distinct semantic nodes.","viewer.route.unreachable":"No directed route to {label}","viewer.route.unreachable.detail":"{target} is not reachable from {source}. Pick a highlighted destination.","viewer.route.start.instructions":"Select the source. The next step will reveal only directed destinations.","viewer.route.copy.success":"Traced route link copied","viewer.route.copy.failed":"Could not copy traced route link","viewer.route.position":"Route position {index} of {total}: {label}","viewer.route.step":"Step {index} of {total} · {phase} · {label}","viewer.route.motionRequired":"Automatic journey requires Live motion","viewer.route.trigger.clear":"Clear traced route","viewer.route.overview.status":"{nodes} · {hops} · shortest authored route","viewer.route.overview.node.one":"{count} node","viewer.route.overview.node.other":"{count} nodes","viewer.route.overview.hop.one":"{count} directed hop","viewer.route.overview.hop.other":"{count} directed hops","viewer.route.phase.playing":"Playing","viewer.route.phase.complete":"Complete","viewer.route.phase.inspecting":"Inspecting","viewer.route.destination.count.one":"{count} directed destination available. Pick a highlighted node.","viewer.route.destination.count.other":"{count} directed destinations available. Pick a highlighted node.","viewer.route.noOutgoing":"No outgoing route starts here. Clear and choose another source.","viewer.route.result.title":"{source} to {target}","viewer.route.finder.source.title":"Choose route start","viewer.route.finder.source.placeholder":"Search route sources","viewer.route.finder.source.empty":"No matching route sources","viewer.route.finder.source.results":"Nodes that can start a route","viewer.route.finder.source.noun":"route sources","viewer.route.finder.source.badge":"start","viewer.route.finder.target.title":"Destination from {label}","viewer.route.finder.target.placeholder":"Search reachable destinations","viewer.route.finder.target.empty":"No matching reachable destinations","viewer.route.finder.target.results":"Reachable route destinations","viewer.route.finder.target.noun":"reachable destinations","viewer.route.hop.one":"{count} hop","viewer.route.hop.other":"{count} hops","viewer.lens.eyebrow":"Semantic lens","viewer.lens.title":"Compare system roles","viewer.lens.close":"Close semantic lens","viewer.lens.instruction":"Choose up to two semantic kinds. One reveals its real traffic; two compare only direct authored relationships.","viewer.lens.kinds":"Semantic kinds","viewer.lens.choose":"Choose a kind to inspect its nodes and touching relationships.","viewer.lens.copy":"Copy link to semantic lens","viewer.lens.clear":"Clear semantic lens","viewer.lens.open":"Open semantic lens","viewer.lens.openActive":"Open active semantic lens","viewer.lens.legend":"Semantic legend","viewer.lens.legend.inspect.one":"Inspect {label}, {count} node","viewer.lens.legend.inspect.other":"Inspect {label}, {count} nodes","viewer.lens.kind.count.one":"{label}, {count} node","viewer.lens.kind.count.other":"{label}, {count} nodes","viewer.lens.compare.one":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationship","viewer.lens.compare.other":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationships","viewer.lens.single":"{nodes} · {relationships} · connected peers remain visible","viewer.lens.node.one":"{count} {label} node","viewer.lens.node.other":"{count} {label} nodes","viewer.lens.relationship.one":"{count} touching relationship","viewer.lens.relationship.other":"{count} touching relationships","viewer.radar.title":"Semantic radar","viewer.radar.building":"Building overview","viewer.radar.openFull":"Open full semantic radar","viewer.radar.open":"Open radar","viewer.radar.close":"Close semantic radar","viewer.radar.surface":"Diagram overview. Click a node to focus it, or use arrow keys to pan.","viewer.radar.click":"Click node","viewer.radar.drag":"Drag to pan","viewer.radar.space":"Semantic radar needs more MAP space.","viewer.radar.nodes":"Semantic diagram radar nodes","viewer.radar.focus":"Focus {label} from Semantic Radar","viewer.radar.status":"{count} nodes · {viewport}","viewer.radar.fullMap":"{count} nodes · full map","viewer.radar.compacted":"Radar compacted to avoid covering the Semantic Passport or MAP controls.","viewer.radar.cancelWaiting":"Cancel semantic radar waiting for more MAP space","viewer.radar.needsSpace":"Semantic radar needs more visible MAP space","viewer.radar.viewport.full":"full map","viewer.radar.viewport.width":"{percent}% width","viewer.radar.viewport.scale":"{percent}% viewport","viewer.nav.controls":"Diagram view controls","viewer.nav.route":"Trace a directed route","viewer.nav.route.title":"Trace route (R)","viewer.nav.route.short":"PATH","viewer.nav.radar":"Open semantic radar","viewer.nav.radar.title":"Semantic radar (M)","viewer.nav.radar.short":"MAP","viewer.nav.lens":"Open semantic lens","viewer.nav.lens.title":"Semantic lens (L)","viewer.nav.lens.short":"LENS","viewer.nav.find":"Find a node","viewer.nav.find.title":"Find a node (/)","viewer.nav.guide":"Open diagram guide","viewer.nav.guide.title":"Diagram guide (?)","viewer.nav.zoomOut":"Zoom out","viewer.nav.zoomOut.title":"Zoom out (-)","viewer.nav.reset":"Reset diagram view","viewer.nav.reset.title":"Reset view (0)","viewer.nav.read":"READ","viewer.nav.zoomIn":"Zoom in","viewer.nav.zoomIn.title":"Zoom in (+)","viewer.nav.camera":"{hint}. Reset diagram view","viewer.nav.camera.title":"{semantic}{hint} · reset view (0)","viewer.nav.camera.semantic":"Semantic camera active · ","viewer.nav.level.map":"MAP","viewer.nav.level.read":"READ","viewer.nav.level.full":"FULL","viewer.nav.level.auto":"AUTO","viewer.nav.detail.map":"Zoom in to reveal relationship labels and node context","viewer.nav.detail.read":"Zoom in again to reveal tags and annotations","viewer.nav.detail.full":"Full diagram detail","viewer.intent.summary":"{label}. {out} outgoing, {in} incoming{loops}. {total} connections. Press Enter for details.","viewer.intent.loops":", {count} self loop","viewer.common.copied":"Copied","viewer.common.copyFailed":"Copy failed","viewer.common.copyLink":"Copy link","viewer.common.clear":"Clear","viewer.common.close":"Close"}}</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
@@ -5130,7 +5130,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / PLATE 04">
-      <svg viewBox="0 0 1120 920" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+      <svg viewBox="0 0 1080 1046" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
         <title id="archify-diagram-title">Luồng Xử Lý LangGraph Agent Bất Động Sản Đà Nẵng</title>
         <desc id="archify-diagram-description">A workflow diagram generated by Archify.</desc>
         <!-- Definitions -->
@@ -5156,55 +5156,60 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Swimlanes -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-0" x="40" y="52" width="1011" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-0" x="40" y="52" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
         <text x="54" y="74" class="t-dim" font-size="10" font-weight="600">01 / Client &amp; Web Gateway</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="178" width="1011" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="exception-lane" data-composition-frame-id="lane-1-exception" x="46" y="184" width="999" height="94" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="178" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="exception-lane" data-composition-frame-id="lane-1-exception" x="46" y="184" width="988" height="94" rx="8" class="c-security-group" stroke-width="1"/>
         <text x="54" y="200" class="t-security" font-size="10" font-weight="600">EX / Guardrails &amp; An Toàn</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="1011" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
         <text x="54" y="326" class="t-dim" font-size="10" font-weight="600">03 / Router &amp; Điều Phối Hội Thoại</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-3" x="40" y="430" width="1011" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="452" class="t-dim" font-size="10" font-weight="600">04 / Legal Advisory RAG</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-3" x="40" y="430" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="452" class="t-dim" font-size="10" font-weight="600">04 / Contract Audit Engine</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-4" x="40" y="556" width="1011" height="106" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="578" class="t-dim" font-size="10" font-weight="600">05 / Financial Engine (MCP Tool)</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-4" x="40" y="556" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="578" class="t-dim" font-size="10" font-weight="600">05 / Legal Advisory RAG</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-5" x="40" y="682" width="1011" height="114" rx="10" class="c-lane" stroke-width="1"/>
-        <text x="54" y="704" class="t-dim" font-size="10" font-weight="600">06 / Property Search Pipeline</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-5" x="40" y="682" width="1000" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="704" class="t-dim" font-size="10" font-weight="600">06 / Financial &amp; Market Research (MCP)</text>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-6" x="40" y="808" width="1000" height="114" rx="10" class="c-lane" stroke-width="1"/>
+        <text x="54" y="830" class="t-dim" font-size="10" font-weight="600">07 / Property Search Pipeline</text>
 
         <!-- Phase headers -->
         <line x1="59.5" y1="35" x2="455" y2="35" class="a-default" stroke-width="1.1"/>
         <rect x="59.5" y="27" width="395.5" height="16" rx="4" class="c-mask"/>
         <text x="257.25" y="39" class="t-muted" font-size="8" font-weight="600" text-anchor="middle">1. Tiếp nhận &amp; Định tuyến</text>
-        <line x1="558.6000000000001" y1="35" x2="852.2000000000002" y2="35" class="a-emphasis" stroke-width="1.1"/>
-        <rect x="558.6000000000001" y="27" width="293.6" height="16" rx="4" class="c-mask"/>
-        <text x="705.4000000000001" y="39" class="t-backend" font-size="8" font-weight="600" text-anchor="middle">2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)</text>
-        <line x1="931.8000000000001" y1="35" x2="1074.2" y2="35" class="a-dashed" stroke-width="1.1"/>
-        <rect x="931.8000000000001" y="27" width="142.39999999999998" height="16" rx="4" class="c-mask"/>
-        <text x="1003" y="39" class="t-messagebus" font-size="8" font-weight="600" text-anchor="middle">3. Tổng hợp &amp; Stream SSE</text>
+        <line x1="558.5999999999999" y1="35" x2="841.4" y2="35" class="a-emphasis" stroke-width="1.1"/>
+        <rect x="558.5999999999999" y="27" width="282.80000000000007" height="16" rx="4" class="c-mask"/>
+        <text x="700" y="39" class="t-backend" font-size="8" font-weight="600" text-anchor="middle">2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)</text>
+        <line x1="921.0000000000001" y1="35" x2="1063.4" y2="35" class="a-dashed" stroke-width="1.1"/>
+        <rect x="921.0000000000001" y="27" width="142.39999999999998" height="16" rx="4" class="c-mask"/>
+        <text x="992.2" y="39" class="t-messagebus" font-size="8" font-weight="600" text-anchor="middle">3. Tổng hợp &amp; Stream SSE</text>
 
         <!-- Workflow groups -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="group" data-composition-frame-id="group-0" x="540.6" y="720" width="501.20000000000016" height="72" rx="9" class="c-lane" stroke-width="1"/>
-        <text x="550.6" y="718" class="t-backend" font-size="7" font-weight="600">Tìm kiếm &amp; Khớp căn</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="group" data-composition-frame-id="group-0" x="540.6" y="846" width="490.4" height="72" rx="9" class="c-lane" stroke-width="1"/>
+        <text x="550.6" y="844" class="t-backend" font-size="7" font-weight="600">Tìm kiếm &amp; Khớp căn</text>
 
         <!-- Edge paths -->
         <path data-edge-from="fastapi" data-edge-to="router" data-edge-label="astream" data-edge-key="0" data-edge-id="edge_api_router" data-composition-points="289,146;289,372;349,372" d="M 289 146 L 289 372 L 349 372" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="general_chat" data-edge-to="sse_output" data-edge-label="chào hỏi" data-edge-key="1" data-edge-id="edge_chat_stream" data-composition-points="664.6,372;956.8000000000001,372;956.8000000000001,154" d="M 664.6 372 L 956.8000000000001 372 L 956.8000000000001 154" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="extract_criteria" data-edge-to="search_props" data-edge-label="filter slot" data-edge-key="2" data-edge-id="edge_extract_search" data-composition-points="664.6,757;746.2,757" d="M 664.6 757 L 746.2 757" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="generate_resp" data-edge-to="sse_output" data-edge-label="cards &amp; text" data-edge-key="3" data-edge-id="edge_gen_stream" data-composition-points="1037.8000000000002,757;1101.4,757;1101.4,120;1042.8000000000002,120" d="M 1037.8000000000002 757 L 1101.4 757 L 1101.4 120 L 1042.8000000000002 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="guardrail_node" data-edge-to="sse_output" data-edge-label="từ chối khéo" data-edge-key="4" data-edge-id="edge_guardrail_stream" data-composition-points="604.6,212;604.6,120;912.8000000000001,120" d="M 604.6 212 L 604.6 120 L 912.8000000000001 120" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="legal_advisory" data-edge-to="sse_output" data-edge-label="citations &amp; text" data-edge-key="5" data-edge-id="edge_legal_stream" data-composition-points="664.6,498;970.8000000000001,498;970.8000000000001,154" d="M 664.6 498 L 970.8000000000001 498 L 970.8000000000001 154" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="mortgage_calc" data-edge-to="sse_output" data-edge-label="lịch trả góp" data-edge-key="6" data-edge-id="edge_mortgage_stream" data-composition-points="664.6,624;984.8000000000001,624;984.8000000000001,154" d="M 664.6 624 L 984.8000000000001 624 L 984.8000000000001 154" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="router" data-edge-to="general_chat" data-edge-label="general_chat" data-edge-key="7" data-edge-id="edge_router_chat" data-composition-points="469,372;544.6,372" d="M 469 372 L 544.6 372" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="router" data-edge-to="guardrail_node" data-edge-label="out_of_scope" data-edge-key="8" data-edge-id="edge_router_guardrail" data-composition-points="409,338;409,246;544.6,246" d="M 409 338 L 409 246 L 544.6 246" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="router" data-edge-to="legal_advisory" data-edge-label="legal_consult" data-edge-key="9" data-edge-id="edge_router_legal" data-composition-points="395,406;395,498;544.6,498" d="M 395 406 L 395 498 L 544.6 498" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="router" data-edge-to="mortgage_calc" data-edge-label="mortgage_calc" data-edge-key="10" data-edge-id="edge_router_mortgage" data-composition-points="409,406;409,624;544.6,624" d="M 409 406 L 409 624 L 544.6 624" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="router" data-edge-to="extract_criteria" data-edge-label="search_property" data-edge-key="11" data-edge-id="edge_router_search" data-composition-points="423,406;423,757;544.6,757" d="M 423 406 L 423 757 L 544.6 757" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="search_props" data-edge-to="generate_resp" data-edge-label="top BĐS" data-edge-key="12" data-edge-id="edge_search_gen" data-composition-points="866.2,757;917.8000000000001,757" d="M 866.2 757 L 917.8000000000001 757" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="user" data-edge-to="fastapi" data-edge-label="user query" data-edge-key="13" data-edge-id="edge_user_api" data-composition-points="163,120;229,120" d="M 163 120 L 229 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="contract_audit" data-edge-to="sse_output" data-edge-label="báo cáo thẩm định" data-edge-key="1" data-edge-id="edge_audit_stream" data-composition-points="664.6,498;939.0000000000001,498;939.0000000000001,154" d="M 664.6 498 L 939.0000000000001 498 L 939.0000000000001 154" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="general_chat" data-edge-to="sse_output" data-edge-label="chào hỏi" data-edge-key="2" data-edge-id="edge_chat_stream" data-composition-points="664.6,372;953.0000000000001,372;953.0000000000001,154" d="M 664.6 372 L 953.0000000000001 372 L 953.0000000000001 154" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="extract_criteria" data-edge-to="search_props" data-edge-label="filter slot" data-edge-key="3" data-edge-id="edge_extract_search" data-composition-points="664.6,883;735.4000000000001,883" d="M 664.6 883 L 735.4000000000001 883" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="generate_resp" data-edge-to="sse_output" data-edge-label="cards &amp; text" data-edge-key="4" data-edge-id="edge_gen_stream" data-composition-points="967.0000000000001,849;967.0000000000001,487;995.0000000000001,487;995.0000000000001,154" d="M 967.0000000000001 849 L 967.0000000000001 487 L 995.0000000000001 487 L 995.0000000000001 154" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="guardrail_node" data-edge-to="sse_output" data-edge-label="từ chối khéo" data-edge-key="5" data-edge-id="edge_guardrail_stream" data-composition-points="604.6,212;604.6,120;902.0000000000001,120" d="M 604.6 212 L 604.6 120 L 902.0000000000001 120" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="legal_advisory" data-edge-to="sse_output" data-edge-label="citations &amp; text" data-edge-key="6" data-edge-id="edge_legal_stream" data-composition-points="664.6,624;1052,624;1052,120;1032,120" d="M 664.6 624 L 1052 624 L 1052 120 L 1032 120" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="mortgage_calc" data-edge-to="sse_output" data-edge-label="lịch trả &amp; so sánh bank" data-edge-key="7" data-edge-id="edge_mortgage_stream" data-composition-points="667.1,750;1052,750;1052,120;1032,120" d="M 667.1 750 L 1052 750 L 1052 120 L 1032 120" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="router" data-edge-to="contract_audit" data-edge-label="contract_audit" data-edge-key="8" data-edge-id="edge_router_audit" data-composition-points="388,406;388,498;544.6,498" d="M 388 406 L 388 498 L 544.6 498" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="router" data-edge-to="general_chat" data-edge-label="general_chat" data-edge-key="9" data-edge-id="edge_router_chat" data-composition-points="469,372;544.6,372" d="M 469 372 L 544.6 372" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="router" data-edge-to="guardrail_node" data-edge-label="out_of_scope" data-edge-key="10" data-edge-id="edge_router_guardrail" data-composition-points="409,338;409,246;544.6,246" d="M 409 338 L 409 246 L 544.6 246" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="router" data-edge-to="legal_advisory" data-edge-label="legal_consult" data-edge-key="11" data-edge-id="edge_router_legal" data-composition-points="402,406;402,624;544.6,624" d="M 402 406 L 402 624 L 544.6 624" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="router" data-edge-to="mortgage_calc" data-edge-label="mortgage_calc" data-edge-key="12" data-edge-id="edge_router_mortgage" data-composition-points="416,406;416,750;542.1,750" d="M 416 406 L 416 750 L 542.1 750" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="router" data-edge-to="extract_criteria" data-edge-label="search_property" data-edge-key="13" data-edge-id="edge_router_search" data-composition-points="409,406;409,938;604.6,938;604.6,917" d="M 409 406 L 409 938 L 604.6 938 L 604.6 917" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="search_props" data-edge-to="generate_resp" data-edge-label="top BĐS" data-edge-key="14" data-edge-id="edge_search_gen" data-composition-points="855.4000000000001,883;907.0000000000001,883" d="M 855.4000000000001 883 L 907.0000000000001 883" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="user" data-edge-to="fastapi" data-edge-label="user query" data-edge-key="15" data-edge-id="edge_user_api" data-composition-points="163,120;229,120" d="M 163 120 L 229 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
 
         <!-- Nodes -->
         <g id="node-user" data-node-id="user" data-node-label="Khách hàng" tabindex="0" role="button" aria-label="Focus Khách hàng, Giao diện React, Client &amp; Web Gateway › 1. Tiếp nhận &amp; Định tuyến" aria-pressed="false" data-node-kind="external" data-node-sublabel="Giao diện React" data-node-context="Client &amp; Web Gateway › 1. Tiếp nhận &amp; Định tuyến">
@@ -5235,28 +5240,28 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text data-detail="context" x="289" y="132" class="t-muted" font-size="8" text-anchor="middle">POST /chat/stream</text>
         </g>
 
-        <g id="node-sse_output" data-node-id="sse_output" data-node-label="SSE Stream" tabindex="0" role="button" aria-label="Focus SSE Stream, Cards + Citations, Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE, React" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Cards + Citations" data-node-tag="Thinking &amp; Tokens" data-node-context="Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE" data-node-brand="React" data-node-brand-id="react" data-node-brand-status="preset" data-node-brand-source="https://github.com/facebook/create-react-app/blob/282c03f9525fdf8061ffa1ec50dce89296d916bd/test/fixtures/relative-paths/src/logo.svg">
-          <title>SSE Stream · Cards + Citations · Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE · Thinking &amp; Tokens · React</title>
-          <rect x="912.8000000000001" y="86" width="130" height="68" rx="6" class="c-mask"/>
-          <rect x="912.8000000000001" y="86" width="130" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(918.8000000000001 92) scale(0.6875)">
+        <g id="node-sse_output" data-node-id="sse_output" data-node-label="SSE Stream" tabindex="0" role="button" aria-label="Focus SSE Stream, Cards + Citations + Audit, Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE, React" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Cards + Citations + Audit" data-node-tag="Thinking &amp; Tokens" data-node-context="Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE" data-node-brand="React" data-node-brand-id="react" data-node-brand-status="preset" data-node-brand-source="https://github.com/facebook/create-react-app/blob/282c03f9525fdf8061ffa1ec50dce89296d916bd/test/fixtures/relative-paths/src/logo.svg">
+          <title>SSE Stream · Cards + Citations + Audit · Client &amp; Web Gateway › 3. Tổng hợp &amp; Stream SSE · Thinking &amp; Tokens · React</title>
+          <rect x="902.0000000000001" y="86" width="130" height="68" rx="6" class="c-mask"/>
+          <rect x="902.0000000000001" y="86" width="130" height="68" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(908.0000000000001 92) scale(0.6875)">
             <rect x="2" y="3" width="12" height="10" rx="2"/>
             <path d="M2 6.5h12"/>
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <g aria-hidden="true" data-brand-mark="react" data-brand-title="React" data-brand-status="preset" data-brand-source="https://github.com/facebook/create-react-app/blob/282c03f9525fdf8061ffa1ec50dce89296d916bd/test/fixtures/relative-paths/src/logo.svg" class="brand-mark" transform="translate(1020.8000000000002 92)">
+          <g aria-hidden="true" data-brand-mark="react" data-brand-title="React" data-brand-status="preset" data-brand-source="https://github.com/facebook/create-react-app/blob/282c03f9525fdf8061ffa1ec50dce89296d916bd/test/fixtures/relative-paths/src/logo.svg" class="brand-mark" transform="translate(1010 92)">
             <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
             <path d="M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z" transform="translate(3 3) scale(0.4166666666666667)" fill="#61DAFB"/>
             <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="977.8000000000001" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">SSE Stream</text>
-          <text data-detail="context" x="977.8000000000001" y="124" class="t-muted" font-size="8" text-anchor="middle">Cards + Citations</text>
-        <text data-detail="fine" x="977.8000000000001" y="142" class="t-frontend" font-size="7" text-anchor="middle">Thinking &amp; Tokens</text>
+          <text data-node-label="" data-detail-anchor="" x="967.0000000000001" y="107" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">SSE Stream</text>
+          <text data-detail="context" x="967.0000000000001" y="124" class="t-muted" font-size="8" text-anchor="middle">Cards + Citations + Audit</text>
+        <text data-detail="fine" x="967.0000000000001" y="142" class="t-frontend" font-size="7" text-anchor="middle">Thinking &amp; Tokens</text>
         </g>
 
-        <g id="node-guardrail_node" data-node-id="guardrail_node" data-node-label="Guardrail Node" tabindex="0" role="button" aria-label="Focus Guardrail Node, out_of_scope_response, Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="security" data-node-sublabel="out_of_scope_response" data-node-tag="Chặn lệch phạm vi" data-node-context="Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>Guardrail Node · out_of_scope_response · Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · Chặn lệch phạm vi</title>
+        <g id="node-guardrail_node" data-node-id="guardrail_node" data-node-label="Guardrail Node" tabindex="0" role="button" aria-label="Focus Guardrail Node, out_of_scope_response, Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="security" data-node-sublabel="out_of_scope_response" data-node-tag="Chặn lệch phạm vi" data-node-context="Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Guardrail Node · out_of_scope_response · Guardrails &amp; An Toàn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Chặn lệch phạm vi</title>
           <rect x="544.6" y="212" width="120" height="68" rx="6" class="c-mask"/>
           <rect x="544.6" y="212" width="120" height="68" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(550.6 218) scale(0.6875)">
@@ -5268,8 +5273,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="604.6" y="268" class="t-security" font-size="7" text-anchor="middle">Chặn lệch phạm vi</text>
         </g>
 
-        <g id="node-router" data-node-id="router" data-node-label="Router Agent" tabindex="0" role="button" aria-label="Focus Router Agent, route_intent_node, Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến" aria-pressed="false" data-node-kind="backend" data-node-sublabel="route_intent_node" data-node-tag="6 Phân loại ý định" data-node-context="Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến">
-          <title>Router Agent · route_intent_node · Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến · 6 Phân loại ý định</title>
+        <g id="node-router" data-node-id="router" data-node-label="Router Agent" tabindex="0" role="button" aria-label="Focus Router Agent, route_intent_node, Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến" aria-pressed="false" data-node-kind="backend" data-node-sublabel="route_intent_node" data-node-tag="7 Phân loại ý định" data-node-context="Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến">
+          <title>Router Agent · route_intent_node · Router &amp; Điều Phối Hội Thoại › 1. Tiếp nhận &amp; Định tuyến · 7 Phân loại ý định</title>
           <rect x="349" y="338" width="120" height="68" rx="6" class="c-mask"/>
           <rect x="349" y="338" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(355 344) scale(0.6875)">
@@ -5277,11 +5282,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           </g>
           <text data-node-label="" data-detail-anchor="" x="409" y="359" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Router Agent</text>
           <text data-detail="context" x="409" y="376" class="t-muted" font-size="8" text-anchor="middle">route_intent_node</text>
-        <text data-detail="fine" x="409" y="394" class="t-backend" font-size="7" text-anchor="middle">6 Phân loại ý định</text>
+        <text data-detail="fine" x="409" y="394" class="t-backend" font-size="7" text-anchor="middle">7 Phân loại ý định</text>
         </g>
 
-        <g id="node-general_chat" data-node-id="general_chat" data-node-label="General Chat" tabindex="0" role="button" aria-label="Focus General Chat, general_chat_response, Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="general_chat_response" data-node-tag="Chào hỏi xã giao" data-node-context="Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>General Chat · general_chat_response · Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · Chào hỏi xã giao</title>
+        <g id="node-general_chat" data-node-id="general_chat" data-node-label="General Chat" tabindex="0" role="button" aria-label="Focus General Chat, general_chat_response, Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="general_chat_response" data-node-tag="Chào hỏi xã giao" data-node-context="Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>General Chat · general_chat_response · Router &amp; Điều Phối Hội Thoại › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Chào hỏi xã giao</title>
           <rect x="544.6" y="338" width="120" height="68" rx="6" class="c-mask"/>
           <rect x="544.6" y="338" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(550.6 344) scale(0.6875)">
@@ -5292,68 +5297,80 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="604.6" y="394" class="t-backend" font-size="7" text-anchor="middle">Chào hỏi xã giao</text>
         </g>
 
-        <g id="node-legal_advisory" data-node-id="legal_advisory" data-node-label="Legal Advisory" tabindex="0" role="button" aria-label="Focus Legal Advisory, legal_advisory_node, Legal Advisory RAG › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="legal_advisory_node" data-node-tag="RAG danang_legal_docs" data-node-context="Legal Advisory RAG › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>Legal Advisory · legal_advisory_node · Legal Advisory RAG › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · RAG danang_legal_docs</title>
+        <g id="node-contract_audit" data-node-id="contract_audit" data-node-label="Contract Audit" tabindex="0" role="button" aria-label="Focus Contract Audit, contract_audit_node, Contract Audit Engine › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="contract_audit_node" data-node-tag="Thẩm định bẫy cọc BĐS" data-node-context="Contract Audit Engine › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Contract Audit · contract_audit_node · Contract Audit Engine › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Thẩm định bẫy cọc BĐS</title>
           <rect x="544.6" y="464" width="120" height="68" rx="6" class="c-mask"/>
           <rect x="544.6" y="464" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(550.6 470) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="604.6" y="485" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Legal Advisory</text>
-          <text data-detail="context" x="604.6" y="502" class="t-muted" font-size="8" text-anchor="middle">legal_advisory_node</text>
-        <text data-detail="fine" x="604.6" y="520" class="t-backend" font-size="7" text-anchor="middle">RAG danang_legal_docs</text>
+          <text data-node-label="" data-detail-anchor="" x="604.6" y="485" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Contract Audit</text>
+          <text data-detail="context" x="604.6" y="502" class="t-muted" font-size="8" text-anchor="middle">contract_audit_node</text>
+        <text data-detail="fine" x="604.6" y="520" class="t-backend" font-size="7" text-anchor="middle">Thẩm định bẫy cọc BĐS</text>
         </g>
 
-        <g id="node-mortgage_calc" data-node-id="mortgage_calc" data-node-label="Mortgage Calc" tabindex="0" role="button" aria-label="Focus Mortgage Calc, LLM + MCP Tool, Financial Engine (MCP Tool) › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="LLM + MCP Tool" data-node-tag="Bảng tính lãi vay" data-node-context="Financial Engine (MCP Tool) › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>Mortgage Calc · LLM + MCP Tool · Financial Engine (MCP Tool) › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · Bảng tính lãi vay</title>
+        <g id="node-legal_advisory" data-node-id="legal_advisory" data-node-label="Legal Advisory" tabindex="0" role="button" aria-label="Focus Legal Advisory, legal_advisory_node, Legal Advisory RAG › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="legal_advisory_node" data-node-tag="RAG danang_legal_docs" data-node-context="Legal Advisory RAG › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Legal Advisory · legal_advisory_node · Legal Advisory RAG › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · RAG danang_legal_docs</title>
           <rect x="544.6" y="590" width="120" height="68" rx="6" class="c-mask"/>
-          <rect x="544.6" y="590" width="120" height="68" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(550.6 596) scale(0.6875)">
+          <rect x="544.6" y="590" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(550.6 596) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="604.6" y="611" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Legal Advisory</text>
+          <text data-detail="context" x="604.6" y="628" class="t-muted" font-size="8" text-anchor="middle">legal_advisory_node</text>
+        <text data-detail="fine" x="604.6" y="646" class="t-backend" font-size="7" text-anchor="middle">RAG danang_legal_docs</text>
+        </g>
+
+        <g id="node-mortgage_calc" data-node-id="mortgage_calc" data-node-label="Mortgage &amp; Research" tabindex="0" role="button" aria-label="Focus Mortgage &amp; Research, ReAct Agent + FastMCP, Financial &amp; Market Research (MCP) › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="ReAct Agent + FastMCP" data-node-tag="Lãi vay &amp; So sánh Bank" data-node-context="Financial &amp; Market Research (MCP) › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Mortgage &amp; Research · ReAct Agent + FastMCP · Financial &amp; Market Research (MCP) › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Lãi vay &amp; So sánh Bank</title>
+          <rect x="542.1" y="716" width="125" height="68" rx="6" class="c-mask"/>
+          <rect x="542.1" y="716" width="125" height="68" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(548.1 722) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="604.6" y="611" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Mortgage Calc</text>
-          <text data-detail="context" x="604.6" y="628" class="t-muted" font-size="8" text-anchor="middle">LLM + MCP Tool</text>
-        <text data-detail="fine" x="604.6" y="646" class="t-messagebus" font-size="7" text-anchor="middle">Bảng tính lãi vay</text>
+          <text data-node-label="" data-detail-anchor="" x="604.6" y="737" class="t-primary" font-size="10.2" font-weight="600" text-anchor="middle">Mortgage &amp; Research</text>
+          <text data-detail="context" x="604.6" y="754" class="t-muted" font-size="8" text-anchor="middle">ReAct Agent + FastMCP</text>
+        <text data-detail="fine" x="604.6" y="772" class="t-messagebus" font-size="7" text-anchor="middle">Lãi vay &amp; So sánh Bank</text>
         </g>
 
-        <g id="node-extract_criteria" data-node-id="extract_criteria" data-node-label="Extract Criteria" tabindex="0" role="button" aria-label="Focus Extract Criteria, extract_criteria_node, Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="extract_criteria_node" data-node-tag="Slot Extractor" data-node-context="Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>Extract Criteria · extract_criteria_node · Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · Slot Extractor</title>
-          <rect x="544.6" y="723" width="120" height="68" rx="6" class="c-mask"/>
-          <rect x="544.6" y="723" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(550.6 729) scale(0.6875)">
+        <g id="node-extract_criteria" data-node-id="extract_criteria" data-node-label="Extract Criteria" tabindex="0" role="button" aria-label="Focus Extract Criteria, extract_criteria_node, Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="extract_criteria_node" data-node-tag="Slot Extractor" data-node-context="Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Extract Criteria · extract_criteria_node · Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Slot Extractor</title>
+          <rect x="544.6" y="849" width="120" height="68" rx="6" class="c-mask"/>
+          <rect x="544.6" y="849" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(550.6 855) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="604.6" y="744" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Extract Criteria</text>
-          <text data-detail="context" x="604.6" y="761" class="t-muted" font-size="8" text-anchor="middle">extract_criteria_node</text>
-        <text data-detail="fine" x="604.6" y="779" class="t-backend" font-size="7" text-anchor="middle">Slot Extractor</text>
+          <text data-node-label="" data-detail-anchor="" x="604.6" y="870" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Extract Criteria</text>
+          <text data-detail="context" x="604.6" y="887" class="t-muted" font-size="8" text-anchor="middle">extract_criteria_node</text>
+        <text data-detail="fine" x="604.6" y="905" class="t-backend" font-size="7" text-anchor="middle">Slot Extractor</text>
         </g>
 
-        <g id="node-search_props" data-node-id="search_props" data-node-label="Search Qdrant" tabindex="0" role="button" aria-label="Focus Search Qdrant, danang_properties, Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)" aria-pressed="false" data-node-kind="database" data-node-sublabel="danang_properties" data-node-tag="Vector &amp; Metadata" data-node-context="Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail)">
-          <title>Search Qdrant · danang_properties · Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Slot / MCP / RAG / Guardrail) · Vector &amp; Metadata</title>
-          <rect x="746.2" y="723" width="120" height="68" rx="6" class="c-mask"/>
-          <rect x="746.2" y="723" width="120" height="68" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(752.2 729) scale(0.6875)">
+        <g id="node-search_props" data-node-id="search_props" data-node-label="Search Qdrant" tabindex="0" role="button" aria-label="Focus Search Qdrant, danang_properties, Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)" aria-pressed="false" data-node-kind="database" data-node-sublabel="danang_properties" data-node-tag="Vector &amp; Metadata" data-node-context="Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)">
+          <title>Search Qdrant · danang_properties · Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot) · Vector &amp; Metadata</title>
+          <rect x="735.4000000000001" y="849" width="120" height="68" rx="6" class="c-mask"/>
+          <rect x="735.4000000000001" y="849" width="120" height="68" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(741.4000000000001 855) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="806.2" y="744" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Search Qdrant</text>
-          <text data-detail="context" x="806.2" y="761" class="t-muted" font-size="8" text-anchor="middle">danang_properties</text>
-        <text data-detail="fine" x="806.2" y="779" class="t-database" font-size="7" text-anchor="middle">Vector &amp; Metadata</text>
+          <text data-node-label="" data-detail-anchor="" x="795.4000000000001" y="870" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Search Qdrant</text>
+          <text data-detail="context" x="795.4000000000001" y="887" class="t-muted" font-size="8" text-anchor="middle">danang_properties</text>
+        <text data-detail="fine" x="795.4000000000001" y="905" class="t-database" font-size="7" text-anchor="middle">Vector &amp; Metadata</text>
         </g>
 
         <g id="node-generate_resp" data-node-id="generate_resp" data-node-label="Generate Response" tabindex="0" role="button" aria-label="Focus Generate Response, generate_response_node, Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 3. Tổng hợp &amp; Stream SSE" aria-pressed="false" data-node-kind="backend" data-node-sublabel="generate_response_node" data-node-tag="Gợi ý BĐS &amp; Đặt lịch" data-node-context="Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 3. Tổng hợp &amp; Stream SSE">
           <title>Generate Response · generate_response_node · Property Search Pipeline › Tìm kiếm &amp; Khớp căn › 3. Tổng hợp &amp; Stream SSE · Gợi ý BĐS &amp; Đặt lịch</title>
-          <rect x="917.8000000000001" y="723" width="120" height="68" rx="6" class="c-mask"/>
-          <rect x="917.8000000000001" y="723" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(923.8000000000001 729) scale(0.6875)">
+          <rect x="907.0000000000001" y="849" width="120" height="68" rx="6" class="c-mask"/>
+          <rect x="907.0000000000001" y="849" width="120" height="68" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(913.0000000000001 855) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="977.8000000000001" y="744" class="t-primary" font-size="10.9" font-weight="600" text-anchor="middle">Generate Response</text>
-          <text data-detail="context" x="977.8000000000001" y="761" class="t-muted" font-size="8" text-anchor="middle">generate_response_node</text>
-        <text data-detail="fine" x="977.8000000000001" y="779" class="t-backend" font-size="7" text-anchor="middle">Gợi ý BĐS &amp; Đặt lịch</text>
+          <text data-node-label="" data-detail-anchor="" x="967.0000000000001" y="870" class="t-primary" font-size="10.9" font-weight="600" text-anchor="middle">Generate Response</text>
+          <text data-detail="context" x="967.0000000000001" y="887" class="t-muted" font-size="8" text-anchor="middle">generate_response_node</text>
+        <text data-detail="fine" x="967.0000000000001" y="905" class="t-backend" font-size="7" text-anchor="middle">Gợi ý BĐS &amp; Đặt lịch</text>
         </g>
 
         <!-- Edge labels -->
@@ -5361,85 +5378,93 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="297.2" y="352" width="43.6" height="14" rx="3" class="c-mask"/>
           <text x="319" y="362" class="t-backend" font-size="8" text-anchor="middle">astream</text>
         </g>
-        <g data-detail="context" data-edge-from="general_chat" data-edge-to="sse_output" data-edge-label="chào hỏi" data-edge-key="1" data-edge-id="edge_chat_stream">
-          <rect x="786.5" y="352" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="810.7" y="362" class="t-muted" font-size="8" text-anchor="middle">chào hỏi</text>
+        <g data-detail="context" data-edge-from="contract_audit" data-edge-to="sse_output" data-edge-label="báo cáo thẩm định" data-edge-key="1" data-edge-id="edge_audit_stream">
+          <rect x="756.0000000000001" y="478" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="801.8000000000001" y="488" class="t-backend" font-size="8" text-anchor="middle">báo cáo thẩm định</text>
         </g>
-        <g data-detail="context" data-edge-from="extract_criteria" data-edge-to="search_props" data-edge-label="filter slot" data-edge-key="2" data-edge-id="edge_extract_search">
-          <rect x="674.0000000000001" y="737" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="705.4000000000001" y="747" class="t-backend" font-size="8" text-anchor="middle">filter slot</text>
+        <g data-detail="context" data-edge-from="general_chat" data-edge-to="sse_output" data-edge-label="chào hỏi" data-edge-key="2" data-edge-id="edge_chat_stream">
+          <rect x="784.6" y="352" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="808.8000000000001" y="362" class="t-muted" font-size="8" text-anchor="middle">chào hỏi</text>
         </g>
-        <g data-detail="context" data-edge-from="generate_resp" data-edge-to="sse_output" data-edge-label="cards &amp; text" data-edge-key="3" data-edge-id="edge_gen_stream">
-          <rect x="1035.8000000000002" y="737" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="1069.6000000000001" y="747" class="t-backend" font-size="8" text-anchor="middle">cards &amp; text</text>
+        <g data-detail="context" data-edge-from="extract_criteria" data-edge-to="search_props" data-edge-label="filter slot" data-edge-key="3" data-edge-id="edge_extract_search">
+          <rect x="668.6" y="863" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="700" y="873" class="t-backend" font-size="8" text-anchor="middle">filter slot</text>
         </g>
-        <g data-detail="context" data-edge-from="guardrail_node" data-edge-to="sse_output" data-edge-label="từ chối khéo" data-edge-key="4" data-edge-id="edge_guardrail_stream">
-          <rect x="724.9000000000001" y="100" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="758.7" y="110" class="t-security" font-size="8" text-anchor="middle">từ chối khéo</text>
+        <g data-detail="context" data-edge-from="generate_resp" data-edge-to="sse_output" data-edge-label="cards &amp; text" data-edge-key="4" data-edge-id="edge_gen_stream">
+          <rect x="947.2000000000002" y="467" width="67.6" height="14" rx="3" class="c-mask"/>
+          <text x="981.0000000000001" y="477" class="t-backend" font-size="8" text-anchor="middle">cards &amp; text</text>
         </g>
-        <g data-detail="context" data-edge-from="legal_advisory" data-edge-to="sse_output" data-edge-label="citations &amp; text" data-edge-key="5" data-edge-id="edge_legal_stream">
-          <rect x="774.3000000000001" y="478" width="86.8" height="14" rx="3" class="c-mask"/>
-          <text x="817.7" y="488" class="t-security" font-size="8" text-anchor="middle">citations &amp; text</text>
+        <g data-detail="context" data-edge-from="guardrail_node" data-edge-to="sse_output" data-edge-label="từ chối khéo" data-edge-key="5" data-edge-id="edge_guardrail_stream">
+          <rect x="719.5000000000001" y="100" width="67.6" height="14" rx="3" class="c-mask"/>
+          <text x="753.3000000000001" y="110" class="t-security" font-size="8" text-anchor="middle">từ chối khéo</text>
         </g>
-        <g data-detail="context" data-edge-from="mortgage_calc" data-edge-to="sse_output" data-edge-label="lịch trả góp" data-edge-key="6" data-edge-id="edge_mortgage_stream">
-          <rect x="790.9000000000001" y="604" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="824.7" y="614" class="t-muted" font-size="8" text-anchor="middle">lịch trả góp</text>
+        <g data-detail="context" data-edge-from="legal_advisory" data-edge-to="sse_output" data-edge-label="citations &amp; text" data-edge-key="6" data-edge-id="edge_legal_stream">
+          <rect x="814.9" y="604" width="86.8" height="14" rx="3" class="c-mask"/>
+          <text x="858.3" y="614" class="t-security" font-size="8" text-anchor="middle">citations &amp; text</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="general_chat" data-edge-label="general_chat" data-edge-key="7" data-edge-id="edge_router_chat">
+        <g data-detail="context" data-edge-from="mortgage_calc" data-edge-to="sse_output" data-edge-label="lịch trả &amp; so sánh bank" data-edge-key="7" data-edge-id="edge_mortgage_stream">
+          <rect x="799.3499999999999" y="730" width="120.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="859.55" y="740" class="t-muted" font-size="8" text-anchor="middle">lịch trả &amp; so sánh bank</text>
+        </g>
+        <g data-detail="context" data-edge-from="router" data-edge-to="contract_audit" data-edge-label="contract_audit" data-edge-key="8" data-edge-id="edge_router_audit">
+          <rect x="427.7" y="478" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="466.3" y="488" class="t-backend" font-size="8" text-anchor="middle">contract_audit</text>
+        </g>
+        <g data-detail="context" data-edge-from="router" data-edge-to="general_chat" data-edge-label="general_chat" data-edge-key="9" data-edge-id="edge_router_chat">
           <rect x="473" y="352" width="67.6" height="14" rx="3" class="c-mask"/>
           <text x="506.8" y="362" class="t-muted" font-size="8" text-anchor="middle">general_chat</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="guardrail_node" data-edge-label="out_of_scope" data-edge-key="8" data-edge-id="edge_router_guardrail">
+        <g data-detail="context" data-edge-from="router" data-edge-to="guardrail_node" data-edge-label="out_of_scope" data-edge-key="10" data-edge-id="edge_router_guardrail">
           <rect x="443" y="226" width="67.6" height="14" rx="3" class="c-mask"/>
           <text x="476.8" y="236" class="t-security" font-size="8" text-anchor="middle">out_of_scope</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="legal_advisory" data-edge-label="legal_consult" data-edge-key="9" data-edge-id="edge_router_legal">
-          <rect x="433.6" y="478" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="469.8" y="488" class="t-security" font-size="8" text-anchor="middle">legal_consult</text>
+        <g data-detail="context" data-edge-from="router" data-edge-to="legal_advisory" data-edge-label="legal_consult" data-edge-key="11" data-edge-id="edge_router_legal">
+          <rect x="437.1" y="604" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="473.3" y="614" class="t-security" font-size="8" text-anchor="middle">legal_consult</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="mortgage_calc" data-edge-label="mortgage_calc" data-edge-key="10" data-edge-id="edge_router_mortgage">
-          <rect x="440.6" y="604" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="476.8" y="614" class="t-muted" font-size="8" text-anchor="middle">mortgage_calc</text>
+        <g data-detail="context" data-edge-from="router" data-edge-to="mortgage_calc" data-edge-label="mortgage_calc" data-edge-key="12" data-edge-id="edge_router_mortgage">
+          <rect x="442.85" y="730" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="479.05" y="740" class="t-muted" font-size="8" text-anchor="middle">mortgage_calc</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="extract_criteria" data-edge-label="search_property" data-edge-key="11" data-edge-id="edge_router_search">
-          <rect x="442.8" y="737" width="82" height="14" rx="3" class="c-mask"/>
-          <text x="483.8" y="747" class="t-backend" font-size="8" text-anchor="middle">search_property</text>
+        <g data-detail="context" data-edge-from="router" data-edge-to="extract_criteria" data-edge-label="search_property" data-edge-key="13" data-edge-id="edge_router_search">
+          <rect x="465.8" y="918" width="82" height="14" rx="3" class="c-mask"/>
+          <text x="506.8" y="928" class="t-backend" font-size="8" text-anchor="middle">search_property</text>
         </g>
-        <g data-detail="context" data-edge-from="search_props" data-edge-to="generate_resp" data-edge-label="top BĐS" data-edge-key="12" data-edge-id="edge_search_gen">
-          <rect x="870.2" y="737" width="43.6" height="14" rx="3" class="c-mask"/>
-          <text x="892" y="747" class="t-backend" font-size="8" text-anchor="middle">top BĐS</text>
+        <g data-detail="context" data-edge-from="search_props" data-edge-to="generate_resp" data-edge-label="top BĐS" data-edge-key="14" data-edge-id="edge_search_gen">
+          <rect x="859.4000000000001" y="863" width="43.6" height="14" rx="3" class="c-mask"/>
+          <text x="881.2" y="873" class="t-backend" font-size="8" text-anchor="middle">top BĐS</text>
         </g>
-        <g data-detail="context" data-edge-from="user" data-edge-to="fastapi" data-edge-label="user query" data-edge-key="13" data-edge-id="edge_user_api">
+        <g data-detail="context" data-edge-from="user" data-edge-to="fastapi" data-edge-label="user query" data-edge-key="15" data-edge-id="edge_user_api">
           <rect x="167" y="100" width="58" height="14" rx="3" class="c-mask"/>
           <text x="196" y="110" class="t-backend" font-size="8" text-anchor="middle">user query</text>
         </g>
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="20" y="820" class="t-primary" font-size="12" font-weight="650">Legend</text>
-          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="User UI" data-legend-x="20" data-legend-baseline="840" data-legend-width="74">
-            <rect x="20" y="832" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
-            <text x="42" y="840" class="t-muted" font-size="7.5" font-weight="500">User UI</text>
+          <text x="20" y="946" class="t-primary" font-size="12" font-weight="650">Legend</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="User UI" data-legend-x="20" data-legend-baseline="966" data-legend-width="74">
+            <rect x="20" y="958" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
+            <text x="42" y="966" class="t-muted" font-size="7.5" font-weight="500">User UI</text>
           </g>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Agent logic" data-legend-x="101" data-legend-baseline="840" data-legend-width="91">
-            <rect x="101" y="832" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="123" y="840" class="t-muted" font-size="7.5" font-weight="500">Agent logic</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Agent logic" data-legend-x="101" data-legend-baseline="966" data-legend-width="91">
+            <rect x="101" y="958" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="123" y="966" class="t-muted" font-size="7.5" font-weight="500">Agent logic</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Policy" data-legend-x="199" data-legend-baseline="840" data-legend-width="70">
-            <rect x="199" y="832" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
-            <text x="221" y="840" class="t-muted" font-size="7.5" font-weight="500">Policy</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Policy" data-legend-x="199" data-legend-baseline="966" data-legend-width="70">
+            <rect x="199" y="958" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="221" y="966" class="t-muted" font-size="7.5" font-weight="500">Policy</text>
           </g>
-          <g data-legend-semantic-kind="messagebus" data-legend-kind="messagebus" data-legend-label="Tool action" data-legend-x="276" data-legend-baseline="840" data-legend-width="91">
-            <rect x="276" y="832" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
-            <text x="298" y="840" class="t-muted" font-size="7.5" font-weight="500">Tool action</text>
+          <g data-legend-semantic-kind="messagebus" data-legend-kind="messagebus" data-legend-label="Tool action" data-legend-x="276" data-legend-baseline="966" data-legend-width="91">
+            <rect x="276" y="958" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
+            <text x="298" y="966" class="t-muted" font-size="7.5" font-weight="500">Tool action</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Context / trace" data-legend-x="374" data-legend-baseline="840" data-legend-width="109">
-            <rect x="374" y="832" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
-            <text x="396" y="840" class="t-muted" font-size="7.5" font-weight="500">Context / trace</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Context / trace" data-legend-x="374" data-legend-baseline="966" data-legend-width="109">
+            <rect x="374" y="958" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
+            <text x="396" y="966" class="t-muted" font-size="7.5" font-weight="500">Context / trace</text>
           </g>
-          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External system" data-legend-x="490" data-legend-baseline="840" data-legend-width="109">
-            <rect x="490" y="832" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
-            <text x="512" y="840" class="t-muted" font-size="7.5" font-weight="500">External system</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External system" data-legend-x="490" data-legend-baseline="966" data-legend-width="109">
+            <rect x="490" y="958" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
+            <text x="512" y="966" class="t-muted" font-size="7.5" font-weight="500">External system</text>
           </g>
         </g>
       </svg>
@@ -5631,22 +5656,33 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
-          <h3>Điều Phối Đa Ý Định &amp; Guardrail</h3>
+          <h3>Điều Phối Đa Ý Định (7 Intents) &amp; Guardrail</h3>
         </div>
         <ul>
-          <li>&bull; Router Agent phân loại 6 ý định: search_property, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.</li>
-          <li>&bull; Guardrail chặn ngay các câu hỏi ngoài Đà Nẵng hoặc prompt injection để bảo vệ phạm vi hoạt động.</li>
+          <li>&bull; Router Agent phân loại 7 ý định: search_property, contract_audit, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.</li>
+          <li>&bull; Input Guardrail chặn đứng prompt injection, jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng.</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot emerald"></div>
-          <h3>Dual Collection Qdrant &amp; MCP Tool</h3>
+          <h3>Dual Collection Qdrant RAG &amp; Thẩm Định Hợp Đồng</h3>
         </div>
         <ul>
-          <li>&bull; Tra cứu song song collection danang_properties (tìm kiếm nhà đất) và danang_legal_docs (văn bản luật đã OCR).</li>
-          <li>&bull; Tích hợp MCP Tool tính toán lãi vay ngân hàng với 2 phương án: dư nợ giảm dần và niên kim cố định.</li>
+          <li>&bull; Tra cứu song song collection danang_properties (nhà đất) và danang_legal_docs (văn bản quy phạm pháp luật đã OCR bằng Docling).</li>
+          <li>&bull; Contract Auditor tự động rà soát bẫy đặt cọc (trần cọc 5%), phạt cọc một chiều, chấm điểm an toàn và trích dẫn điều luật [1], [2].</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>FastMCP Financial &amp; Bank Research Engine</h3>
+        </div>
+        <ul>
+          <li>&bull; ReAct Agent tích hợp FastMCP Client hỗ trợ tính lịch trả góp dư nợ giảm dần hoặc niên kim cố định.</li>
+          <li>&bull; Tool research thị trường cập nhật biểu lãi suất nhóm Big 4 &amp; NHTMCP, tính lãi suất bình quân cả kỳ và gợi ý ngân hàng tối ưu.</li>
         </ul>
       </div>
     </div>

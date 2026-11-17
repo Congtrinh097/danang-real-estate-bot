@@ -7,7 +7,13 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from mortgage_mcp_server import mortgage_mcp_server
-from mortgage_mcp_client import MortgageMCPClient, mortgage_mcp_client, mortgage_langchain_tool
+from mortgage_mcp_client import (
+    MortgageMCPClient,
+    mortgage_mcp_client,
+    mortgage_langchain_tool,
+    create_mortgage_agent,
+    get_mortgage_mcp_tools
+)
 from langchain_core.messages import HumanMessage, AIMessage
 from agent import real_estate_agent
 
@@ -15,17 +21,18 @@ from agent import real_estate_agent
 import asyncio
 
 def test_mcp_server_lists_mortgage_tool():
-    """Kiểm tra MCP Server đăng ký thành công tool tính lãi vay."""
+    """Kiểm tra MCP Server đăng ký thành công tool tính lãi vay và tool research ngân hàng."""
     async def _check():
         tools = await mortgage_mcp_server.list_tools()
         tool_names = [t.name for t in tools]
         assert "calculate_mortgage_loan" in tool_names
+        assert "search_bank_mortgage_rates" in tool_names
 
     asyncio.run(_check())
 
 
 def test_mcp_client_direct_call():
-    """Kiểm tra MCP Client gọi thực thi tool trên MCP Server."""
+    """Kiểm tra MCP Client gọi thực thi tool calculate_mortgage_loan trên MCP Server."""
     client = MortgageMCPClient(server=mortgage_mcp_server)
     result = client.call_tool("calculate_mortgage_loan", {
         "property_price": 2_000_000_000,
@@ -37,16 +44,43 @@ def test_mcp_client_direct_call():
     assert "1,400,000,000 VNĐ" in result
 
 
+def test_mcp_client_search_bank_rates_call():
+    """Kiểm tra MCP Client gọi thực thi tool search_bank_mortgage_rates."""
+    client = MortgageMCPClient(server=mortgage_mcp_server)
+    result = client.call_tool("search_bank_mortgage_rates", {
+        "tenure_years": 15,
+        "loan_amount": 2_000_000_000,
+        "loan_purpose": "mua_nha_o"
+    })
+    assert "BẢNG SO SÁNH GÓI VAY CÁC NGÂN HÀNG LỚN" in result
+    assert "Vietcombank" in result
+    assert "BIDV" in result
+    assert "Techcombank" in result
+    assert "ĐỀ XUẤT GÓI VAY PHÙ HỢP VÀ TỐI ƯU TIỀN LÃI" in result
+
+
+def test_create_mortgage_agent():
+    """Kiểm tra tạo Mortgage Agent bằng create_agent và nạp MCP tools qua adapter."""
+    agent = create_mortgage_agent()
+    assert agent is not None
+    tools = get_mortgage_mcp_tools()
+    assert len(tools) >= 2
+    tool_names = [t.name for t in tools]
+    assert "calculate_mortgage_loan" in tool_names
+    assert "search_bank_mortgage_rates" in tool_names
+
+
 def test_langchain_tool_conversion():
-    """Kiểm tra LangChain StructuredTool gọi qua MCP Client."""
+    """Kiểm tra LangChain Tool gọi qua MCP Client Adapter."""
     res = mortgage_langchain_tool.invoke({
         "property_price": 3_000_000_000,
         "loan_ratio": 80.0,
         "tenure_years": 15,
         "annual_interest_rate": 9.0
     })
-    assert "2,400,000,000 VNĐ" in res
-    assert "15 năm" in res
+    res_str = str(res)
+    assert "2,400,000,000 VNĐ" in res_str
+    assert "15 năm" in res_str
 
 
 def test_llm_to_mcp_client_to_tool_flow():
