@@ -14,6 +14,7 @@ Quy ước trạng thái:
 
 | Commit | Nội dung liên quan | Áp dụng |
 |---|---|---|
+| `59c289d` | Tenant Support/SLA workflow, hybrid RAG, ticketing MCP, HITL, SLA sensor, UI, tests và CI | Implementation chính cho ma trận này |
 | `918ef98` | Mở rộng legal RAGAS golden samples và test coverage | Baseline RAG evaluation |
 | `e1de5e9` | Thêm RAGAS evaluation API/CLI | Baseline RAG evaluation |
 | `1bea2aa` | MCP server/client/tool architecture cho mortgage | Mẫu kiến trúc để xây ticketing MCP |
