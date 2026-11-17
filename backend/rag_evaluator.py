@@ -1,8 +1,6 @@
 import os
 from typing import List, Dict, Any, Optional
 from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from config import settings
 from legal_service import legal_service
@@ -124,9 +122,13 @@ class RAGEvaluator:
         if dataset is None:
             dataset = self.prepare_dataset_from_legal_rag()
 
-        metrics = [faithfulness, answer_relevancy]
-
         try:
+            # Lazy import keeps the application and unit tests usable when optional
+            # Ragas integrations are not installed or are version-incompatible.
+            from ragas import evaluate
+            from ragas.metrics import faithfulness, answer_relevancy
+
+            metrics = [faithfulness, answer_relevancy]
             results = evaluate(
                 dataset=dataset,
                 metrics=metrics,
@@ -143,22 +145,21 @@ class RAGEvaluator:
                     if val is not None and not (isinstance(val, float) and (val != val)):  # check not NaN
                         metrics_mean[col] = round(float(val), 4)
 
-            summary = {
+            return {
                 "sample_count": len(dataset),
-                "metrics_mean": metrics_mean if metrics_mean else {"faithfulness": 0.92, "answer_relevancy": 0.89},
+                "metrics_mean": metrics_mean,
                 "details": result_dict,
                 "status": "success"
             }
-            return summary
         except Exception as e:
-            # Fallback an toàn cho unit test hoặc offline environment
+            # Never fabricate quality scores. Callers can surface this as an
+            # evaluation infrastructure failure and retry after fixing dependencies.
             return {
                 "sample_count": len(dataset),
-                "metrics_mean": {
-                    "faithfulness": 0.92,
-                    "answer_relevancy": 0.89
-                },
-                "status": f"evaluated_with_notice: {str(e)}"
+                "metrics_mean": {},
+                "details": [],
+                "status": "error",
+                "error": str(e),
             }
 
 if __name__ == "__main__":

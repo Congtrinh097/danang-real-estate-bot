@@ -11,7 +11,12 @@ from agent import real_estate_agent
 from legal_service import legal_service
 
 @pytest.fixture(scope="module", autouse=True)
-def setup_sample_legal_data():
+def setup_sample_legal_data(tmp_path_factory):
+    original_storage = legal_service.storage_dir
+    original_meta = legal_service.meta_file
+    legal_service.storage_dir = tmp_path_factory.mktemp("legal_agent_docs")
+    legal_service.meta_file = legal_service.storage_dir / "documents_meta.json"
+    legal_service.meta_file.write_text("[]", encoding="utf-8")
     # Đảm bảo có dữ liệu mẫu được index
     docs = legal_service.list_documents()
     sample_doc = next((d for d in docs if "sample_luat_nha_o" in d["id"]), None)
@@ -23,6 +28,9 @@ def setup_sample_legal_data():
         legal_service.index_document("sample_luat_nha_o")
     elif sample_doc.get("status") != "indexed":
         legal_service.index_document(sample_doc["id"])
+    yield
+    legal_service.storage_dir = original_storage
+    legal_service.meta_file = original_meta
 
 def test_legal_consultation_intent_and_citations():
     """

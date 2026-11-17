@@ -1,0 +1,58 @@
+[
+  {
+    "id": "lease-renewal",
+    "title": "Gia hạn hợp đồng thuê",
+    "category": "lease",
+    "keywords": ["gia hạn", "hợp đồng", "hết hạn", "renewal"],
+    "content": "Người thuê nên gửi yêu cầu gia hạn trước ngày hết hạn ít nhất 30 ngày. Ban quản lý sẽ xác nhận thời hạn mới, giá thuê và phụ lục hợp đồng trước khi hai bên ký."
+  },
+  {
+    "id": "rent-payment",
+    "title": "Thanh toán tiền thuê",
+    "category": "payment",
+    "keywords": ["tiền thuê", "thanh toán", "chuyển khoản", "biên lai", "payment"],
+    "content": "Tiền thuê được thanh toán theo kỳ ghi trong hợp đồng. Khi chuyển khoản, người thuê cần ghi mã căn hộ và kỳ thanh toán; biên nhận được phát hành sau khi giao dịch được đối soát."
+  },
+  {
+    "id": "late-payment",
+    "title": "Thanh toán trễ hạn",
+    "category": "payment",
+    "keywords": ["trễ hạn", "quá hạn", "phí phạt", "late"],
+    "content": "Nếu chưa thể thanh toán đúng hạn, người thuê cần liên hệ bộ phận quản lý ngay để được ghi nhận và hướng dẫn. Phí chậm thanh toán chỉ áp dụng theo điều khoản đã ký trong hợp đồng."
+  },
+  {
+    "id": "water-leak",
+    "title": "Rò rỉ nước và sự cố đường ống",
+    "category": "maintenance",
+    "keywords": ["rò nước", "ngập", "vỡ ống", "đường ống", "leak"],
+    "content": "Khi phát hiện rò rỉ hoặc vỡ ống, hãy khóa van nước nếu có thể, di chuyển thiết bị điện khỏi vùng ướt và báo khẩn cho ban quản lý. Không tự sửa hệ thống ống chung của tòa nhà."
+  },
+  {
+    "id": "power-outage",
+    "title": "Mất điện và sự cố điện",
+    "category": "utilities",
+    "keywords": ["mất điện", "chập điện", "tia lửa", "mùi khét", "power"],
+    "content": "Nếu có tia lửa, khói hoặc mùi khét, người thuê cần ngắt cầu dao khi an toàn, rời khỏi khu vực và gọi hỗ trợ khẩn cấp. Mất điện thông thường sẽ được kiểm tra theo phạm vi căn hộ hoặc toàn tòa nhà."
+  },
+  {
+    "id": "noise-complaint",
+    "title": "Phản ánh tiếng ồn",
+    "category": "noise",
+    "keywords": ["tiếng ồn", "ồn ào", "hàng xóm", "ban đêm", "noise"],
+    "content": "Người thuê có thể gửi thời gian, vị trí và mô tả tiếng ồn cho ban quản lý. Trường hợp đang có đe dọa an toàn, hãy liên hệ bảo vệ hoặc cơ quan khẩn cấp thay vì tự đối đầu."
+  },
+  {
+    "id": "move-out",
+    "title": "Quy trình trả căn hộ",
+    "category": "move_in_out",
+    "keywords": ["trả nhà", "chuyển đi", "hoàn cọc", "bàn giao", "move out"],
+    "content": "Yêu cầu trả căn cần được gửi theo thời hạn báo trước trong hợp đồng. Ban quản lý sẽ hẹn kiểm tra hiện trạng, chốt công nợ, nhận lại chìa khóa và xử lý tiền đặt cọc theo biên bản bàn giao."
+  },
+  {
+    "id": "lost-key",
+    "title": "Mất chìa khóa hoặc thẻ ra vào",
+    "category": "security",
+    "keywords": ["mất chìa khóa", "mất thẻ", "khóa cửa", "ra vào", "key"],
+    "content": "Hãy báo ngay cho ban quản lý để khóa thẻ ra vào bị mất và xác minh danh tính trước khi cấp lại. Không chia sẻ mã cửa hoặc thông tin truy cập trong nội dung ticket."
+  }
+]

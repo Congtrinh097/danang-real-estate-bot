@@ -17,8 +17,127 @@ import {
   Check,
   AlertCircle,
   Database,
-  ArrowRight
+  ArrowRight,
+  LifeBuoy,
+  Clock,
+  ShieldCheck,
+  RefreshCw
 } from "lucide-react";
+
+const API_BASE = "http://localhost:8000";
+
+function TenantSupportPanel({ onNavigate }) {
+  const [form, setForm] = useState({
+    tenant_name: "", email: "", phone: "", property_id: "", unit: "", subject: "", message: ""
+  });
+  const [result, setResult] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadDashboard = async () => {
+    try {
+      const [metricsResponse, ticketsResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/tenant/sla/metrics`),
+        fetch(`${API_BASE}/api/tenant/tickets?limit=8`)
+      ]);
+      if (metricsResponse.ok) setMetrics((await metricsResponse.json()).data);
+      if (ticketsResponse.ok) setTickets((await ticketsResponse.json()).data || []);
+    } catch (dashboardError) {
+      console.error("Không tải được SLA dashboard:", dashboardError);
+    }
+  };
+
+  useEffect(() => { loadDashboard(); }, []);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/tenant/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, channel: "web" })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Không thể tạo ticket");
+      setResult(payload.data);
+      setForm((current) => ({ ...current, subject: "", message: "" }));
+      await loadDashboard();
+    } catch (submitError) {
+      setError(submitError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="tenant-view">
+      <div className="admin-header">
+        <div>
+          <h2>Tenant Support & SLA Assurance</h2>
+          <p>Tiếp nhận sự cố, tra cứu chính sách thuê và theo dõi SLA có human oversight.</p>
+        </div>
+        <div className="header-nav">
+          <button className="nav-tab-btn" onClick={() => onNavigate("chat")}><MessageSquare size={14} /> Tư vấn BĐS</button>
+          <button className="nav-tab-btn active"><LifeBuoy size={14} /> Tenant Support</button>
+          <button className="nav-tab-btn" onClick={() => onNavigate("admin_legal")}><Scale size={14} /> Pháp lý</button>
+        </div>
+      </div>
+
+      <div className="tenant-metrics">
+        {[
+          ["Tổng ticket", metrics?.total ?? 0, <FileText size={20} />],
+          ["Đang xử lý", metrics?.active ?? 0, <Clock size={20} />],
+          ["Chờ nhân viên", metrics?.awaiting_human ?? 0, <ShieldCheck size={20} />],
+          ["Vi phạm SLA", metrics?.breached ?? 0, <AlertCircle size={20} />]
+        ].map(([label, value, icon]) => (
+          <div className="tenant-metric-card" key={label}>{icon}<div><span>{label}</span><strong>{value}</strong></div></div>
+        ))}
+        <button className="tenant-refresh" onClick={loadDashboard} title="Làm mới"><RefreshCw size={16} /></button>
+      </div>
+
+      <div className="tenant-grid">
+        <form className="tenant-form" onSubmit={submit}>
+          <h3>Gửi yêu cầu hỗ trợ</h3>
+          <div className="tenant-form-row">
+            <label>Họ tên<input value={form.tenant_name} onChange={(e) => setForm({ ...form, tenant_name: e.target.value })} /></label>
+            <label>Căn hộ<input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="A-1203" /></label>
+          </div>
+          <div className="tenant-form-row">
+            <label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label>Điện thoại<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+          </div>
+          <label>Tiêu đề<input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Ví dụ: Rò nước trong căn hộ" /></label>
+          <label>Nội dung<textarea required rows="6" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></label>
+          <button className="btn-book" disabled={loading}>{loading ? "Đang phân loại và tạo ticket..." : "Gửi yêu cầu"}</button>
+          {error && <div className="tenant-error">{error}</div>}
+          {result && (
+            <div className={`tenant-result urgency-${result.ticket.urgency}`}>
+              <strong>{result.ticket.id} · {result.ticket.intent} · {result.ticket.urgency}</strong>
+              <p>{result.reply}</p>
+              <small>Luồng: {result.supervisor_route.join(" → ")}</small>
+            </div>
+          )}
+        </form>
+
+        <div className="tenant-ticket-list">
+          <h3>Ticket gần đây</h3>
+          {tickets.length === 0 ? <p className="tenant-empty">Chưa có ticket.</p> : tickets.map((ticket) => (
+            <article key={ticket.id}>
+              <div><strong>{ticket.id}</strong><span className={`tenant-pill urgency-${ticket.urgency}`}>{ticket.urgency}</span></div>
+              <p>{ticket.subject || ticket.description}</p>
+              <small>{ticket.intent} · {ticket.status} · SLA {new Date(ticket.sla_due_at).toLocaleString("vi-VN")}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const INITIAL_GREETING = {
   sender: "bot",
@@ -41,7 +160,7 @@ const STORAGE_KEY = "danang_re_threads";
 const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
 
 export default function App() {
-  // Navigation: "chat" | "admin_legal"
+  // Navigation: "chat" | "tenant" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
 
   // 1. Quản lý danh sách threads & thread đang active
@@ -510,6 +629,9 @@ export default function App() {
         {/* Gợi ý tìm nhanh & Câu hỏi pháp lý */}
         <div className="quick-prompts">
           <h4>Gợi ý tra cứu nhanh</h4>
+          <button className="prompt-btn" onClick={() => setActiveTab("tenant")}>
+            🛟 Báo sự cố & theo dõi SLA
+          </button>
           <button
             className="prompt-btn"
             onClick={() => {
@@ -570,6 +692,12 @@ export default function App() {
                   onClick={() => setActiveTab("chat")}
                 >
                   <MessageSquare size={14} /> Tư Vấn BĐS
+                </button>
+                <button
+                  className={`nav-tab-btn ${activeTab === "tenant" ? "active" : ""}`}
+                  onClick={() => setActiveTab("tenant")}
+                >
+                  <LifeBuoy size={14} /> Tenant Support
                 </button>
                 <button
                   className={`nav-tab-btn ${activeTab === "admin_legal" ? "active" : ""}`}
@@ -661,6 +789,8 @@ export default function App() {
             </form>
           </div>
         </div>
+      ) : activeTab === "tenant" ? (
+        <TenantSupportPanel onNavigate={setActiveTab} />
       ) : (
         /* ==================== MÀN HÌNH QUẢN TRỊ TÀI LIỆU PHÁP LÝ ==================== */
         <div className="admin-view-container">
@@ -677,6 +807,9 @@ export default function App() {
             <div className="header-nav">
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
                 <MessageSquare size={14} /> Về Khung Chat
+              </button>
+              <button className="nav-tab-btn" onClick={() => setActiveTab("tenant")}>
+                <LifeBuoy size={14} /> Tenant Support
               </button>
               <button className="nav-tab-btn active">
                 <Scale size={14} /> Quản Trị Pháp Lý

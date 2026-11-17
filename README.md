@@ -5,6 +5,8 @@ Hệ thống đã được lập trình hoàn chỉnh gồm **3 phần chính**:
 2. **Backend**: Python FastAPI, LangChain, LangGraph, Qdrant Client, LangSmith.
 3. **Frontend**: ReactJS (Vite), Server-Sent Events (SSE) Streaming, Cards BĐS, Modal Thu thập Lead.
 
+Ngoài luồng tư vấn BĐS, hệ thống có phân hệ **Tenant Support & SLA Assurance**: tiếp nhận web/email, phân loại intent/urgency, hybrid RAG trên chính sách thuê, tạo ticket qua MCP, SLA dashboard và human approval cho sự cố high/critical.
+
 ---
 
 ## 1. Khởi động Hạ tầng Docker (Qdrant & Postgres)
@@ -42,6 +44,15 @@ python main.py
 * Server API sẽ chạy tại: `http://localhost:8000`
 * Tài liệu Swagger API: `http://localhost:8000/docs`
 * *Backend sẽ tự động nạp dataset mẫu BĐS Đà Nẵng (`backend/data/danang_properties.json`) vào Qdrant khi vừa khởi động.*
+
+Các endpoint tenant chính:
+
+- `POST /api/tenant/intake` và `POST /api/tenant/email`
+- `GET /api/tenant/tickets`, `POST /api/tenant/tickets/{id}/human-action`
+- `GET /api/tenant/sla/metrics`
+- `POST /api/tenant/documents/index` và `POST /api/tenant/rag/evaluate`
+
+Trong production, cấu hình `ADMIN_API_KEY`, gửi header `X-Admin-Key` cho staff API, và đặt `TENANT_STORAGE_MODE=auto` để lưu ticket vào PostgreSQL.
 
 ---
 

@@ -272,7 +272,10 @@ class LegalService:
     def search_legal_context(self, query: str, top_k: int = 4) -> List[Dict[str, Any]]:
         """Tìm kiếm các đoạn văn bản luật liên quan nhất tới câu hỏi, có deduplicate để không trùng lặp điều khoản"""
         self.ensure_collection()
-        if settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
+        use_real_embeddings = bool(
+            settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_")
+        )
+        if use_real_embeddings:
             query_vector = qdrant_service.embed_query_safe(query)
         else:
             # Deterministic mock fallback
@@ -282,13 +285,44 @@ class LegalService:
             rng = random.Random(seed)
             query_vector = [rng.uniform(-0.1, 0.1) for _ in range(self.vector_size)]
 
-        # Lấy số lượng ứng viên lớn hơn để deduplicate
-        fetch_limit = max(top_k * 3, 12)
-        search_result = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_vector,
-            limit=fetch_limit
-        )
+        # In offline/test mode random mock vectors have no semantic meaning, so
+        # retrieve the complete small corpus and let deterministic lexical
+        # reranking lead. Production keeps vector retrieval as a candidate stage.
+        if use_real_embeddings:
+            search_result = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                limit=max(top_k * 12, 50),
+            )
+        else:
+            search_result, _ = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=1000,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+        import re
+        stop_words = {"và", "là", "có", "được", "về", "cho", "tại", "theo", "quy", "định", "không", "nhà"}
+        query_tokens = {
+            token for token in re.findall(r"[\wÀ-ỹ]+", query.lower())
+            if len(token) > 1 and token not in stop_words
+        }
+
+        def hybrid_rank(hit):
+            payload = hit.payload or {}
+            searchable = " ".join(
+                [payload.get("article", ""), payload.get("content", ""), payload.get("doc_title", "")]
+            ).lower()
+            searchable_tokens = set(re.findall(r"[\wÀ-ỹ]+", searchable))
+            lexical = len(query_tokens & searchable_tokens) / max(len(query_tokens), 1)
+            phrase_bonus = sum(
+                0.2 for phrase in ("người nước ngoài", "đặt cọc", "sổ đỏ", "sổ hồng")
+                if phrase in query.lower() and phrase in searchable
+            )
+            return lexical + phrase_bonus + (float(getattr(hit, "score", 0.0)) * 0.35)
+
+        search_result = sorted(search_result, key=hybrid_rank, reverse=True)
 
         formatted = []
         seen_articles = set()
@@ -323,7 +357,7 @@ class LegalService:
                 "chapter": payload.get("chapter", ""),
                 "article": article,
                 "content": content,
-                "score": round(float(hit.score), 4)
+                "score": round(float(hybrid_rank(hit)), 4)
             })
 
             if len(formatted) >= top_k:

@@ -4,7 +4,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from config import settings
@@ -12,6 +11,7 @@ from qdrant_service import qdrant_service
 from legal_service import legal_service
 from mortgage_calculator import MortgageCalculator, MortgageInput
 from mortgage_mcp_client import mortgage_mcp_client, mortgage_langchain_tool
+from checkpointing import create_agent_checkpointer
 
 # 1. Định nghĩa Schema phân loại ý định (Router Agent & Input Guardrails)
 class IntentClassification(BaseModel):
@@ -335,7 +335,7 @@ def route_intent_node(state: AgentState) -> Dict[str, Any]:
         # Heuristic fallback an toàn
         mortgage_keywords = ["lãi suất", "vay ngân hàng", "trả góp", "vay 70%", "vay 80%", "vay 50%", "dư nợ", "tính lãi", "góp bao nhiêu", "gốc lãi"]
         legal_keywords = ["pháp lý", "sổ đỏ", "sổ hồng", "sang tên", "công chứng", "đặt cọc", "hợp đồng", "thủ tục", "tranh chấp", "người nước ngoài", "thuế", "luật nhà ở", "luật đất đai", "quy định", "sở hữu"]
-        search_keywords = ["thuê", "mua", "bán", "căn hộ", "chung cư", "nhà phố", "phòng ngủ", "triệu", "tỷ", "sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "tìm"]
+        search_keywords = ["thuê", "mua", "bán", "căn hộ", "chung cư", "nhà phố", "phòng ngủ", "triệu", "tỷ", "ngân sách", "vnđ", "sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "tìm"]
         if any(kw in text_lower for kw in mortgage_keywords):
             intent = "mortgage_calculation"
         elif any(kw in text_lower for kw in legal_keywords):
@@ -516,10 +516,15 @@ def extract_criteria_node(state: AgentState) -> Dict[str, Any]:
         criteria_obj = criteria_extraction_chain.invoke({"messages": all_messages[-6:]})
         new_criteria = criteria_obj.model_dump()
     except Exception:
+        import re
+        price_match = re.search(r"(?<!\d)(\d{6,12})(?!\d)", last_user_message.replace(".", "").replace(",", ""))
+        parsed_price = float(price_match.group(1)) if price_match else None
+        if "15 triệu" in last_user_message.lower():
+            parsed_price = 15_000_000.0
         new_criteria = {
             "category": "rent" if "thuê" in last_user_message.lower() else ("sale" if "mua" in last_user_message.lower() else None),
             "district": "Sơn Trà" if "sơn trà" in last_user_message.lower() else ("hải châu" if "hải châu" in last_user_message.lower() else ("liên chiểu" if "liên chiểu" in last_user_message.lower() else None)),
-            "max_price": 15000000.0 if "15 triệu" in last_user_message.lower() or "15000000" in last_user_message else None,
+            "max_price": parsed_price,
             "min_bedrooms": 2 if "2 phòng ngủ" in last_user_message.lower() or "2pn" in last_user_message.lower() else None,
             "keywords": last_user_message,
             "needs_clarification": False,
@@ -612,5 +617,5 @@ workflow.add_edge("search_properties", "generate_response")
 workflow.add_edge("generate_response", END)
 
 # Checkpointer lưu state bộ nhớ cho từng thread_id
-memory = MemorySaver()
+memory = create_agent_checkpointer()
 real_estate_agent = workflow.compile(checkpointer=memory)
