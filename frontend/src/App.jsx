@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
 import TopupModal from "./components/TopupModal";
+import DueDiligenceModal from "./components/DueDiligenceModal";
+import "./components/DueDiligenceModal.css";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
 Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
@@ -153,6 +155,20 @@ export default function App() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", note: "" });
   const [leadSuccess, setLeadSuccess] = useState(false);
+
+  // Quản lý Modal Thẩm Định Chuyên Sâu Bất Động Sản (Milestone 4)
+  const [isDueDiligenceOpen, setIsDueDiligenceOpen] = useState(false);
+  const [selectedDueDiligenceProperty, setSelectedDueDiligenceProperty] = useState(null);
+
+  const handleOpenDueDiligence = (prop) => {
+    setSelectedDueDiligenceProperty(prop);
+    setIsDueDiligenceOpen(true);
+  };
+
+  const handleCloseDueDiligence = () => {
+    setIsDueDiligenceOpen(false);
+    setSelectedDueDiligenceProperty(null);
+  };
 
   // Drawer căn cứ pháp lý
   const [activeDrawerCitations, setActiveDrawerCitations] = useState(null);
@@ -1167,9 +1183,19 @@ export default function App() {
                                 <Maximize2 size={14} /> {item.area_m2} m²
                               </span>
                             </div>
-                            <button className="btn-book" onClick={() => handleBookVisit(item)}>
-                              Đặt lịch xem nhà
-                            </button>
+                            <div className="card-actions">
+                              <button className="btn-book" onClick={() => handleBookVisit(item)}>
+                                Đặt lịch xem nhà
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-due-diligence"
+                                onClick={() => handleOpenDueDiligence(item)}
+                                title="Thẩm định chuyên sâu pháp lý, quy hoạch, ngập lụt & tài chính AI"
+                              >
+                                <Sparkles size={13} /> Thẩm định chuyên sâu
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1790,6 +1816,28 @@ export default function App() {
         }}
         API_BASE={API_BASE}
       />
+
+      {/* Modal Thẩm Định Chuyên Sâu Bất Động Sản (Milestone 4) */}
+      {isDueDiligenceOpen && selectedDueDiligenceProperty && (
+        <DueDiligenceModal
+          key={selectedDueDiligenceProperty.id || "empty"}
+          isOpen={isDueDiligenceOpen}
+          onClose={handleCloseDueDiligence}
+          property={selectedDueDiligenceProperty}
+          userId={userId}
+          userWallet={userWallet}
+          API_BASE={API_BASE}
+          onOpenTopup={() => {
+            handleCloseDueDiligence();
+            setShowTopupModal(true);
+          }}
+          onRequireTopup={() => {
+            handleCloseDueDiligence();
+            setShowTopupModal(true);
+          }}
+          onWalletUpdate={(updatedWallet) => setUserWallet(updatedWallet)}
+        />
+      )}
     </div>
   );
 }

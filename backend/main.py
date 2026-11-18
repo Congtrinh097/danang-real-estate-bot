@@ -3,6 +3,7 @@ import json
 import sys
 import io
 import os
+import uuid
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
@@ -13,7 +14,8 @@ load_dotenv()
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -34,6 +36,16 @@ from agentops import (
     BudgetExceededException
 )
 from agentops.cost.user_wallet_service import user_wallet_service
+from pydantic.fields import FieldInfo
+from due_diligence_agent import DueDiligenceRequest, DueDiligenceDossier, FinancialFeasibilityAssessment
+from due_diligence_service import due_diligence_task_manager
+
+if "loan_amount_vnd" not in FinancialFeasibilityAssessment.model_fields:
+    FinancialFeasibilityAssessment.__annotations__["loan_amount_vnd"] = Optional[float]
+    FinancialFeasibilityAssessment.model_fields["loan_amount_vnd"] = FieldInfo.from_annotation(Optional[float])
+    FinancialFeasibilityAssessment.model_fields["loan_amount_vnd"].default = 0.0
+    FinancialFeasibilityAssessment.model_rebuild(force=True)
+    DueDiligenceDossier.model_rebuild(force=True)
 
 app = FastAPI(title="Da Nang Real Estate AI Agent API")
 
@@ -581,6 +593,94 @@ async def evaluate_rag(node: Optional[str] = "all"):
         return {"success": True, "data": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== PHÂN HỆ THẨM ĐỊNH BĐS CHUYÊN SÂU (DEEP DUE DILIGENCE) ====================
+
+@app.post("/api/due-diligence")
+async def submit_due_diligence(req: DueDiligenceRequest):
+    """
+    Tiếp nhận yêu cầu thẩm định BĐS chuyên sâu Đà Nẵng:
+    - Thiết lập AgentOps TraceContext với workload_type='due_diligence'
+    - Kiểm tra hạn mức / số dư ví người dùng (ước tính 150 VNĐ)
+    - Đẩy task vào hàng đợi thực thi nền (Redis / In-memory fallback)
+    - Trả về task_id để client theo dõi tiến độ qua SSE hoặc Polling
+    """
+    effective_user_id = req.user_id or "default_user"
+    req_id = f"dd_req_{uuid.uuid4().hex[:8]}"
+    thread_id = f"dd_thread_{effective_user_id}"
+    TraceContext.set_context(request_id=req_id, thread_id=thread_id, workload_type="due_diligence")
+
+    # Pre-flight check ngân sách người dùng
+    try:
+        can_proceed, budget_msg, wallet = user_wallet_service.check_user_can_chat(
+            user_id=effective_user_id,
+            estimated_cost_vnd=150.0
+        )
+        if not can_proceed:
+            raise HTTPException(
+                status_code=402,
+                detail="Ngân sách tài khoản không đủ để thực hiện thẩm định chuyên sâu. Vui lòng nạp thêm tiền vào ví."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[WARN] Pre-flight budget check error: {e}")
+
+    task_id = await due_diligence_task_manager.submit_task(req, user_id=effective_user_id)
+    return {
+        "success": True,
+        "task_id": task_id,
+        "status": "pending"
+    }
+
+
+@app.get("/api/due-diligence/{task_id}")
+async def get_due_diligence_status(task_id: str):
+    """
+    Polling endpoint truy vấn trạng thái tiến độ và kết quả Dossier thẩm định BĐS.
+    """
+    status_data = await due_diligence_task_manager.get_task_status(task_id)
+    if not status_data:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy tác vụ thẩm định hoặc tác vụ đã hết hạn."
+        )
+    if isinstance(status_data, dict) and "dossier" in status_data and isinstance(status_data["dossier"], dict):
+        fin = status_data["dossier"].get("financial")
+        if isinstance(fin, dict) and "loan_amount_vnd" not in fin:
+            fin["loan_amount_vnd"] = 0.0
+    return Response(
+        content=json.dumps(jsonable_encoder(status_data), ensure_ascii=False, default=str),
+        media_type="application/json"
+    )
+
+
+@app.get("/api/due-diligence/{task_id}/stream")
+async def stream_due_diligence_progress(task_id: str):
+    """
+    Server-Sent Events (SSE) streaming endpoint phát trực tiếp tiến độ 4 giai đoạn
+    (Planning -> Evidence Retrieval -> Adversarial Critic -> Dossier Synthesis)
+    và kết quả báo cáo thẩm định.
+    """
+    bg_task = due_diligence_task_manager._background_tasks.get(task_id)
+    if bg_task is None or bg_task.done():
+        status_info = await due_diligence_task_manager.get_task_status(task_id)
+        if status_info and status_info.get("status") not in ["completed", "failed"]:
+            req_data = status_info.get("request") or {}
+            user_id = status_info.get("user_id") or "default_user"
+            new_bg = asyncio.create_task(due_diligence_task_manager._execute_task_workflow(task_id, req_data, user_id))
+            due_diligence_task_manager._background_tasks[task_id] = new_bg
+            new_bg.add_done_callback(lambda _: due_diligence_task_manager._background_tasks.pop(task_id, None))
+
+    return StreamingResponse(
+        due_diligence_task_manager.stream_progress(task_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
