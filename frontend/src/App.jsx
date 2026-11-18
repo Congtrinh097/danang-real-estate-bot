@@ -56,7 +56,7 @@ Nhờ AI thẩm định các điều khoản, bẫy cọc và tính hợp pháp 
 
 const INITIAL_GREETING = {
   sender: "bot",
-  text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản và Pháp lý nhà ở tại Đà Nẵng. Anh/chị đang có nhu cầu thuê/mua nhà đất hay cần tư vấn về thủ tục pháp lý, sổ đỏ, hợp đồng đặt cọc ạ?",
+  text: "Xin chào anh/chị! Em là trợ lý tư vấn Bất động sản và Pháp lý nhà ở tại Đà Nẵng. Anh/chị đang có nhu cầu tìm mua, chuyển nhượng nhà đất hay cần thẩm định dự án, tư vấn pháp lý, sổ đỏ, hợp đồng đặt cọc ạ?",
   properties: [],
   citations: []
 };
@@ -1022,10 +1022,10 @@ export default function App() {
             onClick={() => {
               setActiveTab("chat");
               setIsMobileSidebarOpen(false);
-              handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu");
+              handleSend("Tìm mua căn hộ 2 phòng ngủ Sơn Trà view biển dưới 3.5 tỷ");
             }}
           >
-            🏢 Căn hộ 2PN Sơn Trà view sông Hàn
+            🏢 Căn hộ 2PN Sơn Trà (Mua bán)
           </button>
         </div>
       </div>
@@ -1236,9 +1236,9 @@ export default function App() {
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleSend("Tìm thuê căn hộ 2 phòng ngủ Sơn Trà view sông Hàn dưới 15 triệu")}
+                  onClick={() => handleSend("Tìm mua căn hộ 2 phòng ngủ Sơn Trà view biển dưới 3.5 tỷ")}
                 >
-                  🏢 Căn hộ 2PN Sơn Trà
+                  🏢 Căn hộ 2PN Sơn Trà (Mua bán)
                 </button>
               </div>
             )}
@@ -1318,7 +1318,7 @@ export default function App() {
                     ? "⛔ Phiên hội thoại đã hết hạn mức. Vui lòng tạo đoạn chat mới..."
                     : attachedContract
                     ? "Nhập thêm ghi chú hoặc nhấn gửi để thẩm định hợp đồng..."
-                    : "Hỏi pháp lý, đính kèm hợp đồng, tính lãi vay, BĐS Đà Nẵng..."
+                    : "Hỏi mua bán nhà đất, thẩm định dự án, tính lãi vay, BĐS Đà Nẵng..."
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

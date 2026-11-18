@@ -94,8 +94,23 @@ class QdrantService:
             )
             print(f"[OK] Collection created: {self.collection_name}")
 
-    def ingest_dataset(self, json_file_path: str = "./data/danang_properties.json"):
-        """Nạp dữ liệu BĐS vào Qdrant"""
+    def ingest_dataset(self, json_file_path: Optional[str] = None, clear_existing: bool = True):
+        """Nạp dữ liệu BĐS vào Qdrant với cơ chế dọn dẹp dữ liệu cũ và định vị đường dẫn linh hoạt"""
+        if json_file_path is None or not os.path.exists(json_file_path):
+            base_data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "danang_properties.json"))
+            if os.path.exists(base_data_path):
+                json_file_path = base_data_path
+            elif json_file_path and os.path.exists(json_file_path):
+                pass
+            else:
+                json_file_path = "./data/danang_properties.json"
+
+        if clear_existing:
+            collections = [c.name for c in self.client.get_collections().collections]
+            if self.collection_name in collections:
+                self.client.delete_collection(collection_name=self.collection_name)
+                print(f"[INFO] Cleared old collection: {self.collection_name}")
+
         self.ensure_collection()
         with open(json_file_path, "r", encoding="utf-8") as f:
             properties = json.load(f)
@@ -126,7 +141,7 @@ class QdrantService:
     def search_properties(
         self,
         query: str,
-        category: Optional[str] = None,
+        category: Optional[str] = "sale",
         district: Optional[str] = None,
         max_price: Optional[float] = None,
         min_bedrooms: Optional[int] = None,

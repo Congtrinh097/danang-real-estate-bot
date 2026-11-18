@@ -97,7 +97,7 @@ def test_rule_violation_prompt_injection():
 
 def test_in_scope_property_search_still_works():
     """
-    Test TDD: Đảm bảo câu hỏi hợp lệ tại Đà Nẵng vẫn hoạt động bình thường, không bị false positive
+    Test TDD: Đảm bảo câu hỏi mua BĐS hợp lệ tại Đà Nẵng vẫn hoạt động bình thường, không bị false positive
     """
     thread_id = "test_guardrail_valid_danang_004"
     config = {
@@ -107,10 +107,37 @@ def test_in_scope_property_search_still_works():
     }
 
     state = real_estate_agent.invoke(
-        {"messages": [HumanMessage(content="Tôi muốn tìm thuê căn hộ tại quận Sơn Trà Đà Nẵng")]},
+        {"messages": [HumanMessage(content="Tôi muốn tìm mua căn hộ tại quận Sơn Trà Đà Nẵng")]},
         config=config,
     )
 
     assert state.get("intent") == "search_property"
     assert isinstance(state.get("found_properties"), list)
     assert len(state.get("found_properties")) > 0
+
+
+def test_renting_inquiry_triggers_out_of_scope_guardrail():
+    """
+    Test TDD: Người dùng hỏi thuê BĐS tại Đà Nẵng (hệ thống chỉ hỗ trợ Mua Bán)
+    1. Phải bị router phân loại vào 'out_of_scope'
+    2. found_properties phải rỗng ([])
+    3. Phản hồi giải thích hệ thống chỉ chuyên tư vấn Mua Bán và từ chối dịch vụ thuê
+    """
+    thread_id = "test_guardrail_rent_005"
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "tags": ["test_guardrail_rent", thread_id],
+        "metadata": {"thread_id": thread_id, "test": "test_renting_inquiry_triggers_out_of_scope_guardrail"}
+    }
+
+    state = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Cho mình hỏi có phòng trọ hoặc căn hộ mini nào cho thuê ở quận Hải Châu không?")]},
+        config=config,
+    )
+
+    assert state.get("intent") == "out_of_scope"
+    assert state.get("found_properties") == [] or state.get("found_properties") is None
+    messages = state.get("messages", [])
+    assert len(messages) >= 2
+    reply_text = messages[-1].content.lower()
+    assert "mua bán" in reply_text or "chuyên" in reply_text or "phạm vi" in reply_text

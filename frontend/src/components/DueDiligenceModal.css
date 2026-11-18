@@ -978,6 +978,53 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
+.dd-btn-download-pdf {
+  background: linear-gradient(135deg, #1e40af, #2563eb);
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.dd-btn-download-pdf:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  box-shadow: 0 3px 6px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.dd-btn-download-pdf:active {
+  transform: translateY(0);
+}
+
+.dd-btn-download-pdf-compact {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1d4ed8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.dd-btn-download-pdf-compact:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
 .dd-btn-copy-markdown {
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
@@ -1130,3 +1177,88 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==============================================================================
+   LIVE MARKET WEB LISTINGS (TAVILY SEARCH)
+   ============================================================================== */
+.dd-web-listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.dd-web-listing-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.dd-web-listing-card:hover {
+  border-color: #93c5fd;
+  background: #f0f7ff;
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
+}
+
+.dd-web-listing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dd-web-listing-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: lowercase;
+  letter-spacing: 0.3px;
+}
+
+.dd-web-listing-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.dd-web-listing-link:hover {
+  background: #dbeafe;
+  text-decoration: underline;
+}
+
+.dd-web-listing-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dd-web-listing-snippet {
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+

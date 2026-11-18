@@ -48,7 +48,7 @@ def test_general_chat_bypasses_property_search():
 def test_property_search_triggers_qdrant():
     """
     Test theo TDD:
-    Khi người dùng hỏi tìm kiếm BĐS cụ thể:
+    Khi người dùng hỏi tìm mua BĐS cụ thể:
     1. Agent phải phân loại intent == 'search_property'
     2. Đi qua node extract_criteria và search_properties
     3. found_properties chứa danh sách kết quả phù hợp
@@ -62,7 +62,7 @@ def test_property_search_triggers_qdrant():
     }
 
     state = real_estate_agent.invoke(
-        {"messages": [HumanMessage(content="Tôi muốn tìm thuê căn hộ 2 phòng ngủ tại quận Sơn Trà")]},
+        {"messages": [HumanMessage(content="Tôi muốn tìm mua căn hộ 2 phòng ngủ tại quận Sơn Trà")]},
         config=config,
     )
 
@@ -70,3 +70,32 @@ def test_property_search_triggers_qdrant():
     assert state.get("criteria", {}).get("district") == "Sơn Trà"
     assert isinstance(state.get("found_properties"), list)
     assert len(state.get("found_properties")) > 0
+
+
+def test_rental_query_classified_as_out_of_scope():
+    """
+    Test theo TDD:
+    Hệ thống chỉ hỗ trợ Mua Bán BĐS tại Đà Nẵng. Khi người dùng hỏi thuê nhà/phòng trọ:
+    1. Phải phân loại intent == 'out_of_scope'
+    2. found_properties phải rỗng ([])
+    3. Phản hồi giải thích hệ thống chỉ chuyên tư vấn Mua Bán / Chuyển nhượng BĐS tại Đà Nẵng
+    """
+    thread_id = "test_tdd_rental_out_of_scope_003"
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "tags": ["test_out_of_scope_rent", thread_id],
+        "metadata": {"thread_id": thread_id, "test": "test_rental_query_classified_as_out_of_scope"},
+        "run_name": "Test-Rent-OutOfScope"
+    }
+
+    state = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Tôi muốn tìm thuê căn hộ 2 phòng ngủ tại quận Sơn Trà giá 15 triệu")]},
+        config=config,
+    )
+
+    assert state.get("intent") == "out_of_scope"
+    assert state.get("found_properties") == [] or state.get("found_properties") is None
+    messages = state.get("messages", [])
+    assert len(messages) >= 2
+    reply_text = messages[-1].content.lower()
+    assert "mua bán" in reply_text or "chuyên" in reply_text or "phạm vi" in reply_text

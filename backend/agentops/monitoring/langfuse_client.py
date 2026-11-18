@@ -45,6 +45,7 @@ class LangfuseManager:
             os.environ["LANGFUSE_SECRET_KEY"] = agentops_settings.LANGFUSE_SECRET_KEY
         if agentops_settings.LANGFUSE_HOST:
             os.environ["LANGFUSE_HOST"] = agentops_settings.LANGFUSE_HOST
+            os.environ["LANGFUSE_BASE_URL"] = agentops_settings.LANGFUSE_HOST
 
         try:
             from langfuse.types import TraceContext

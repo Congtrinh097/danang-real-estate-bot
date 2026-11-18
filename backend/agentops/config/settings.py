@@ -26,7 +26,7 @@ class AgentOpsSettings(BaseSettings):
     # Cấu hình Langfuse
     LANGFUSE_PUBLIC_KEY: Optional[str] = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     LANGFUSE_SECRET_KEY: Optional[str] = os.getenv("LANGFUSE_SECRET_KEY", "")
-    LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    LANGFUSE_HOST: str = (os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com").strip('"').strip("'")
     LANGFUSE_ENVIRONMENT: str = os.getenv("LANGFUSE_ENVIRONMENT", "development")
 
     # Thư mục lưu vết local fallback

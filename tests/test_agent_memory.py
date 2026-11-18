@@ -53,20 +53,20 @@ def test_thread_criteria_accumulation():
     config = {"configurable": {"thread_id": thread_id}}
 
     state_turn_1 = real_estate_agent.invoke(
-        {"messages": [HumanMessage(content="Tìm thuê chung cư quận Sơn Trà")]},
+        {"messages": [HumanMessage(content="Tìm mua chung cư quận Sơn Trà")]},
         config=config,
     )
     assert state_turn_1.get("criteria", {}).get("district") == "Sơn Trà"
 
     state_turn_2 = real_estate_agent.invoke(
-        {"messages": [HumanMessage(content="Ngân sách tối đa 15000000 vnđ")]},
+        {"messages": [HumanMessage(content="Ngân sách tối đa 3000000000 vnđ")]},
         config=config,
     )
     criteria = state_turn_2.get("criteria", {})
     # Phải giữ lại district của turn 1
     assert criteria.get("district") == "Sơn Trà"
     # Đồng thời cập nhật thêm max_price của turn 2
-    assert criteria.get("max_price") == 15000000.0 or criteria.get("max_price") == 15000000
+    assert criteria.get("max_price") == 3000000000.0 or criteria.get("max_price") == 3000000000
 
 
 def test_isolated_threads():

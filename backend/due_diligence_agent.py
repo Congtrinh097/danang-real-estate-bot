@@ -19,6 +19,8 @@ Features:
 - StateGraph compilation with parallel fan-out and join.
 """
 
+import os
+from urllib.parse import urlparse
 from typing import Annotated, Sequence, TypedDict, Optional, List, Dict, Any, Literal, Tuple
 from pydantic import BaseModel, Field, model_validator, field_validator
 import operator
@@ -52,6 +54,7 @@ class MarketValuationAssessment(BaseModel):
     avg_district_price_per_m2: float
     valuation_status: Literal["under_priced", "fair", "over_priced"]
     comparable_properties: List[Dict[str, Any]]
+    live_market_listings: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ClimateInfrastructureAssessment(BaseModel):
@@ -73,6 +76,7 @@ class FinancialFeasibilityAssessment(BaseModel):
 class DueDiligenceDossier(BaseModel):
     overall_score: int = Field(..., ge=0, le=100)
     verdict: Literal["STRONGLY_RECOMMENDED", "PROCEED_WITH_CAUTION", "HIGH_RISK_AVOID"]
+    verdict_label: Optional[str] = None
     executive_summary: str
     legal: LegalRiskAssessment
     valuation: MarketValuationAssessment
@@ -328,6 +332,63 @@ def search_legal_documents(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
     ]
 
 
+def search_tavily_real_estate(
+    query: str,
+    district: str,
+    max_results: int = 3,
+    tavily_client: Optional[Any] = None
+) -> List[Dict[str, Any]]:
+    """
+    Tìm kiếm thông tin tin đăng BĐS thực tế qua Tavily Web Search.
+    Khoanh vùng các cổng BĐS lớn (batdongsan, chotot, alonhadat, homedy, cafeland).
+    Hỗ trợ graceful fallback an toàn nếu không có API key hoặc lỗi kết nối.
+    """
+    client = tavily_client
+    if client is None:
+        try:
+            from tavily import TavilyClient
+            from config import settings
+            api_key = settings.TAVILY_API_KEY or os.getenv("TAVILY_API_KEY", "")
+            if api_key and not api_key.startswith("tvly-your"):
+                client = TavilyClient(api_key=api_key)
+        except Exception:
+            client = None
+
+    if client is None:
+        return []
+
+    listings: List[Dict[str, Any]] = []
+    try:
+        search_query = f"mua bán nhà đất {district} Đà Nẵng {query}".strip()
+        domains = ["batdongsan.com.vn", "chotot.com", "alonhadat.com.vn", "homedy.com", "cafeland.vn"]
+
+        res = client.search(
+            query=search_query,
+            include_domains=domains,
+            max_results=max_results,
+            search_depth="basic"
+        )
+
+        for item in res.get("results", []):
+            url = item.get("url", "")
+            domain = ""
+            if url:
+                parsed = urlparse(url)
+                domain = parsed.netloc.replace("www.", "")
+
+            listings.append({
+                "title": item.get("title", ""),
+                "url": url,
+                "snippet": item.get("content", "")[:250],
+                "source_domain": domain or "web"
+            })
+    except Exception:
+        # Graceful fallback: return empty list on any network/API failure
+        return []
+
+    return listings
+
+
 def calculate_monthly_payment(
     loan_amount: float,
     annual_interest_rate: float = 8.5,
@@ -395,9 +456,9 @@ def plan_investigation_node(state: DueDiligenceState) -> Dict[str, Any]:
 
     sub_tasks = [
         f"1. Thẩm định pháp lý sổ hồng, quy hoạch ODT và tranh chấp theo Luật Đất đai 2024 tại khu vực {addr}",
-        f"2. Khảo sát định giá so sánh đơn giá {unit_price:,.0f} đ/m2 với mặt bằng quận {info['district']}",
+        f"2. Khảo sát định giá so sánh đơn giá {unit_price / 1_000_000:.1f} triệu đ/m² với mặt bằng quận {info['district']}",
         f"3. Đánh giá địa hình và rủi ro ngập lụt mùa mưa lũ tại khu vực {addr}",
-        f"4. Mô phỏng phương án tài chính vay {info['loan']:,.0f} đ, tính toán DSCR và tỷ suất sinh lời ròng",
+        f"4. Mô phỏng phương án tài chính vay {info['loan'] / 1_000_000:,.1f} triệu đ, tính toán DSCR và tỷ suất sinh lời ròng",
         "5. Phản biện rủi ro (Adversarial Critic) kịch bản lãi suất thả nổi tăng +3% và tính thanh khoản"
     ]
 
@@ -531,11 +592,18 @@ def valuation_investigation_node(state: DueDiligenceState) -> Dict[str, Any]:
     else:
         valuation_status = "over_priced"
 
+    live_listings = search_tavily_real_estate(
+        query=info["title"],
+        district=district,
+        max_results=3
+    )
+
     assessment = MarketValuationAssessment(
         unit_price_per_m2=round(unit_price, 2),
         avg_district_price_per_m2=round(avg_district_price, 2),
         valuation_status=valuation_status,
-        comparable_properties=comparables
+        comparable_properties=comparables,
+        live_market_listings=live_listings
     )
     return {"valuation": assessment.model_dump()}
 
@@ -663,9 +731,11 @@ def adversarial_critic_node(state: DueDiligenceState) -> Dict[str, Any]:
     curr_monthly = float(financial.get("monthly_repayment_vnd", 0.0))
     stressed_monthly = calculate_monthly_payment(loan, stressed_rate, tenure_years=20) if loan > 0 else 0.0
     delta_monthly = max(0.0, stressed_monthly - curr_monthly)
+    delta_monthly_m = delta_monthly / 1_000_000
+    loan_m = loan / 1_000_000
 
     counterarguments = [
-        f"1. Rủi ro cú sốc lãi suất thả nổi (+3%): Khi bước sang giai đoạn thả nổi từ {eff_rate:.1f}% lên {stressed_rate:.1f}%/năm, số tiền trả góp hàng tháng sẽ tăng thêm ~{delta_monthly:,.0f} đ/tháng. Nếu người mua không có thặng dư tiền mặt dự phòng tối thiểu 6 tháng, nguy cơ mất khả năng chi trả là rất lớn.",
+        f"1. Rủi ro cú sốc lãi suất thả nổi (+3%): Khi bước sang giai đoạn thả nổi từ {eff_rate:.1f}% lên {stressed_rate:.1f}%/năm, số tiền trả góp hàng tháng sẽ tăng thêm ~{delta_monthly_m:.1f} triệu đ/tháng. Nếu người mua không có thặng dư tiền mặt dự phòng tối thiểu 6 tháng, nguy cơ mất khả năng chi trả là rất lớn.",
         f"2. Bẫy thanh khoản và biến động giá: Thị trường thứ cấp tại {district} có tính thanh khoản chọn lọc theo từng tuyến phố. Nếu mua ở mức giá hiện tại và cần bán thu hồi vốn gấp trong 6-12 tháng, nhà đầu tư có thể phải chiết khấu từ 7% - 12% so với giá chào ban đầu.",
         "3. Rủi ro pháp lý & Quy chế trần cọc 5%: Cần cảnh giác với các điều khoản phạt cọc một chiều trong hợp đồng đặt cọc. Theo Luật Kinh doanh Bất động sản 2023, số tiền cọc không được vượt quá 5% giá trị BĐS.",
     ]
@@ -683,7 +753,7 @@ def adversarial_critic_node(state: DueDiligenceState) -> Dict[str, Any]:
         f"1. Đàm phán giảm giá tối thiểu 5% - 8% dựa trên cơ sở dữ liệu định giá so sánh các tài sản tương đương tại quận {district}.",
         "2. Yêu cầu bên bán cung cấp Trích lục bản đồ địa chính mới nhất do Chi nhánh VPĐKĐĐ cấp trong vòng 30 ngày trước khi ký hợp đồng đặt cọc.",
         "3. Đóng đinh điều khoản trần tiền đặt cọc đúng 5% giá trị chuyển nhượng theo Luật Kinh doanh Bất động sản 2023.",
-        f"4. Thêm điều khoản bảo vệ tài chính: Nếu ngân hàng thẩm định không giải ngân đủ khoản vay mục tiêu ({loan:,.0f} đ) do lỗi định giá, bên mua được quyền rút 100% tiền cọc mà không bị phạt vi phạm.",
+        f"4. Thêm điều khoản bảo vệ tài chính: Nếu ngân hàng thẩm định không giải ngân đủ khoản vay mục tiêu ({loan_m:,.1f} triệu đ) do lỗi định giá, bên mua được quyền rút 100% tiền cọc mà không bị phạt vi phạm.",
     ]
     if climate.get("flood_risk_level") == "high":
         negotiation_points.append("5. Đòi hỏi trừ lùi chi phí tôn nền / gia cố thoát nước (tương đương 30 - 50 triệu đồng) vào tổng giá bán.")
@@ -750,19 +820,48 @@ def synthesize_dossier_node(state: DueDiligenceState) -> Dict[str, Any]:
     else:
         verdict = "HIGH_RISK_AVOID"
 
+    # Friendly human-readable labels for end users
+    verdict_display_map = {
+        "STRONGLY_RECOMMENDED": "Khuyến nghị mạnh mẽ (An toàn đầu tư)",
+        "PROCEED_WITH_CAUTION": "Cần thận trọng (Xem xét rủi ro & Đàm phán thêm)",
+        "HIGH_RISK_AVOID": "Rủi ro cao (Cân nhắc tránh đầu tư)",
+    }
+    valuation_display_map = {
+        "under_priced": "Giá tốt hơn thị trường (Rẻ hơn mặt bằng chung)",
+        "fair": "Mức giá hợp lý (Sát mặt bằng chung)",
+        "over_priced": "Giá cao hơn thị trường (Cần đàm phán giảm giá)",
+    }
+    flood_display_map = {
+        "low": "Thấp (Khu vực cao ráo, an toàn ngập lụt)",
+        "medium": "Trung bình (Nguy cơ ngập úng cục bộ khi mưa lớn hoặc triều cường)",
+        "high": "Cao (Khu vực trũng thấp ven sông, dễ ngập mùa mưa lũ)",
+    }
+
+    verdict_label = verdict_display_map.get(verdict, verdict)
+    val_status_label = valuation_display_map.get(val_status, val_status)
+    flood_level = climate_data.get("flood_risk_level", "low")
+    flood_label = flood_display_map.get(flood_level, flood_level)
+
     # Executive Markdown Report
+    price_million = price / 1_000_000
+    unit_price_million = (price / area) / 1_000_000
+    unit_price_val_m = float(valuation_data.get("unit_price_per_m2", 0)) / 1_000_000
+    avg_district_val_m = float(valuation_data.get("avg_district_price_per_m2", 0)) / 1_000_000
+    monthly_repay_m = float(financial_data.get("monthly_repayment_vnd", 0)) / 1_000_000
+    est_rental_m = float(financial_data.get("estimated_monthly_rental_income", 0)) / 1_000_000
+
     markdown_lines = [
         f"# 📑 BÁO CÁO THẨM ĐỊNH CHUYÊN SÂU BẤT ĐỘNG SẢN (DUE DILIGENCE DOSSIER)",
         f"**Tài sản:** {title} | **Địa bàn:** {district}, Đà Nẵng",
-        f"**Quy mô:** {area} m² | **Giá chào bán:** {price:,.0f} VNĐ ({price/area:,.0f} đ/m²)\n",
+        f"**Quy mô:** {area} m² | **Giá chào bán:** {price_million:,.1f} triệu VNĐ ({unit_price_million:.1f} triệu đ/m²)\n",
         f"## 🏆 KẾT QUẢ ĐÁNH GIÁ TỔNG THỂ",
         f"- **Điểm an toàn & tiềm năng đầu tư:** **{overall_score}/100**",
-        f"- **Kết luận thẩm định (Verdict):** `{verdict}`",
+        f"- **Kết luận thẩm định:** **{verdict_label}**",
         f"- **Điểm thành phần:** Pháp lý: {L}/100 | Định giá: {V}/100 | Hạ tầng & Ngập lụt: {C}/100 | Tài chính: {F}/100\n",
         f"### 🎯 Tóm tắt điều hành (Executive Summary)",
-        f"Bất động sản đạt điểm tổng hợp {overall_score}/100 với khuyến nghị `{verdict}`. "
-        f"Tình trạng pháp lý {legal_data.get('title_deed_status')}, định giá ở mức `{val_status}` so với trung bình quận {district}. "
-        f"Rủi ro ngập lụt được phân loại `{climate_data.get('flood_risk_level')}`. Kịch bản tài chính {'đạt bài kiểm tra chịu đựng lãi suất +3%' if stress_passed else 'cảnh báo rủi ro đứt gãy dòng tiền khi thả nổi'}.\n",
+        f"Bất động sản đạt điểm tổng hợp {overall_score}/100 với kết luận **{verdict_label}**. "
+        f"Tình trạng pháp lý {legal_data.get('title_deed_status')}, định giá ở mức **{val_status_label}** so với trung bình quận {district}. "
+        f"Rủi ro ngập lụt được phân loại **{flood_label}**. Kịch bản tài chính {'đạt bài kiểm tra chịu đựng lãi suất +3%' if stress_passed else 'cảnh báo rủi ro đứt gãy dòng tiền khi thả nổi'}.\n",
         f"## 1. ⚖️ Thẩm định Pháp lý & Quy hoạch (Trọng số 35%)",
         f"- **Tình trạng sổ:** {legal_data.get('title_deed_status')}",
         f"- **Quy hoạch sử dụng đất:** {legal_data.get('zoning_status')}",
@@ -777,19 +876,32 @@ def synthesize_dossier_node(state: DueDiligenceState) -> Dict[str, Any]:
 
     markdown_lines.extend([
         f"\n## 2. 📊 Thẩm định Định giá & So sánh Thị trường (Trọng số 25%)",
-        f"- **Đơn giá tài sản:** {valuation_data.get('unit_price_per_m2', 0):,.0f} VNĐ/m²",
-        f"- **Đơn giá trung bình quận {district}:** {valuation_data.get('avg_district_price_per_m2', 0):,.0f} VNĐ/m²",
-        f"- **Trạng thái định giá:** `{val_status}`",
-        f"- **Số lượng BĐS so sánh tham chiếu:** {len(valuation_data.get('comparable_properties', []))} tài sản\n",
-        f"## 3. 🌊 Khảo sát Địa hình, Ngập lụt & Hạ tầng Tiện ích (Trọng số 20%)",
-        f"- **Mức độ rủi ro ngập lụt:** `{climate_data.get('flood_risk_level')}`",
+        f"- **Đơn giá tài sản:** {unit_price_val_m:.1f} triệu đ/m²",
+        f"- **Đơn giá trung bình quận {district}:** {avg_district_val_m:.1f} triệu đ/m²",
+        f"- **Trạng thái định giá:** {val_status_label}",
+        f"- **Số lượng BĐS so sánh tham chiếu:** {len(valuation_data.get('comparable_properties', []))} tài sản",
+    ])
+
+    live_web_listings = valuation_data.get("live_market_listings", [])
+    if live_web_listings:
+        markdown_lines.append(f"\n### 🌐 Tin đăng Tham khảo Thực tế từ Thị trường (Tavily Search):")
+        for item in live_web_listings:
+            title_item = item.get("title", "Tin đăng BĐS")
+            url_item = item.get("url", "")
+            domain_item = item.get("source_domain", "web")
+            snippet_item = item.get("snippet", "")
+            markdown_lines.append(f"- [{domain_item}] **[{title_item}]({url_item})**: {snippet_item}")
+
+    markdown_lines.extend([
+        f"\n## 3. 🌊 Khảo sát Địa hình, Ngập lụt & Hạ tầng Tiện ích (Trọng số 20%)",
+        f"- **Mức độ rủi ro ngập lụt:** {flood_label}",
         f"- **Ghi chú thủy văn mùa mưa bão:** {climate_data.get('flood_notes')}",
         f"- **Điểm hạ tầng:** {C}/100",
         f"- **Tiện ích trọng điểm:** {', '.join(climate_data.get('key_amenities', []))}\n",
         f"## 4. 💰 Mô phỏng Tài chính & Dòng tiền Cho thuê (Trọng số 20%)",
-        f"- **Số tiền vay đề xuất:** {financial_data.get('monthly_repayment_vnd', 0):,.0f} đ trả góp tháng đầu",
+        f"- **Số tiền vay đề xuất:** {monthly_repay_m:.1f} triệu đ trả góp tháng đầu",
         f"- **Lãi suất tham chiếu:** {financial_data.get('effective_interest_rate', 0)}%/năm",
-        f"- **Dòng tiền cho thuê ước tính:** {financial_data.get('estimated_monthly_rental_income', 0):,.0f} đ/tháng",
+        f"- **Dòng tiền cho thuê ước tính:** {est_rental_m:.1f} triệu đ/tháng",
         f"- **Tỷ suất sinh lời ròng (Net Yield):** {financial_data.get('net_rental_yield_percent', 0)}%/năm",
         f"- **Hệ số chi trả nợ DSCR:** {financial_data.get('dscr_ratio', 0)}",
         f"- **Kết quả Stress-test lãi suất +3%:** `{'ĐẠT (Passed)' if stress_passed else 'KHÔNG ĐẠT (Failed)'}`\n",
@@ -815,9 +927,10 @@ def synthesize_dossier_node(state: DueDiligenceState) -> Dict[str, Any]:
     dossier = DueDiligenceDossier(
         overall_score=overall_score,
         verdict=verdict,
+        verdict_label=verdict_label,
         executive_summary=(
-            f"Tài sản {title} ({district}) đạt {overall_score}/100 điểm (`{verdict}`). "
-            f"Pháp lý: {L}/100, Định giá: `{val_status}`, Ngập lụt: `{climate_data.get('flood_risk_level')}`."
+            f"Tài sản {title} ({district}) đạt {overall_score}/100 điểm ({verdict_label}). "
+            f"Pháp lý: {L}/100, Định giá: {val_status_label}, Ngập lụt: {flood_label}."
         ),
         legal=legal_obj,
         valuation=val_obj,

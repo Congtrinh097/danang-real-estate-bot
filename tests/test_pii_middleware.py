@@ -109,7 +109,7 @@ def test_route_intent_node_redacts_and_masks_for_property_search():
     state = {
         "messages": [
             HumanMessage(
-                content="Tôi muốn thuê căn hộ 2 phòng ngủ Sơn Trà, gửi báo giá về test@domain.com, số thẻ đặt cọc 4532015112830366"
+                content="Tôi muốn mua căn hộ 2 phòng ngủ Sơn Trà, gửi báo giá về test@domain.com, số thẻ đặt cọc 4532015112830366"
             )
         ]
     }

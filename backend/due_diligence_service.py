@@ -22,6 +22,7 @@ from typing import Optional, Dict, Any, List, Union, AsyncGenerator
 import redis.asyncio as aioredis
 
 from config import settings
+from agentops import AgentOpsCallbackHandler, langfuse_manager
 from agentops.monitoring.trace_context import TraceContext
 from agentops.cost.user_wallet_service import user_wallet_service
 from due_diligence_agent import (
@@ -355,6 +356,7 @@ class DueDiligenceTaskManager:
             workload_type="due_diligence",
         )
 
+        lf_cb = None
         try:
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
@@ -377,7 +379,39 @@ class DueDiligenceTaskManager:
 
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
-            final_state = await due_diligence_graph.ainvoke(initial_state)
+
+            callbacks = [AgentOpsCallbackHandler(agent_name="DueDiligenceAgent")]
+            lf_cb = langfuse_manager.get_callback_handler(
+                request_id=task_id,
+                thread_id=f"thread_{task_id}",
+                user_id=effective_user_id,
+                tags=["due_diligence", "danang_real_estate"],
+            )
+            if lf_cb:
+                callbacks.append(lf_cb)
+
+            config = {
+                "configurable": {"thread_id": f"thread_{task_id}"},
+                "callbacks": callbacks,
+                "metadata": {
+                    "thread_id": f"thread_{task_id}",
+                    "request_id": task_id,
+                    "task_id": task_id,
+                    "user_id": effective_user_id,
+                    "workload_type": "due_diligence",
+                    "session_type": "due_diligence",
+                },
+                "tags": ["due_diligence", f"user_{effective_user_id}", getattr(req_obj, "district", "DaNang")],
+                "run_name": f"DueDiligenceGraph-{task_id}",
+            }
+
+            try:
+                final_state = await due_diligence_graph.ainvoke(initial_state, config=config)
+            except TypeError as te:
+                if "config" in str(te):
+                    final_state = await due_diligence_graph.ainvoke(initial_state)
+                else:
+                    raise
 
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
@@ -414,6 +448,11 @@ class DueDiligenceTaskManager:
                 error=str(e),
             )
         finally:
+            if lf_cb and hasattr(lf_cb, "_langfuse_client") and hasattr(lf_cb._langfuse_client, "flush"):
+                try:
+                    lf_cb._langfuse_client.flush()
+                except Exception as f_err:
+                    logger.warning(f"Failed to flush Langfuse client: {f_err}")
             try:
                 user_wallet_service.deduct_request_cost(
                     user_id=effective_user_id,

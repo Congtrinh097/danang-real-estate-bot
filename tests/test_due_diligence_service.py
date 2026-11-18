@@ -361,7 +361,7 @@ def test_tracecontext_and_wallet_deduction_invocation():
         wallet_calls.append(kwargs)
         return {"status": "success", "deducted_vnd": 35.0}
 
-    async def mock_invoke(state):
+    async def mock_invoke(state, *args, **kwargs):
         return {
             "dossier": {
                 "overall_score": 85,

@@ -34,9 +34,44 @@ import {
   Building2,
   Handshake,
   AlertCircle,
-  Wallet
+  Wallet,
+  Globe,
+  ExternalLink,
+  Download,
+  FileText,
+  Printer
 } from "lucide-react";
 import "./DueDiligenceModal.css";
+
+const getFriendlyVerdict = (verdict) => {
+  switch (verdict) {
+    case "STRONGLY_RECOMMENDED":
+      return "Khuyến nghị mạnh mẽ (An toàn đầu tư)";
+    case "PROCEED_WITH_CAUTION":
+      return "Cần thận trọng (Xem xét rủi ro & Đàm phán thêm)";
+    case "HIGH_RISK_AVOID":
+      return "Rủi ro cao (Cân nhắc tránh đầu tư)";
+    default:
+      return verdict || "Đang đánh giá";
+  }
+};
+
+const formatFriendlyText = (text) => {
+  if (!text || typeof text !== "string") return text || "";
+  return text
+    .replace(/`?STRONGLY_RECOMMENDED`?/g, "Khuyến nghị mạnh mẽ (An toàn đầu tư)")
+    .replace(/`?PROCEED_WITH_CAUTION`?/g, "Cần thận trọng (Xem xét rủi ro & Đàm phán thêm)")
+    .replace(/`?HIGH_RISK_AVOID`?/g, "Rủi ro cao (Cân nhắc tránh đầu tư)")
+    .replace(/`?under_priced`?/g, "Giá tốt hơn thị trường (Rẻ hơn mặt bằng chung)")
+    .replace(/`?over_priced`?/g, "Giá cao hơn thị trường (Cần đàm phán giảm giá)")
+    .replace(/`?fair`?/g, "Mức giá hợp lý (Sát mặt bằng chung)")
+    .replace(/`?residential`?/g, "Mua để ở (An cư)")
+    .replace(/`?rental_cashflow`?/g, "Khai thác dòng tiền cho thuê")
+    .replace(/`?capital_gain`?/g, "Đầu tư lãi vốn tăng giá")
+    .replace(/`?low`?/g, "Thấp (An toàn ngập lụt)")
+    .replace(/`?medium`?/g, "Trung bình (Ngập úng tạm thời khi triều cường)")
+    .replace(/`?high`?/g, "Cao (Khu vực trũng thấp ven sông, dễ ngập mùa mưa)");
+};
 
 const formatVND = (val) => {
   if (val === undefined || val === null || isNaN(val)) return "0 VNĐ";
@@ -52,6 +87,17 @@ const formatShortVND = (val) => {
     return (val / 1_000_000).toFixed(1).replace(/\.0$/, "") + " Triệu";
   }
   return Number(val).toLocaleString("vi-VN") + " đ";
+};
+
+const formatMillionPerM2 = (val) => {
+  if (val === undefined || val === null || isNaN(val)) return "0.0 triệu/m²";
+  return `${(Number(val) / 1_000_000).toFixed(1)} triệu/m²`;
+};
+
+const formatMillionPrice = (val, unit = "triệu đ") => {
+  if (val === undefined || val === null || isNaN(val)) return `0.0 ${unit}`;
+  const numInMillion = Number(val) / 1_000_000;
+  return `${numInMillion.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${unit}`;
 };
 
 const getStageLabel = (stage) => {
@@ -422,21 +468,384 @@ export default function DueDiligenceModal({
     (score >= 80 ? "STRONGLY_RECOMMENDED" : score >= 60 ? "PROCEED_WITH_CAUTION" : "HIGH_RISK_AVOID");
 
   let verdictColorClass = "caution";
-  let verdictText = "CẦN THẬN TRỌNG - XEM XÉT RỦI RO";
+  let verdictText = "Cần thận trọng (Xem xét rủi ro & Đàm phán thêm)";
   let VerdictIcon = AlertTriangle;
 
   if (verdict === "STRONGLY_RECOMMENDED") {
     verdictColorClass = "recommended";
-    verdictText = "KHUYẾN NGHỊ MẠNH MẼ - AN TOÀN ĐẦU TƯ";
+    verdictText = "Khuyến nghị mạnh mẽ (An toàn đầu tư)";
     VerdictIcon = CheckCircle2;
   } else if (verdict === "HIGH_RISK_AVOID") {
     verdictColorClass = "avoid";
-    verdictText = "RỦI RO CAO - CÂN NHẮC TRÁNH ĐẦU TƯ";
+    verdictText = "Rủi ro cao (Cân nhắc tránh đầu tư)";
     VerdictIcon = ShieldAlert;
+  }
+
+  if (dossier?.verdict_label) {
+    verdictText = dossier.verdict_label;
   }
 
   const scoreStrokeColor =
     verdictColorClass === "recommended" ? "#16a34a" : verdictColorClass === "caution" ? "#d97706" : "#dc2626";
+
+  const generatePrintableHtml = () => {
+    if (!dossier) return "";
+    const title = property?.title || "Bất động sản Đà Nẵng";
+    const district = property?.district || property?.location || "Đà Nẵng";
+    const ward = property?.ward || "";
+    const area = areaM2 || 0;
+    const price = propertyPrice || 0;
+    const unitPrice = area > 0 ? Math.round(price / area) : 0;
+    const dateStr = new Date().toLocaleDateString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const friendlyVerdict = dossier.verdict_label || getFriendlyVerdict(dossier.verdict || verdict);
+    const friendlyExec = formatFriendlyText(dossier.executive_summary || "");
+    const friendlyMarkdown = formatFriendlyText(dossier.full_markdown_report || "");
+
+    const formattedReport = friendlyMarkdown
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return "<div style='height:6px;'></div>";
+        if (trimmed.startsWith("# ")) {
+          return `<h1 style="color:#1e3a8a; font-size:16px; border-bottom:2px solid #2563eb; padding-bottom:5px; margin:14px 0 8px 0;">${trimmed.slice(2)}</h1>`;
+        }
+        if (trimmed.startsWith("## ")) {
+          return `<h2 style="color:#0f172a; font-size:14px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin:12px 0 6px 0;">${trimmed.slice(3)}</h2>`;
+        }
+        if (trimmed.startsWith("### ")) {
+          return `<h3 style="color:#334155; font-size:12.5px; margin:8px 0 4px 0;">${trimmed.slice(4)}</h3>`;
+        }
+        if (trimmed.startsWith("- ")) {
+          const content = trimmed.slice(2).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>");
+          return `<div style="display:flex; margin:3px 0; font-size:11.5px; line-height:1.5;"><span style="color:#2563eb; margin-right:6px;">•</span><span>${content}</span></div>`;
+        }
+        const text = trimmed.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>");
+        return `<p style="margin:3px 0; font-size:11.5px; line-height:1.5;">${text}</p>`;
+      })
+      .join("");
+
+    return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Bao_Cao_Tham_Dinh_${title.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, "_")}_${new Date().toISOString().slice(0, 10)}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #0f172a;
+      line-height: 1.45;
+      font-size: 11.5px;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+    .print-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2.5px solid #1e3a8a;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .header-logo-title h1 {
+      margin: 0;
+      font-size: 15px;
+      color: #1e3a8a;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .header-logo-title p {
+      margin: 2px 0 0 0;
+      font-size: 10.5px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .header-meta {
+      text-align: right;
+      font-size: 10px;
+      color: #475569;
+    }
+    .header-meta strong {
+      color: #0f172a;
+    }
+    .summary-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+    }
+    .prop-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .prop-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .prop-table td:nth-child(odd) {
+      color: #64748b;
+      font-weight: 500;
+      width: 22%;
+    }
+    .prop-table td:nth-child(even) {
+      color: #0f172a;
+      font-weight: 600;
+      width: 28%;
+    }
+    .verdict-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background: ${verdictColorClass === "recommended" ? "#f0fdf4" : verdictColorClass === "caution" ? "#fffbeb" : "#fef2f2"};
+      border: 1.5px solid ${verdictColorClass === "recommended" ? "#86efac" : verdictColorClass === "caution" ? "#fde68a" : "#fecaca"};
+    }
+    .score-badge {
+      font-size: 24px;
+      font-weight: 800;
+      color: ${scoreStrokeColor};
+      background: #ffffff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1.5px solid ${scoreStrokeColor};
+      display: inline-block;
+      margin-right: 12px;
+    }
+    .verdict-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: ${scoreStrokeColor};
+    }
+    .verdict-sub {
+      font-size: 11px;
+      color: #475569;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pillar-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #ffffff;
+      text-align: center;
+    }
+    .pillar-title {
+      font-size: 10px;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .pillar-score {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-top: 2px;
+    }
+    .report-content {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 8px;
+    }
+    .footer-seal {
+      margin-top: 20px;
+      padding-top: 10px;
+      border-top: 1px solid #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 9.5px;
+      color: #64748b;
+    }
+    .seal-box {
+      border: 1.5px dashed #2563eb;
+      border-radius: 6px;
+      padding: 5px 12px;
+      text-align: center;
+      color: #1e3a8a;
+      font-weight: 700;
+      background: #f0f7ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <div class="header-logo-title">
+      <h1>HỆ THỐNG THẨM ĐỊNH BẤT ĐỘNG SẢN ĐÀ NẴNG</h1>
+      <p>BÁO CÁO THẨM ĐỊNH CHUYÊN SÂU (DEEP DUE DILIGENCE DOSSIER)</p>
+    </div>
+    <div class="header-meta">
+      <div>Mã tác vụ: <strong>${taskId || "DD-REPORT"}</strong></div>
+      <div>Thời gian xuất: <strong>${dateStr}</strong></div>
+      <div>Trạng thái: <strong>ĐÃ HOÀN TẤT (100%)</strong></div>
+    </div>
+  </div>
+
+  <div class="summary-card">
+    <table class="prop-table">
+      <tr>
+        <td>Tên tài sản:</td>
+        <td colspan="3"><strong style="font-size:12px; color:#1e3a8a;">${title}</strong></td>
+      </tr>
+      <tr>
+        <td>Địa bàn:</td>
+        <td>${ward ? `${ward}, ` : ""}${district}, TP. Đà Nẵng</td>
+        <td>Quy mô diện tích:</td>
+        <td><strong>${area} m²</strong></td>
+      </tr>
+      <tr>
+        <td>Giá chào bán:</td>
+        <td><strong style="color:#b91c1c;">${formatMillionPrice(price)}</strong></td>
+        <td>Đơn giá tham chiếu:</td>
+        <td>${formatMillionPerM2(unitPrice)}</td>
+      </tr>
+      <tr>
+        <td>Mục tiêu đầu tư:</td>
+        <td>${objective === "residential" ? "Mua để ở (An cư)" : objective === "rental_cashflow" ? "Dòng tiền cho thuê" : "Đầu tư lãi vốn"}</td>
+        <td>Cơ cấu tài chính:</td>
+        <td>Vốn tự có ${Math.round(equityRatio * 100)}% (${formatMillionPrice(equityCapital)}) - Vay ${formatMillionPrice(loanAmount)}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="verdict-banner">
+    <div style="display:flex; align-items:center; width:100%;">
+      <div class="score-badge">${score} <span style="font-size:11px; font-weight:500; color:#64748b;">/ 100</span></div>
+      <div style="flex:1;">
+        <div class="verdict-label">${friendlyVerdict}</div>
+        <div class="verdict-sub">${friendlyExec}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pillars-grid">
+    <div class="pillar-box">
+      <div class="pillar-title">1. Pháp lý (35%)</div>
+      <div class="pillar-score" style="color:#2563eb;">${dossier.legal?.legal_safety_score ?? 0}đ</div>
+      <div style="font-size:9.5px; color:#64748b; margin-top:1px;">An toàn sổ hồng</div>
+    </div>
+    <div class="pillar-box">
+      <div class="pillar-title">2. Định giá (25%)</div>
+      <div class="pillar-score" style="color:#10b981;">
+        ${dossier.valuation?.valuation_status === "under_priced" ? "Giá tốt" : dossier.valuation?.valuation_status === "fair" ? "Mức giá hợp lý" : "Giá cao"}
+      </div>
+      <div style="font-size:9.5px; color:#64748b; margin-top:1px;">So sánh mặt bằng</div>
+    </div>
+    <div class="pillar-box">
+      <div class="pillar-title">3. Hạ tầng & Thủy văn (20%)</div>
+      <div class="pillar-score" style="color:#06b6d4;">${dossier.climate_infrastructure?.infrastructure_score ?? 0}đ</div>
+      <div style="font-size:9.5px; color:#64748b; margin-top:1px;">
+        ${dossier.climate_infrastructure?.flood_risk_level === "low" ? "An toàn ngập" : dossier.climate_infrastructure?.flood_risk_level === "medium" ? "Ngập tạm thời" : "Vùng trũng lũ"}
+      </div>
+    </div>
+    <div class="pillar-box">
+      <div class="pillar-title">4. Tài chính (20%)</div>
+      <div class="pillar-score" style="color:${dossier.financial?.stress_test_passed ? "#16a34a" : "#dc2626"};">
+        ${dossier.financial?.stress_test_passed ? "Đạt Stress-test" : "Cảnh báo lãi suất"}
+      </div>
+      <div style="font-size:9.5px; color:#64748b; margin-top:1px;">DSCR ${dossier.financial?.dscr_ratio ?? 0}x</div>
+    </div>
+  </div>
+
+  <div style="font-size:13px; font-weight:700; color:#1e3a8a; border-bottom:1.5px solid #2563eb; padding-bottom:4px; margin:14px 0 8px 0;">
+    Báo Cáo Thẩm Định Chi Tiết
+  </div>
+  <div class="report-content">
+    ${formattedReport}
+  </div>
+
+  <div class="footer-seal">
+    <div>
+      <div>Báo cáo được khởi tạo tự động bởi AI Engine Thẩm Định BĐS Đà Nẵng.</div>
+      <div>Trích xuất và đối soát dữ liệu quy hoạch địa chính và thị trường thực tế.</div>
+    </div>
+    <div class="seal-box">
+      <div>✓ ĐÃ XÁC THỰC HỆ THỐNG</div>
+      <div style="font-size:8.5px; font-weight:normal; margin-top:1px;">AgentOps & LangSmith Observability</div>
+    </div>
+  </div>
+</body>
+</html>`;
+  };
+
+  const handleDownloadPDF = () => {
+    if (!dossier) return;
+    try {
+      const printIframe = document.createElement("iframe");
+      printIframe.name = "dossier_print_frame";
+      printIframe.style.position = "fixed";
+      printIframe.style.top = "-10000px";
+      printIframe.style.left = "-10000px";
+      printIframe.style.width = "0";
+      printIframe.style.height = "0";
+      printIframe.style.border = "none";
+      document.body.appendChild(printIframe);
+
+      const frameDoc = printIframe.contentWindow || printIframe.contentDocument.document || printIframe.contentDocument;
+      frameDoc.document.open();
+      frameDoc.document.write(generatePrintableHtml());
+      frameDoc.document.close();
+
+      setTimeout(() => {
+        try {
+          frameDoc.focus();
+          frameDoc.print();
+        } catch (printErr) {
+          console.warn("Direct iframe print failed, falling back to window.open:", printErr);
+          const w = window.open("", "_blank");
+          if (w) {
+            w.document.write(generatePrintableHtml());
+            w.document.close();
+            w.focus();
+            w.print();
+          }
+        } finally {
+          setTimeout(() => {
+            if (document.body.contains(printIframe)) {
+              document.body.removeChild(printIframe);
+            }
+          }, 2000);
+        }
+      }, 350);
+    } catch (e) {
+      console.error("Error generating printable dossier:", e);
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(generatePrintableHtml());
+        w.document.close();
+        w.focus();
+        w.print();
+      }
+    }
+  };
 
   return (
     <div className="dd-modal-overlay" onClick={onClose}>
@@ -460,7 +869,7 @@ export default function DueDiligenceModal({
                     {areaM2} m²
                   </span>
                 )}
-                <span className="dd-property-price-tag">{formatVND(propertyPrice)}</span>
+                <span className="dd-property-price-tag">{formatMillionPrice(propertyPrice)}</span>
                 {userWallet?.balance !== undefined && (
                   <span className="dd-property-tag" title="Số dư ví AI">
                     <Wallet size={11} /> {formatVND(userWallet.balance)}
@@ -577,7 +986,7 @@ export default function DueDiligenceModal({
                   <div className="dd-slider-wrapper">
                     <div className="dd-slider-label-row">
                       <span>Tỷ lệ vốn tự có:</span>
-                      <b>{Math.round(equityRatio * 100)}% ({formatShortVND(equityCapital)})</b>
+                      <b>{Math.round(equityRatio * 100)}% ({formatMillionPrice(equityCapital)})</b>
                     </div>
                     <input
                       type="range"
@@ -599,11 +1008,11 @@ export default function DueDiligenceModal({
                   <div className="dd-loan-summary-box">
                     <div className="dd-loan-item">
                       <span>Vốn vay ngân hàng:</span>
-                      <b>{formatShortVND(loanAmount)}</b>
+                      <b>{formatMillionPrice(loanAmount)}</b>
                     </div>
                     <div className="dd-loan-item">
                       <span>Gốc + Lãi tháng đầu (ước tính):</span>
-                      <b style={{ color: "#2563eb" }}>{formatVND(estimatedMonth1Payment)}/tháng</b>
+                      <b style={{ color: "#2563eb" }}>{formatMillionPrice(estimatedMonth1Payment, "triệu đ/tháng")}</b>
                     </div>
                     <div className="dd-loan-item" style={{ fontSize: "11px", color: "#94a3b8" }}>
                       <span>Lãi suất tham chiếu:</span>
@@ -758,13 +1167,24 @@ export default function DueDiligenceModal({
                 </div>
 
                 <div className="dd-scorecard-details">
-                  <div className={`dd-verdict-pill ${verdictColorClass}`}>
-                    <VerdictIcon size={14} />
-                    <span>{verdictText}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+                    <div className={`dd-verdict-pill ${verdictColorClass}`}>
+                      <VerdictIcon size={14} />
+                      <span>{verdictText}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="dd-btn-download-pdf-compact"
+                      onClick={handleDownloadPDF}
+                      title="Tải xuống toàn bộ hồ sơ thẩm định định dạng PDF"
+                    >
+                      <Download size={13} />
+                      <span>Xuất PDF</span>
+                    </button>
                   </div>
 
                   <div className="dd-exec-summary-box">
-                    {dossier.executive_summary}
+                    {formatFriendlyText(dossier.executive_summary)}
                   </div>
 
                   {/* 4 Pillar Mini Progress Bars */}
@@ -929,9 +1349,9 @@ export default function DueDiligenceModal({
                       <div className="dd-metric-title">
                         <TrendingUp size={14} /> Đơn giá / m²
                       </div>
-                      <div className="dd-metric-val">{formatShortVND(dossier.valuation?.unit_price_per_m2)}/m²</div>
+                      <div className="dd-metric-val">{formatMillionPerM2(dossier.valuation?.unit_price_per_m2)}</div>
                       <div className="dd-metric-sub">
-                        Trung bình quận: {formatShortVND(dossier.valuation?.avg_district_price_per_m2)}/m²
+                        Trung bình quận: {formatMillionPerM2(dossier.valuation?.avg_district_price_per_m2)}
                       </div>
                     </div>
 
@@ -968,7 +1388,7 @@ export default function DueDiligenceModal({
                       <span>Kết luận Phân tích Điều tra Tổng hợp</span>
                     </div>
                     <div className="dd-info-card-body">
-                      {dossier.executive_summary}
+                      {formatFriendlyText(dossier.executive_summary)}
                     </div>
                   </div>
                 </div>
@@ -1047,14 +1467,14 @@ export default function DueDiligenceModal({
                     <div>
                       <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Đơn giá BĐS thẩm định:</div>
                       <div style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
-                        {formatVND(dossier.valuation?.unit_price_per_m2)} / m²
+                        {formatMillionPerM2(dossier.valuation?.unit_price_per_m2)}
                       </div>
                     </div>
 
                     <div>
                       <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Mặt bằng trung bình khu vực quận:</div>
                       <div style={{ fontSize: "20px", fontWeight: 800, color: "#2563eb" }}>
-                        {formatVND(dossier.valuation?.avg_district_price_per_m2)} / m²
+                        {formatMillionPerM2(dossier.valuation?.avg_district_price_per_m2)}
                       </div>
                     </div>
 
@@ -1082,7 +1502,7 @@ export default function DueDiligenceModal({
                             <tr>
                               <th>Tên / Tiêu đề BĐS</th>
                               <th>Diện tích</th>
-                              <th>Tổng giá VNĐ</th>
+                              <th>Tổng giá</th>
                               <th>Đơn giá / m²</th>
                             </tr>
                           </thead>
@@ -1091,14 +1511,49 @@ export default function DueDiligenceModal({
                               <tr key={idx}>
                                 <td style={{ fontWeight: 600 }}>{comp.title}</td>
                                 <td>{comp.area} m²</td>
-                                <td>{formatVND(comp.price)}</td>
+                                <td>{formatMillionPrice(comp.price)}</td>
                                 <td style={{ color: "#2563eb", fontWeight: 700 }}>
-                                  {formatShortVND(comp.unit_price_per_m2)}/m²
+                                  {formatMillionPerM2(comp.unit_price_per_m2)}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tin đăng thực tế từ Web (Tavily Search) */}
+                  {dossier.valuation?.live_market_listings && dossier.valuation.live_market_listings.length > 0 && (
+                    <div style={{ marginTop: "20px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Globe size={15} style={{ color: "#0284c7" }} />
+                        <span>Tin đăng thị trường thực tế tham khảo qua Web (Tavily Search - {dossier.valuation.live_market_listings.length} tin):</span>
+                      </div>
+                      <div className="dd-web-listings-grid">
+                        {dossier.valuation.live_market_listings.map((item, idx) => (
+                          <div key={idx} className="dd-web-listing-card">
+                            <div className="dd-web-listing-header">
+                              <span className="dd-web-listing-badge">{item.source_domain || "web"}</span>
+                              {item.url && (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="dd-web-listing-link"
+                                  title="Mở tin đăng gốc trên trang web"
+                                >
+                                  <span>Xem tin gốc</span>
+                                  <ExternalLink size={12} />
+                                </a>
+                              )}
+                            </div>
+                            <div className="dd-web-listing-title">{item.title}</div>
+                            {item.snippet && (
+                              <div className="dd-web-listing-snippet">{item.snippet}</div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -1162,8 +1617,8 @@ export default function DueDiligenceModal({
                       <div className="dd-metric-title">
                         <DollarSign size={14} /> Khoản vay ngân hàng
                       </div>
-                      <div className="dd-metric-val">{formatShortVND(dossier.financial?.loan_amount_vnd ?? loanAmount)}</div>
-                      <div className="dd-metric-sub">Vốn tự có: {formatShortVND(equityCapital)}</div>
+                      <div className="dd-metric-val">{formatMillionPrice(dossier.financial?.loan_amount_vnd ?? loanAmount)}</div>
+                      <div className="dd-metric-sub">Vốn tự có: {formatMillionPrice(equityCapital)}</div>
                     </div>
 
                     <div className="dd-metric-card">
@@ -1171,7 +1626,7 @@ export default function DueDiligenceModal({
                         <Calculator size={14} /> Trả góp tháng đầu
                       </div>
                       <div className="dd-metric-val" style={{ color: "#2563eb" }}>
-                        {formatVND(dossier.financial?.monthly_repayment_vnd)}
+                        {formatMillionPrice(dossier.financial?.monthly_repayment_vnd, "triệu đ/tháng")}
                       </div>
                       <div className="dd-metric-sub">Dư nợ giảm dần</div>
                     </div>
@@ -1189,7 +1644,7 @@ export default function DueDiligenceModal({
                         <Home size={14} /> Doanh thu cho thuê ước tính
                       </div>
                       <div className="dd-metric-val">
-                        {formatVND(dossier.financial?.estimated_monthly_rental_income)} / tháng
+                        {formatMillionPrice(dossier.financial?.estimated_monthly_rental_income, "triệu đ/tháng")}
                       </div>
                       <div className="dd-metric-sub">Khảo sát giá thuê thực tế</div>
                     </div>
@@ -1280,28 +1735,41 @@ export default function DueDiligenceModal({
                         <span>Báo cáo Thẩm định Dossier Toàn diện</span>
                       </span>
 
-                      <button
-                        type="button"
-                        className={`dd-btn-copy-markdown ${copiedMarkdown ? "copied" : ""}`}
-                        onClick={handleCopyMarkdown}
-                      >
-                        {copiedMarkdown ? (
-                          <>
-                            <Check size={14} />
-                            <span>Đã sao chép!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={14} />
-                            <span>Sao chép Markdown</span>
-                          </>
-                        )}
-                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          className="dd-btn-download-pdf"
+                          onClick={handleDownloadPDF}
+                          title="Tải xuống toàn bộ hồ sơ thẩm định định dạng PDF"
+                        >
+                          <Download size={14} />
+                          <span>Tải xuống PDF</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`dd-btn-copy-markdown ${copiedMarkdown ? "copied" : ""}`}
+                          onClick={handleCopyMarkdown}
+                          title="Sao chép toàn bộ văn bản Markdown"
+                        >
+                          {copiedMarkdown ? (
+                            <>
+                              <Check size={14} />
+                              <span>Đã sao chép!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={14} />
+                              <span>Sao chép Markdown</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="dd-markdown-rendered-view">
                       <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                        {dossier.full_markdown_report || "Báo cáo đang được tổng hợp..."}
+                        {formatFriendlyText(dossier.full_markdown_report || "Báo cáo đang được tổng hợp...")}
                       </ReactMarkdown>
                     </div>
                   </div>
