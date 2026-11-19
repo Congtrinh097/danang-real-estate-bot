@@ -138,3 +138,22 @@ def test_a2a_council_graph_execution():
     assert CouncilSpeaker.FINANCIAL_ANALYST in speakers
     assert CouncilSpeaker.CRITIC in speakers
     assert CouncilSpeaker.SYNTHESIZER in speakers
+
+
+from fastapi.testclient import TestClient
+from main import app
+
+def test_chat_stream_emits_a2a_council_events():
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat/stream",
+        json={
+            "message": "Tôi có 1 tỷ, muốn mua căn 3 tỷ ở Sơn Trà thì vay ngân hàng thế nào và pháp lý rủi ro gì?",
+            "thread_id": "test_a2a_stream_thread",
+            "user_id": "test_user_a2a"
+        }
+    )
+    assert response.status_code == 200
+    text = response.text
+    assert "a2a_debate" in text
+    assert "a2a_verdict" in text

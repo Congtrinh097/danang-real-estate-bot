@@ -329,6 +329,7 @@ async def chat_stream(req: ChatRequest):
                             "legal_consultation": "Đang tra cứu cơ sở dữ liệu Luật Đất Đai & Nhà Ở...",
                             "mortgage_calculation": "Đang kết nối công cụ tính toán lãi suất & gói vay...",
                             "contract_audit": "Đang rà soát điều khoản hợp đồng & kiểm tra bẫy pháp lý...",
+                            "a2a_council": "🏛️ Đang triệu tập Hội đồng A2A War Room (BĐS, Tài chính, Pháp lý, Phản biện)...",
                             "general_chat": "Đang soạn nội dung phản hồi...",
                             "out_of_scope": "Đang kiểm tra phạm vi hỗ trợ...",
                             "rule_violation": "Đang kiểm tra tiêu chuẩn an toàn..."
@@ -345,6 +346,8 @@ async def chat_stream(req: ChatRequest):
                         yield f"data: {json.dumps({'type': 'status', 'stage': 'mortgage_completed', 'message': 'Đã hoàn tất tính toán phương án vay'})}\n\n"
                     elif node_name == "contract_audit":
                         yield f"data: {json.dumps({'type': 'status', 'stage': 'contract_completed', 'message': 'Đã hoàn thành thẩm định hợp đồng'})}\n\n"
+                    elif node_name == "a2a_council":
+                        yield f"data: {json.dumps({'type': 'status', 'stage': 'a2a_completed', 'message': 'Hội đồng A2A đã thống nhất nghị quyết'})}\n\n"
             
             # Gửi danh sách BĐS tìm thấy (nếu có) trước để ReactJS render Cards
             properties = final_state.get("found_properties", [])
@@ -361,6 +364,15 @@ async def chat_stream(req: ChatRequest):
             hitl_interrupt = final_state.get("hitl_interrupt")
             if hitl_interrupt:
                 yield f"data: {json.dumps({'type': 'hitl_approval_request', 'data': hitl_interrupt})}\n\n"
+
+            # Gửi sự kiện A2A Council Debate và Verdict nếu có
+            a2a_debate = final_state.get("a2a_debate")
+            if a2a_debate:
+                yield f"data: {json.dumps({'type': 'a2a_debate', 'data': a2a_debate})}\n\n"
+
+            a2a_verdict = final_state.get("a2a_verdict")
+            if a2a_verdict:
+                yield f"data: {json.dumps({'type': 'a2a_verdict', 'data': a2a_verdict})}\n\n"
 
             # Gửi phản hồi văn bản của Bot (nếu không có hitl_interrupt hiển thị thẻ xác nhận)
             messages = final_state.get("messages", [])
