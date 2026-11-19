@@ -99,3 +99,31 @@ def test_rental_query_classified_as_out_of_scope():
     assert len(messages) >= 2
     reply_text = messages[-1].content.lower()
     assert "mua bán" in reply_text or "chuyên" in reply_text or "phạm vi" in reply_text
+
+
+def test_router_classifies_complex_multi_domain_query_as_a2a_council():
+    """
+    Test theo TDD:
+    Khi người dùng hỏi câu hỏi phức hợp đa chiều (vừa hỏi vay vốn ngân hàng, vừa hỏi BĐS/pháp lý cho thuê):
+    1. Agent phải phân loại intent == 'a2a_council'
+    2. a2a_verdict hoặc a2a_debate phải được sinh ra từ A2A Council StateGraph
+    """
+    thread_id = "test_tdd_a2a_council_004"
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "tags": ["test_a2a_council", thread_id],
+        "metadata": {"thread_id": thread_id},
+        "run_name": "Test-A2A-Council-Router"
+    }
+
+    state = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Tôi có 1 tỷ, muốn mua căn 3 tỷ ở Sơn Trà để cho thuê thì vay ngân hàng thế nào và pháp lý rủi ro gì?")]},
+        config=config,
+    )
+
+    assert state.get("intent") == "a2a_council"
+    assert state.get("a2a_verdict") is not None
+    messages = state.get("messages", [])
+    assert len(messages) >= 2
+    reply_text = messages[-1].content.lower()
+    assert "hội đồng" in reply_text or "khả thi" in reply_text or "nghị quyết" in reply_text

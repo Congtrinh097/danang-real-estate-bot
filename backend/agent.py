@@ -38,6 +38,7 @@ from appointment_tools import (
     set_current_user_id,
     get_current_user_id
 )
+from a2a_council import a2a_council_graph, CouncilSpeaker, CouncilDebateTurn, CouncilVerdict
 from langchain.agents.middleware import (
     HumanInTheLoopMiddleware,
     PIIMiddleware,
@@ -53,10 +54,12 @@ class IntentClassification(BaseModel):
         "out_of_scope",
         "rule_violation",
         "mortgage_calculation",
-        "contract_audit"
+        "contract_audit",
+        "a2a_council"
     ] = Field(
         ...,
         description=(
+            "'a2a_council': người dùng hỏi câu hỏi phức hợp đa chiều kết hợp từ 2 lĩnh vực trở lên (ví dụ: vừa hỏi BĐS vừa hỏi vay vốn ngân hàng, vừa hỏi bài toán tài chính vừa hỏi tính pháp lý cho thuê/quy hoạch, thẩm định rủi ro đầu tư dòng tiền hoặc phân vân lựa chọn phương án đầu tư BĐS Đà Nẵng).\n"
             "'search_property': người dùng có nhu cầu tìm kiếm, mua bán, chuyển nhượng, hỏi giá bán, tư vấn mua căn hộ, nhà phố, đất đai cụ thể tại thành phố Đà Nẵng (LƯU Ý: Hệ thống KHÔNG hỗ trợ thuê/cho thuê, nếu người dùng hỏi thuê thì phân loại là 'out_of_scope').\n"
             "'legal_consultation': người dùng hỏi về pháp lý nhà đất, quy định pháp luật, thủ tục hành chính, sang tên sổ đỏ/sổ hồng, đặt cọc công chứng, tranh chấp, quyền sở hữu của người nước ngoài, thuế phí mua bán nhà đất.\n"
             "'mortgage_calculation': người dùng hỏi về tính lãi suất vay ngân hàng mua nhà đất, số tiền trả góp hàng tháng, bảng tính dư nợ gốc lãi, tỷ lệ vay vốn, so sánh gói vay của các ngân hàng (Vietcombank, BIDV, Techcombank, MBBank, ACB...), hoặc tư vấn nên chọn ngân hàng nào tối ưu tiền lãi.\n"
@@ -172,6 +175,8 @@ class AgentState(TypedDict):
     found_properties: List[Dict[str, Any]]
     citations: Optional[List[Dict[str, Any]]]
     hitl_interrupt: Optional[Dict[str, Any]]
+    a2a_debate: Optional[List[Dict[str, Any]]]
+    a2a_verdict: Optional[Dict[str, Any]]
 
 # Khởi tạo LLM với cơ chế Fallback (ưu tiên custom OPENAI_BASE_URL, tự động fallback về endpoint OpenAI chính thức nếu lỗi)
 primary_llm_kwargs = {
@@ -641,6 +646,13 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
     if any(t in text_lower for t in rental_triggers) and not ("mua" in text_lower or "bán" in text_lower or "đầu tư" in text_lower):
         return make_result("out_of_scope")
 
+    has_mortgage = any(kw in text_lower for kw in ["vay", "ngân hàng", "lãi suất", "trả góp", "dư nợ", "vốn tự có", "tiết kiệm"])
+    has_property = any(kw in text_lower for kw in ["căn", "nhà", "mua", "bán", "sơn trà", "hải châu", "ngũ hành sơn", "cẩm lệ", "liên chiểu", "hòa vang", "thanh khê", "bđs", "dự án", "monarchy"])
+    has_complex = any(kw in text_lower for kw in ["rủi ro", "cho thuê", "khả thi", "đầu tư", "pháp lý", "hội đồng", "chuyên gia", "xin ý kiến", "tư vấn giúp", "phân vân"])
+
+    if (has_mortgage and has_property and has_complex) or "hội đồng" in text_lower or "war room" in text_lower or "a2a" in text_lower:
+        return make_result("a2a_council")
+
     try:
         invoke_kwargs = {"config": config} if config else {}
         cleaned_router_msgs = sanitize_messages_for_prompt(sanitized_messages, max_messages=4)
@@ -661,7 +673,9 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         contract_keywords = ["hợp đồng", "bẫy cọc", "phạt cọc", "thẩm định hợp đồng", "rà soát", "thỏa thuận đặt cọc"]
         
         # Hệ thống chỉ hỗ trợ Mua Bán, mọi yêu cầu hỏi thuê thuần túy được chuyển vào out_of_scope
-        if any(kw in text_lower for kw in rental_keywords) and not ("mua" in text_lower or "bán" in text_lower):
+        if (has_mortgage and has_property and has_complex) or "hội đồng" in text_lower or "war room" in text_lower or "a2a" in text_lower:
+            intent = "a2a_council"
+        elif any(kw in text_lower for kw in rental_keywords) and not ("mua" in text_lower or "bán" in text_lower):
             intent = "out_of_scope"
         elif any(kw in text_lower for kw in mortgage_keywords):
             intent = "mortgage_calculation"
@@ -689,6 +703,8 @@ def decide_route(state: AgentState) -> str:
         return "general_chat_response"
     elif intent == "legal_consultation":
         return "legal_advisory"
+    elif intent == "a2a_council":
+        return "a2a_council"
     return "property_agent"
 
 # 3.0. Node Mortgage Calculation Agent (Mô hình ReAct Agent -> MCP Client Adapter -> FastMCP Tool)
@@ -1022,6 +1038,51 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
             "citations": []
         }
 
+# 7. Node A2A Council (War Room - Hội đồng Đa Tác tử Thẩm định & Phản biện)
+def a2a_council_node(state: AgentState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
+    all_messages = state.get("messages", [])
+    user_query = all_messages[-1].content if all_messages else ""
+    initial_council_state = {
+        "messages": all_messages,
+        "user_query": user_query,
+        "equity_capital": 0.0,
+        "target_price": 0.0,
+        "target_district": "",
+        "property_findings": [],
+        "mortgage_analysis": {},
+        "legal_citations": [],
+        "debate_history": [],
+        "verdict": None
+    }
+    council_result = a2a_council_graph.invoke(initial_council_state, config={"recursion_limit": 50})
+    verdict = council_result.get("verdict")
+    verdict_dict = verdict.model_dump() if verdict else {}
+    debate_history = [turn.model_dump() for turn in council_result.get("debate_history", [])]
+
+    # Xây dựng tin nhắn tổng kết của Hội đồng A2A
+    score = verdict_dict.get("feasibility_score", 70)
+    rec = verdict_dict.get("summary_recommendation", "")
+    status_str = verdict_dict.get("overall_feasibility", "caution_required").upper()
+
+    summary_text = (
+        f"🏛️ **NGHỊ QUYẾT HỘI ĐỒNG A2A (COUNCIL VERDICT)**\n\n"
+        f"• **Đánh giá khả thi:** {status_str} (Điểm an toàn: {score}/100)\n"
+        f"• **Khuyến nghị chung:** {rec}\n\n"
+        f"📋 **Checklist Hành động Khuyến nghị:**\n"
+    )
+    for act in verdict_dict.get("action_checklist", []):
+        summary_text += f"- {act}\n"
+
+    summary_text += "\n*Hội đồng gồm 4 chuyên gia (BĐS Đà Nẵng, Tài chính Tín dụng, Pháp lý BĐS và Phản biện Rủi ro) đã thẩm định độc lập và đưa ra kết luận trên.*"
+
+    return {
+        "messages": [AIMessage(content=summary_text)],
+        "found_properties": council_result.get("property_findings", []),
+        "citations": council_result.get("legal_citations", []),
+        "a2a_debate": debate_history,
+        "a2a_verdict": verdict_dict
+    }
+
 # Giữ lại các hàm cũ để tương thích ngược nếu module ngoài còn tham chiếu
 def extract_criteria_node(state: AgentState) -> Dict[str, Any]:
     return property_agent_node(state)
@@ -1041,6 +1102,7 @@ workflow.add_node("contract_audit", contract_audit_node)
 workflow.add_node("general_chat_response", general_chat_response_node)
 workflow.add_node("legal_advisory", legal_advisory_node)
 workflow.add_node("property_agent", property_agent_node)
+workflow.add_node("a2a_council", a2a_council_node)
 
 # Entry point vào Router Agent
 workflow.set_entry_point("route_intent")
@@ -1055,7 +1117,8 @@ workflow.add_conditional_edges(
         "contract_audit": "contract_audit",
         "general_chat_response": "general_chat_response",
         "legal_advisory": "legal_advisory",
-        "property_agent": "property_agent"
+        "property_agent": "property_agent",
+        "a2a_council": "a2a_council"
     }
 )
 
@@ -1065,6 +1128,7 @@ workflow.add_edge("contract_audit", END)
 workflow.add_edge("general_chat_response", END)
 workflow.add_edge("legal_advisory", END)
 workflow.add_edge("property_agent", END)
+workflow.add_edge("a2a_council", END)
 
 # Checkpointer lưu state bộ nhớ cho từng thread_id
 memory = MemorySaver()
