@@ -263,6 +263,7 @@ async def chat_stream(req: ChatRequest):
 
     config = {
         "configurable": {"thread_id": req.thread_id},
+        "recursion_limit": 50,
         "callbacks": callbacks,
         "metadata": {
             "thread_id": req.thread_id,
@@ -361,9 +362,9 @@ async def chat_stream(req: ChatRequest):
             if hitl_interrupt:
                 yield f"data: {json.dumps({'type': 'hitl_approval_request', 'data': hitl_interrupt})}\n\n"
 
-            # Gửi phản hồi văn bản của Bot
+            # Gửi phản hồi văn bản của Bot (nếu không có hitl_interrupt hiển thị thẻ xác nhận)
             messages = final_state.get("messages", [])
-            if messages:
+            if messages and not hitl_interrupt:
                 bot_text = messages[-1].content
                 # Stream giả lập từng cụm từ để frontend có hiệu ứng gõ mượt mà
                 chunk_size = 6
@@ -415,7 +416,10 @@ async def hitl_decision_stream(req: HITLDecisionRequest):
     request_id = f"req_hitl_{int(asyncio.get_event_loop().time() * 1000)}"
     TraceContext.set_context(request_id=request_id, thread_id=req.thread_id, workload_type="chat")
 
-    sub_config = {"configurable": {"thread_id": f"prop_sub_{req.thread_id}"}}
+    sub_config = {
+        "configurable": {"thread_id": f"prop_sub_{req.thread_id}"},
+        "recursion_limit": 50
+    }
 
     # Xây dựng decision payload theo cấu trúc của HumanInTheLoopMiddleware
     decision_payload = {"type": req.decision}
@@ -432,16 +436,60 @@ async def hitl_decision_stream(req: HITLDecisionRequest):
             yield f"data: {json.dumps({'type': 'status', 'stage': 'hitl_resuming', 'message': 'Đang ghi nhận quyết định và hoàn tất thủ tục...'})}\n\n"
             await asyncio.sleep(0.01)
 
-            # Resume property_agent với Command
-            cmd = Command(resume={"decisions": [decision_payload]})
-            agent_result = await asyncio.to_thread(property_agent.invoke, cmd, config=sub_config)
-            agent_messages = agent_result.get("messages", [])
+            # Kiểm tra trạng thái sub_state để xác định xem có interrupt chờ duyệt hay không
+            sub_state = property_agent.get_state(sub_config)
+            has_interrupt = False
+            pending_args = {}
+            if sub_state and sub_state.tasks:
+                for task in sub_state.tasks:
+                    interrupts = getattr(task, "interrupts", ())
+                    if interrupts:
+                        has_interrupt = True
+                        for intr in interrupts:
+                            intr_val = getattr(intr, "value", {})
+                            reqs = intr_val.get("action_requests", [])
+                            if reqs and reqs[0].get("args"):
+                                pending_args = reqs[0]["args"]
+                        break
 
             reply_text = ""
-            if agent_messages:
-                reply_text = agent_messages[-1].content
+            if has_interrupt:
+                # Có interrupt đang chờ -> Resume qua Command
+                cmd = Command(resume={"decisions": [decision_payload]})
+                agent_result = await asyncio.to_thread(property_agent.invoke, cmd, config=sub_config)
+                agent_messages = agent_result.get("messages", [])
+                if agent_messages:
+                    reply_text = agent_messages[-1].content
+                else:
+                    reply_text = "Đã xử lý xong phản hồi của bạn."
             else:
-                reply_text = "Đã xử lý xong phản hồi của bạn."
+                # Không còn interrupt trong bộ nhớ (ví dụ: phiên cũ sau khi restart backend hoặc bấm duyệt lại)
+                # Xử lý trực tiếp để tránh lỗi GraphRecursionError
+                effective_args = req.edited_args or pending_args
+                if req.decision == "reject":
+                    reply_text = "Dạ em đã ghi nhận và hủy yêu cầu đặt lịch xem nhà theo mong muốn của anh/chị ạ. Nếu anh/chị cần hỗ trợ thêm thông tin bất động sản nào khác tại Đà Nẵng, cứ nhắn em nhé!"
+                elif req.decision in ["approve", "edit"] and (effective_args.get("name") or effective_args.get("phone")):
+                    appt = appointment_service.create_appointment(
+                        user_id=req.user_id or "default_user",
+                        customer_name=effective_args.get("name", "Khách hàng"),
+                        customer_phone=effective_args.get("phone", ""),
+                        viewing_time=effective_args.get("viewing_time", "Theo thỏa thuận"),
+                        property_title=effective_args.get("property_title", ""),
+                        note=effective_args.get("note", "")
+                    )
+                    reply_text = (
+                        f"✅ ĐÃ ĐẶT LỊCH HẸN THÀNH CÔNG!\n"
+                        f"- Mã lịch hẹn: #{appt['id']}\n"
+                        f"- Khách hàng: {appt['customer_name']}\n"
+                        f"- Số điện thoại: {appt['customer_phone']}\n"
+                        f"- Thời gian xem nhà: {appt['viewing_time']}\n"
+                        f"- Bất động sản: {appt['property_title'] or 'Theo tư vấn trong chat'}\n"
+                        f"- Ghi chú: {appt['note'] or 'Không có'}\n"
+                        f"- Trạng thái: Đã xác nhận\n\n"
+                        f"Chuyên viên tư vấn sẽ liên hệ lại với anh/chị trước giờ hẹn để đón tiếp chu đáo nhất ạ!"
+                    )
+                else:
+                    reply_text = "Yêu cầu đặt lịch hẹn này đã được ghi nhận trước đó. Anh/chị có thể kiểm tra danh sách trong tab Lịch hẹn hoặc gửi tin nhắn mới để em hỗ trợ nhé!"
 
             chunk_size = 6
             for i in range(0, len(reply_text), chunk_size):
@@ -451,7 +499,15 @@ async def hitl_decision_stream(req: HITLDecisionRequest):
 
             yield "data: [DONE]\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            error_msg = str(e)
+            if "Recursion limit" in error_msg:
+                friendly_msg = (
+                    "Yêu cầu đặt lịch hẹn của anh/chị đã được ghi nhận hoặc phiên làm việc trước đó đã hoàn tất. "
+                    "Anh/chị có thể kiểm tra lịch hẹn đã lưu trong mục Quản lý lịch hẹn hoặc gửi tin nhắn mới để em hỗ trợ ạ."
+                )
+                yield f"data: {json.dumps({'type': 'token', 'content': friendly_msg})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

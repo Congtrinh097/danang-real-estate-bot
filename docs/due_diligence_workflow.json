@@ -1,0 +1,298 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Quy Trình Thẩm Định Chuyên Sâu BĐS Đà Nẵng (Due Diligence)",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "full-flow",
+        "label": "1. Toàn bộ Quy trình",
+        "focus": ["user", "api_gateway", "plan_node", "valuation_node", "critic_node", "synthesis_node", "dossier_stream"],
+        "note": "Luồng thẩm định chuyên sâu từ tiếp nhận, lập kế hoạch, phản biện và xuất hồ sơ dossier."
+      },
+      {
+        "id": "parallel-investigations",
+        "label": "2. Fan-Out Điều tra Đa chiều",
+        "focus": ["plan_node", "legal_node", "research_node", "valuation_node", "climate_node", "finance_node", "critic_node"],
+        "note": "5 nhánh điều tra độc lập: Pháp lý, Chủ đầu tư, Định giá thị trường, Ngập lụt hạ tầng, Tài chính dòng tiền."
+      },
+      {
+        "id": "adversarial-critic",
+        "label": "3. Phản biện Đối kháng",
+        "focus": ["legal_node", "valuation_node", "finance_node", "critic_node", "synthesis_node"],
+        "note": "Vai trò Devil's Advocate tìm kiếm mâu thuẫn, bẫy dòng tiền, pháp lý mù mờ và tạo lập luận đàm phán."
+      },
+      {
+        "id": "financial-legal",
+        "label": "4. Pháp lý & Mô phỏng Tài chính",
+        "focus": ["legal_node", "finance_node", "critic_node", "synthesis_node"],
+        "note": "RAG kiểm tra sổ đỏ/quy hoạch và mô phỏng dư nợ giảm dần, stress test +2% lãi suất."
+      },
+      {
+        "id": "async-streaming",
+        "label": "5. Tác vụ Nền & SSE Stream",
+        "focus": ["user", "api_gateway", "synthesis_node", "dossier_stream"],
+        "note": "Xử lý nền bất đồng bộ với Task Manager, Redis Pub/Sub và streaming tiến độ 0% -> 100%."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "client", "label": "Client & Web Gateway" },
+    { "id": "legal_lane", "label": "Pháp Lý & Sổ Đỏ (RAG)" },
+    { "id": "developer_lane", "label": "Chủ Đầu Tư & Dự Án (Deep Research)" },
+    { "id": "critic_synthesis", "label": "Hội Đồng Phản Biện & Dossier" },
+    { "id": "valuation_lane", "label": "Kế Hoạch & Định Giá Thị Trường" },
+    { "id": "climate_lane", "label": "Khí Hậu & Ngập Lụt Đà Nẵng" },
+    { "id": "finance_lane", "label": "Mô Phỏng Lãi Vay & Dòng Tiền" }
+  ],
+  "phases": [
+    { "id": "phase_intake", "label": "1. Tiếp nhận & Lập kế hoạch", "fromCol": 0, "toCol": 1 },
+    { "id": "phase_parallel", "label": "2. Điều tra Đa chiều Song song (Parallel Fan-Out)", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "phase_verdict", "label": "3. Phản biện & Ra Phán quyết (Fan-In Barrier)", "fromCol": 3, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "verdict_group", "label": "Hội đồng Thẩm định & Kết luận", "lane": "critic_synthesis", "fromCol": 3, "toCol": 4, "variant": "emphasis" }
+  ],
+  "mainPath": ["user", "api_gateway", "plan_node", "valuation_node", "critic_node", "synthesis_node", "dossier_stream"],
+  "nodes": [
+    {
+      "id": "user",
+      "lane": "client",
+      "col": 0,
+      "type": "external",
+      "label": "Nhà Đầu Tư",
+      "sublabel": "Gửi yêu cầu BĐS",
+      "width": 120
+    },
+    {
+      "id": "api_gateway",
+      "lane": "client",
+      "col": 1,
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "POST /due-diligence",
+      "brand": "fastapi",
+      "tag": "Task Manager & Redis",
+      "width": 135
+    },
+    {
+      "id": "plan_node",
+      "lane": "valuation_lane",
+      "col": 1,
+      "type": "backend",
+      "label": "Plan Investigation",
+      "sublabel": "plan_node",
+      "tag": "Phân rã 5 nhánh",
+      "width": 135
+    },
+    {
+      "id": "legal_node",
+      "lane": "legal_lane",
+      "col": 2,
+      "type": "security",
+      "label": "Legal Assessment",
+      "sublabel": "legal_node",
+      "tag": "RAG danang_legal_docs",
+      "width": 135
+    },
+    {
+      "id": "research_node",
+      "lane": "developer_lane",
+      "col": 2,
+      "type": "backend",
+      "label": "Deep Research",
+      "sublabel": "deep_research_node",
+      "tag": "Uy tín & Tranh chấp CĐT",
+      "width": 135
+    },
+    {
+      "id": "valuation_node",
+      "lane": "valuation_lane",
+      "col": 2,
+      "type": "database",
+      "label": "Market Valuation",
+      "sublabel": "valuation_node",
+      "tag": "Benchmark + Tavily live",
+      "width": 135
+    },
+    {
+      "id": "climate_node",
+      "lane": "climate_lane",
+      "col": 2,
+      "type": "backend",
+      "label": "Climate & Infra",
+      "sublabel": "climate_node",
+      "tag": "Ngập lụt & Tiện ích",
+      "width": 135
+    },
+    {
+      "id": "finance_node",
+      "lane": "finance_lane",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Financial Simulation",
+      "sublabel": "financial_node",
+      "tag": "Dư nợ giảm dần & DSCR",
+      "width": 135
+    },
+    {
+      "id": "critic_node",
+      "lane": "critic_synthesis",
+      "col": 3,
+      "type": "security",
+      "label": "Adversarial Critic",
+      "sublabel": "adversarial_critic",
+      "tag": "Devil's Advocate Bắt Lỗi",
+      "width": 140
+    },
+    {
+      "id": "synthesis_node",
+      "lane": "critic_synthesis",
+      "col": 4,
+      "type": "backend",
+      "label": "Synthesize Dossier",
+      "sublabel": "synthesize_dossier",
+      "tag": "Phán quyết 3 cấp độ",
+      "width": 135
+    },
+    {
+      "id": "dossier_stream",
+      "lane": "client",
+      "col": 5,
+      "type": "frontend",
+      "label": "Dossier Stream",
+      "sublabel": "Báo cáo & Thẻ thẩm định",
+      "brand": "react",
+      "tag": "Score 0-100 & Verdict",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_user_api",
+      "from": "user",
+      "to": "api_gateway",
+      "label": "thẩm định",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_api_plan",
+      "from": "api_gateway",
+      "to": "plan_node",
+      "label": "init task",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_plan_legal",
+      "from": "plan_node",
+      "to": "legal_node",
+      "label": "pháp lý",
+      "variant": "security"
+    },
+    {
+      "id": "edge_plan_research",
+      "from": "plan_node",
+      "to": "research_node",
+      "label": "chủ đầu tư",
+      "variant": "default"
+    },
+    {
+      "id": "edge_plan_valuation",
+      "from": "plan_node",
+      "to": "valuation_node",
+      "label": "định giá",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_plan_climate",
+      "from": "plan_node",
+      "to": "climate_node",
+      "label": "khí hậu",
+      "variant": "default"
+    },
+    {
+      "id": "edge_plan_finance",
+      "from": "plan_node",
+      "to": "finance_node",
+      "label": "tài chính",
+      "variant": "default"
+    },
+    {
+      "id": "edge_legal_critic",
+      "from": "legal_node",
+      "to": "critic_node",
+      "label": "rủi ro luật",
+      "variant": "security"
+    },
+    {
+      "id": "edge_research_critic",
+      "from": "research_node",
+      "to": "critic_node",
+      "label": "red flags",
+      "variant": "default"
+    },
+    {
+      "id": "edge_valuation_critic",
+      "from": "valuation_node",
+      "to": "critic_node",
+      "label": "lệch giá",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_climate_critic",
+      "from": "climate_node",
+      "to": "critic_node",
+      "label": "ngập lụt",
+      "variant": "default"
+    },
+    {
+      "id": "edge_finance_critic",
+      "from": "finance_node",
+      "to": "critic_node",
+      "label": "dòng tiền",
+      "variant": "default"
+    },
+    {
+      "id": "edge_critic_synthesis",
+      "from": "critic_node",
+      "to": "synthesis_node",
+      "label": "phản biện",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge_synthesis_stream",
+      "from": "synthesis_node",
+      "to": "dossier_stream",
+      "label": "dossier",
+      "variant": "emphasis",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Parallel Fan-Out & 5 Trụ Cột Điều Tra",
+      "items": [
+        "Tự động phân rã 5 luồng điều tra song song: Pháp lý (RAG danang_legal_docs), Định giá (Tavily live listings), Khí hậu (ngập lụt Đà Nẵng), Tài chính (lãi vay & DSCR) và Deep Research CĐT.",
+        "Khung thẩm định chuẩn hóa theo mục tiêu đầu tư: An cư (residential), Dòng tiền (rental_cashflow) hoặc Lãi vốn (capital_gain)."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Adversarial Critic (Devil's Advocate)",
+      "items": [
+        "Hội đồng phản biện đối kháng độc lập, rà soát toàn bộ kết quả từ 5 trụ cột để chỉ ra bẫy giá, rủi ro tiềm ẩn và số liệu quá lạc quan.",
+        "Tự động xuất danh sách các điểm đàm phán hành động (Actionable Negotiation Points) giúp người mua ép giá và phòng vệ hợp đồng."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Dossier Synthesis & 3 Cấp Phán Quyết",
+      "items": [
+        "Chấm điểm trọng số toàn diện (0-100 điểm) và ra phán quyết: STRONGLY_RECOMMENDED, PROCEED_WITH_CAUTION, hoặc HIGH_RISK_AVOID.",
+        "Quản lý tác vụ nền bất đồng bộ qua Redis Pub/Sub, stream tiến độ thời gian thực (0% -> 100%) và lưu trữ hồ sơ thẩm định chi tiết."
+      ]
+    }
+  ]
+}

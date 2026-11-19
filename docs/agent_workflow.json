@@ -6,10 +6,10 @@
     "quality_profile": "showcase",
     "views": [
       {
-        "id": "property-search",
-        "label": "1. Tìm kiếm BĐS",
-        "focus": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
-        "note": "Nhận diện nhu cầu thuê/mua nhà, bóc tách tiêu chí quận/giá/loại hình và tra cứu Qdrant."
+        "id": "property-flow",
+        "label": "1. Tìm kiếm & Đặt lịch BĐS",
+        "focus": ["user", "fastapi", "router", "property_agent", "hitl_gate", "sse_output"],
+        "note": "ReAct Agent tìm kiếm căn hộ, đề xuất danh sách và kích hoạt HITL khi khách hàng đặt lịch xem nhà."
       },
       {
         "id": "contract-audit",
@@ -25,7 +25,7 @@
       },
       {
         "id": "mortgage-calc",
-        "label": "4. Lãi Vay & So Sánh Ngân Hàng",
+        "label": "4. Lãi Vay & FastMCP",
         "focus": ["user", "fastapi", "router", "mortgage_calc", "sse_output"],
         "note": "ReAct Agent gọi FastMCP Client tính dư nợ giảm dần/niên kim và research so sánh lãi suất ngân hàng."
       },
@@ -33,7 +33,7 @@
         "id": "guardrail-safety",
         "label": "5. Guardrail & An toàn",
         "focus": ["user", "fastapi", "router", "guardrail_node", "general_chat", "sse_output"],
-        "note": "Chặn prompt injection/jailbreak, lịch sự từ chối câu hỏi ngoài Đà Nẵng và giao tiếp chào hỏi."
+        "note": "Chặn prompt injection/jailbreak, bảo mật PII, lịch sự từ chối câu hỏi ngoài Đà Nẵng và giao tiếp chào hỏi."
       }
     ]
   },
@@ -44,17 +44,17 @@
     { "id": "audit_pipeline", "label": "Contract Audit Engine" },
     { "id": "legal_pipeline", "label": "Legal Advisory RAG" },
     { "id": "tools_pipeline", "label": "Financial & Market Research (MCP)" },
-    { "id": "property_pipeline", "label": "Property Search Pipeline" }
+    { "id": "property_pipeline", "label": "Property ReAct Agent & HITL" }
   ],
   "phases": [
     { "id": "phase_intake", "label": "1. Tiếp nhận & Định tuyến", "fromCol": 0, "toCol": 2 },
-    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (Audit / RAG / MCP / Slot)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
-    { "id": "phase_output", "label": "3. Tổng hợp & Stream SSE", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+    { "id": "phase_processing", "label": "2. Xử lý Chuyên biệt (ReAct / RAG / MCP / Audit)", "fromCol": 3, "toCol": 4, "variant": "emphasis" },
+    { "id": "phase_output", "label": "3. Stream SSE & Phê duyệt HITL", "fromCol": 5, "toCol": 5, "variant": "dashed" }
   ],
   "groups": [
-    { "id": "property_flow_group", "label": "Tìm kiếm & Khớp căn", "lane": "property_pipeline", "fromCol": 3, "toCol": 5, "variant": "emphasis" }
+    { "id": "property_flow_group", "label": "ReAct Agent & HITL Booking", "lane": "property_pipeline", "fromCol": 3, "toCol": 4, "variant": "emphasis" }
   ],
-  "mainPath": ["user", "fastapi", "router", "extract_criteria", "search_props", "generate_resp", "sse_output"],
+  "mainPath": ["user", "fastapi", "router", "property_agent", "hitl_gate", "sse_output"],
   "nodes": [
     {
       "id": "user",
@@ -63,7 +63,7 @@
       "type": "external",
       "label": "Khách hàng",
       "sublabel": "Giao diện React",
-      "width": 115
+      "width": 120
     },
     {
       "id": "fastapi",
@@ -73,7 +73,8 @@
       "label": "FastAPI",
       "sublabel": "POST /chat/stream",
       "brand": "fastapi",
-      "width": 120
+      "tag": "AgentOps Tracing",
+      "width": 135
     },
     {
       "id": "router",
@@ -83,7 +84,7 @@
       "label": "Router Agent",
       "sublabel": "route_intent_node",
       "tag": "7 Phân loại ý định",
-      "width": 120
+      "width": 125
     },
     {
       "id": "guardrail_node",
@@ -93,7 +94,7 @@
       "label": "Guardrail Node",
       "sublabel": "out_of_scope_response",
       "tag": "Chặn lệch phạm vi",
-      "width": 120
+      "width": 125
     },
     {
       "id": "general_chat",
@@ -103,7 +104,7 @@
       "label": "General Chat",
       "sublabel": "general_chat_response",
       "tag": "Chào hỏi xã giao",
-      "width": 120
+      "width": 125
     },
     {
       "id": "contract_audit",
@@ -112,8 +113,8 @@
       "type": "backend",
       "label": "Contract Audit",
       "sublabel": "contract_audit_node",
-      "tag": "Thẩm định bẫy cọc BĐS",
-      "width": 120
+      "tag": "Thẩm định bẫy cọc 5%",
+      "width": 125
     },
     {
       "id": "legal_advisory",
@@ -123,7 +124,7 @@
       "label": "Legal Advisory",
       "sublabel": "legal_advisory_node",
       "tag": "RAG danang_legal_docs",
-      "width": 120
+      "width": 125
     },
     {
       "id": "mortgage_calc",
@@ -133,37 +134,27 @@
       "label": "Mortgage & Research",
       "sublabel": "ReAct Agent + FastMCP",
       "tag": "Lãi vay & So sánh Bank",
-      "width": 125
+      "width": 130
     },
     {
-      "id": "extract_criteria",
+      "id": "property_agent",
       "lane": "property_pipeline",
       "col": 3,
       "type": "backend",
-      "label": "Extract Criteria",
-      "sublabel": "extract_criteria_node",
-      "tag": "Slot Extractor",
-      "width": 120
+      "label": "Property ReAct Agent",
+      "sublabel": "property_agent_node",
+      "tag": "Search + Appointment Tools",
+      "width": 135
     },
     {
-      "id": "search_props",
+      "id": "hitl_gate",
       "lane": "property_pipeline",
       "col": 4,
-      "type": "database",
-      "label": "Search Qdrant",
-      "sublabel": "danang_properties",
-      "tag": "Vector & Metadata",
-      "width": 120
-    },
-    {
-      "id": "generate_resp",
-      "lane": "property_pipeline",
-      "col": 5,
-      "type": "backend",
-      "label": "Generate Response",
-      "sublabel": "generate_response_node",
-      "tag": "Gợi ý BĐS & Đặt lịch",
-      "width": 120
+      "type": "security",
+      "label": "HITL Approval Gate",
+      "sublabel": "HumanInTheLoopMiddleware",
+      "tag": "Xác nhận lịch xem nhà",
+      "width": 135
     },
     {
       "id": "sse_output",
@@ -171,10 +162,10 @@
       "col": 5,
       "type": "frontend",
       "label": "SSE Stream",
-      "sublabel": "Cards + Citations + Audit",
+      "sublabel": "Cards + Citations + Tokens",
       "brand": "react",
-      "tag": "Thinking & Tokens",
-      "width": 130
+      "tag": "HITL Prompt & Updates",
+      "width": 135
     }
   ],
   "edges": [
@@ -228,25 +219,34 @@
       "variant": "default"
     },
     {
-      "id": "edge_router_search",
+      "id": "edge_router_property",
       "from": "router",
-      "to": "extract_criteria",
+      "to": "property_agent",
       "label": "search_property",
       "variant": "emphasis"
     },
     {
-      "id": "edge_extract_search",
-      "from": "extract_criteria",
-      "to": "search_props",
-      "label": "filter slot",
-      "variant": "emphasis"
+      "id": "edge_property_hitl",
+      "from": "property_agent",
+      "to": "hitl_gate",
+      "label": "đặt lịch hẹn",
+      "variant": "security"
     },
     {
-      "id": "edge_search_gen",
-      "from": "search_props",
-      "to": "generate_resp",
-      "label": "top BĐS",
-      "variant": "emphasis"
+      "id": "edge_hitl_stream",
+      "from": "hitl_gate",
+      "to": "sse_output",
+      "label": "yêu cầu phê duyệt",
+      "variant": "security",
+      "role": "return"
+    },
+    {
+      "id": "edge_property_stream",
+      "from": "property_agent",
+      "to": "sse_output",
+      "label": "cards & tư vấn",
+      "variant": "emphasis",
+      "role": "return"
     },
     {
       "id": "edge_guardrail_stream",
@@ -284,42 +284,34 @@
       "id": "edge_mortgage_stream",
       "from": "mortgage_calc",
       "to": "sse_output",
-      "label": "lịch trả & so sánh bank",
+      "label": "lịch trả & lãi bank",
       "variant": "default",
-      "role": "return"
-    },
-    {
-      "id": "edge_gen_stream",
-      "from": "generate_resp",
-      "to": "sse_output",
-      "label": "cards & text",
-      "variant": "emphasis",
       "role": "return"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Điều Phối Đa Ý Định (7 Intents) & Guardrail",
+      "title": "Router Agent (7 Intents) & Guardrails An Toàn",
       "items": [
         "Router Agent phân loại 7 ý định: search_property, contract_audit, legal_consultation, mortgage_calculation, general_chat, out_of_scope, rule_violation.",
-        "Input Guardrail chặn đứng prompt injection, jailbreak và lịch sự từ chối các câu hỏi ngoài phạm vi Đà Nẵng."
+        "ModelCallGuard kiểm soát ngân sách token (AgentOps) và PIIMiddleware ngăn chặn rò rỉ API key/thông tin nhạy cảm."
       ]
     },
     {
       "dot": "emerald",
-      "title": "Dual Collection Qdrant RAG & Thẩm Định Hợp Đồng",
+      "title": "Property ReAct Agent & Human-in-the-Loop (HITL)",
       "items": [
-        "Tra cứu song song collection danang_properties (nhà đất) và danang_legal_docs (văn bản quy phạm pháp luật đã OCR bằng Docling).",
-        "Contract Auditor tự động rà soát bẫy đặt cọc (trần cọc 5%), phạt cọc một chiều, chấm điểm an toàn và trích dẫn điều luật [1], [2]."
+        "Hợp nhất bóc tách tiêu chí, truy vấn Hybrid Qdrant danang_properties và bộ công cụ đặt/hủy lịch hẹn xem nhà.",
+        "HumanInTheLoopMiddleware tự động ngắt quy trình khi đặt lịch xem thực tế, yêu cầu người dùng xác nhận phê duyệt qua /chat/hitl-decision."
       ]
     },
     {
       "dot": "amber",
-      "title": "FastMCP Financial & Bank Research Engine",
+      "title": "RAG Pháp Lý, Thẩm Định Hợp Đồng & FastMCP Tài Chính",
       "items": [
-        "ReAct Agent tích hợp FastMCP Client hỗ trợ tính lịch trả góp dư nợ giảm dần hoặc niên kim cố định.",
-        "Tool research thị trường cập nhật biểu lãi suất nhóm Big 4 & NHTMCP, tính lãi suất bình quân cả kỳ và gợi ý ngân hàng tối ưu."
+        "Legal Advisory RAG đối chiếu văn bản luật đã OCR (Docling) và Contract Auditor bắt lỗi vi phạm trần cọc 5% theo Luật Kinh doanh BĐS 2023.",
+        "Mortgage MCP Client kết nối FastMCP server tính lịch trả nợ linh hoạt và Tavily research biểu lãi suất Big 4 & NHTMCP."
       ]
     }
   ]

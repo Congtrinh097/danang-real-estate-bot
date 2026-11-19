@@ -794,7 +794,7 @@ export default function App() {
                   type="button"
                   className="btn-hitl-approve"
                   disabled={loading}
-                  onClick={() => handleHITLDecision("approve")}
+                  onClick={() => handleHITLDecision("approve", msg.hitlRequest.action_requests?.[0]?.args)}
                 >
                   <Check size={16} /> Xác nhận & Đặt lịch ngay
                 </button>

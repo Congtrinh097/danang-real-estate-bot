@@ -1,5 +1,6 @@
 from typing import Annotated, Sequence, TypedDict, Optional, List, Dict, Any, Literal
 import json
+import re
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
@@ -293,7 +294,10 @@ def create_property_search_agent(model: ChatOpenAI):
         "     3. Thời gian hẹn cụ thể (viewing_time, ví dụ: '15:00 chiều mai', '10h sáng thứ Bảy')\n"
         "     4. Tên căn nhà / BĐS muốn xem (property_title): Hãy trích xuất từ tên dự án / BĐS mà khách hoặc trợ lý đã trao đổi trước đó (ví dụ: 'Căn hộ Monarchy Sơn Trà', 'Dự án Monarchy Sơn Trà') nếu khách không nêu lại trong tin nhắn hiện tại.\n"
         "   - Nếu thiếu tên, số điện thoại hoặc giờ hẹn: Hãy hỏi khéo léo để khách bổ sung.\n"
-        "   - KHI ĐÃ CÓ TÊN, SỐ ĐIỆN THOẠI VÀ GIỜ HẸN (kèm tên BĐS từ ngữ cảnh): BẮT BUỘC GỌI NGAY tool 'book_viewing_appointment' (note có thể để trống ''), KHÔNG ĐƯỢC tự ý trả lời bằng lời hứa suông hay cảm ơn mà không gọi tool! Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để hiển thị thẻ xác nhận cho khách hàng duyệt.\n"
+        "   - KHI ĐÃ CÓ TÊN, SỐ ĐIỆN THOẠI VÀ GIỜ HẸN (kèm tên BĐS từ ngữ cảnh):\n"
+        "     + BẮT BUỘC GỌI NGAY tool 'book_viewing_appointment' LẬP TỨC (note có thể để trống '')!\n"
+        "     + TUYỆT ĐỐI KHÔNG ĐƯỢC trả lời cảm ơn suông dạng văn bản (ví dụ: 'Cảm ơn bạn đã cung cấp thông tin! Tôi sẽ đặt lịch...' hoặc 'Cảm ơn bạn...').\n"
+        "     + TUYỆT ĐỐI KHÔNG chúc tụng hay hứa hẹn bằng lời trước khi gọi tool. Hệ thống sẽ tự động kích hoạt cơ chế Human-In-The-Loop để hiển thị thẻ xác nhận trực quan cho khách hàng duyệt.\n"
         "3. QUẢN LÝ LỊCH HẸN ĐÃ ĐẶT:\n"
         "   - Khi khách hỏi lại lịch hẹn ('Tôi có lịch hẹn nào không?', 'Xem lại lịch đã đặt', 'Kiểm tra giúp tôi các lịch hẹn'): Gọi ngay tool 'get_user_appointments'. Lưu ý: Mặc định tool chỉ trả về các lịch hẹn còn hiệu lực (status='confirmed') và BẮT BUỘC KHÔNG trả về các lịch đã hủy trừ khi khách hàng hỏi đích danh về các lịch đã hủy.\n"
         "   - Khi khách muốn dời giờ, đổi ngày, sửa ghi chú: Hỏi mã lịch hẹn hoặc căn nhà, rồi gọi tool 'update_appointment'.\n"
@@ -420,7 +424,7 @@ router_prompt = ChatPromptTemplate.from_messages([
     ("system",
      "Bạn là chuyên gia điều phối luồng trò chuyện kiêm kiểm soát an toàn và phạm vi (Input Guardrails) cho trợ lý ảo Bất động sản Đà Nẵng.\n"
      "Nhiệm vụ: Phân loại ý định của người dùng dựa trên tin nhắn gần nhất và lịch sử hội thoại thành 1 trong 7 loại sau:\n"
-     "1. 'search_property': người dùng muốn tìm kiếm, xem, hỏi MUA BÁN, CHUYỂN NHƯỢNG nhà, căn hộ, đất đai, villa cụ thể TẠI ĐÀ NẴNG (LƯU Ý: Nếu người dùng hỏi THUÊ phòng trọ, thuê căn hộ, thuê nhà đất thì PHẢI phân loại vào 'out_of_scope' vì hệ thống không hỗ trợ thuê).\n"
+     "1. 'search_property': người dùng muốn tìm kiếm, xem, hỏi MUA BÁN, CHUYỂN NHƯỢNG nhà, căn hộ, đất đai, villa cụ thể TẠI ĐÀ NẴNG; hoặc người dùng muốn ĐẶT LỊCH HẸN XEM NHÀ, cung cấp thông tin liên hệ (họ tên, số điện thoại, thời gian hẹn) để đi xem nhà/BĐS, hoặc kiểm tra/hủy/đổi lịch hẹn đã đặt (LƯU Ý: Nếu người dùng hỏi THUÊ phòng trọ, thuê căn hộ, thuê nhà đất thì PHẢI phân loại vào 'out_of_scope' vì hệ thống không hỗ trợ thuê).\n"
      "2. 'legal_consultation': người dùng hỏi về pháp lý nhà đất, quy định pháp luật, thủ tục sang tên, sổ đỏ/sổ hồng, tranh chấp, quyền sở hữu của người nước ngoài, thuế phí mua bán.\n"
      "3. 'mortgage_calculation': người dùng muốn tính lãi vay ngân hàng, hỏi tiền trả góp hàng tháng, bảng tính dư nợ gốc lãi, hỏi vay 70%, 80% trong bao nhiêu năm trả bao nhiêu, so sánh gói vay ngân hàng nào tốt hơn hoặc tối ưu tiền lãi nhất.\n"
      "4. 'contract_audit': người dùng gửi nội dung hợp đồng, điều khoản đặt cọc hoặc yêu cầu rà soát, thẩm định hợp đồng đặt cọc/mua bán BĐS, kiểm tra bẫy phạt cọc, vi phạm trần cọc 5% hoặc điều khoản bất lợi.\n"
@@ -595,13 +599,21 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         "kê đơn thuốc", "chữa đau dạ dày", "crypto", "bitcoin"
     ]
 
-    # Pre-check nhanh cho yêu cầu đặt lịch, tra cứu lịch hẹn xem nhà
+    # Pre-check nhanh cho yêu cầu đặt lịch, tra cứu lịch hẹn xem nhà hoặc người dùng cung cấp thông tin liên hệ đặt lịch
     appointment_triggers = [
         "đặt lịch", "lịch hẹn", "hẹn xem nhà", "hẹn đi xem", "xem thực tế",
         "hỏi lại lịch", "xem lịch", "lịch đã hẹn", "hủy lịch", "đổi lịch", "dời lịch",
         "kiểm tra lịch", "kiểm tra các lịch", "kiểm tra giúp tôi các lịch hẹn"
     ]
-    if any(tr in text_lower for tr in appointment_triggers):
+    has_phone_number = bool(re.search(r'(?:\+?84|0|\b)\d{8,11}\b', last_user_message))
+    has_time_or_contact = any(w in text_lower for w in ["mai", "sáng", "chiều", "tối", "hôm nay", "thứ", "giờ", "h", "sđt", "sdt", "số điện thoại", "điện thoại", "zalo", "tên"])
+    bot_asked_appointment = False
+    if len(sanitized_messages) >= 2:
+        last_bot_content = sanitized_messages[-2].content.lower()
+        if any(k in last_bot_content for k in ["đặt lịch", "lịch hẹn", "xem nhà", "thời gian", "số điện thoại", "sđt", "họ tên", "họ và tên", "liên hệ", "xem thực tế"]):
+            bot_asked_appointment = True
+
+    if any(tr in text_lower for tr in appointment_triggers) or (has_phone_number and (has_time_or_contact or bot_asked_appointment)):
         return make_result("search_property")
 
     # Pre-check nhanh cho yêu cầu rà soát / thẩm định hợp đồng
@@ -688,7 +700,10 @@ def mortgage_calc_node(state: AgentState) -> Dict[str, Any]:
         # 1. Ủy thác câu hỏi cho Mortgage ReAct Agent (được tạo bởi create_agent + langchain-mcp-adapters)
         # Agent tự động thực hiện vòng lặp ReAct: suy luận -> gọi tool MCP -> nhận kết quả -> trả lời
         cleaned_mortgage_msgs = sanitize_messages_for_react_agent(all_messages, max_messages=4)
-        agent_result = mortgage_agent.invoke({"messages": cleaned_mortgage_msgs})
+        agent_result = mortgage_agent.invoke(
+            {"messages": cleaned_mortgage_msgs},
+            config={"recursion_limit": 50}
+        )
         agent_messages = agent_result.get("messages", [])
         if agent_messages:
             reply = agent_messages[-1]
@@ -897,7 +912,10 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
     thread_id = None
     if config and isinstance(config, dict):
         thread_id = config.get("configurable", {}).get("thread_id")
-    agent_config = {"configurable": {"thread_id": f"prop_sub_{thread_id or 'default'}"}}
+    agent_config = {
+        "configurable": {"thread_id": f"prop_sub_{thread_id or 'default'}"},
+        "recursion_limit": 50
+    }
 
     try:
         # Làm sạch lát cắt tin nhắn trước khi truyền vào Sub-Agent ReAct

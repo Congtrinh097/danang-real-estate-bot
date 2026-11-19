@@ -25,7 +25,7 @@ class UserWalletService:
             # 1. Khởi tạo wallet nếu chưa tồn tại
             cur.execute("""
                 INSERT INTO user_wallets (user_id, balance_vnd, daily_free_limit_vnd, user_group)
-                VALUES (%s, 0.00, 5000.00, 'standard')
+                VALUES (%s, 0.00, NULL, 'standard')
                 ON CONFLICT (user_id) DO NOTHING;
             """, (user_id,))
 
@@ -42,7 +42,7 @@ class UserWalletService:
                 SELECT 
                     w.user_id, 
                     w.balance_vnd, 
-                    COALESCE(g.daily_free_limit_vnd, w.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd,
+                    COALESCE(w.daily_free_limit_vnd, g.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd,
                     COALESCE(w.user_group, 'standard') AS user_group,
                     COALESCE(g.group_name, 'Người dùng thường') AS group_name,
                     w.total_deposited_vnd, 
@@ -294,7 +294,7 @@ class UserWalletService:
                     w.balance_vnd, 
                     COALESCE(w.user_group, 'standard') AS user_group,
                     COALESCE(g.group_name, 'Người dùng thường') AS group_name,
-                    COALESCE(g.daily_free_limit_vnd, w.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd, 
+                    COALESCE(w.daily_free_limit_vnd, g.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd, 
                     w.total_deposited_vnd, 
                     w.total_spent_vnd,
                     COALESCE(u.free_spent_vnd, 0.0) AS daily_free_spent_vnd,
@@ -477,6 +477,7 @@ class UserWalletService:
             cur.execute("""
                 UPDATE user_wallets
                 SET user_group = %s,
+                    daily_free_limit_vnd = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = %s;
             """, (code, user_id))

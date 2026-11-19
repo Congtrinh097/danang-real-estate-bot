@@ -133,6 +133,8 @@ export default function DueDiligenceModal({
   const [objective, setObjective] = useState("residential");
   const [equityRatio, setEquityRatio] = useState(0.7);
   const [isConfigCollapsed, setIsConfigCollapsed] = useState(false);
+  const [enableDeepResearch, setEnableDeepResearch] = useState(false);
+  const [developerName, setDeveloperName] = useState("");
 
   // Execution & Stream State
   const [taskId, setTaskId] = useState(null);
@@ -255,7 +257,9 @@ export default function DueDiligenceModal({
           equity_ratio: equityRatio,
           equity_capital_vnd: equityCapital,
           loan_amount_vnd: loanAmount,
-          user_id: userId
+          user_id: userId,
+          enable_deep_research: enableDeepResearch,
+          developer_name: developerName.trim() || undefined
         })
       });
 
@@ -775,6 +779,12 @@ export default function DueDiligenceModal({
     </div>
   </div>
 
+  ${dossier.deep_research ? `
+  <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:7px 12px; margin-top:8px; font-size:10.5px;">
+    <strong>🕵️ Deep Research Tín nhiệm Chủ đầu tư:</strong> ${dossier.deep_research.target_entity} — Điểm tín nhiệm: <strong>${dossier.deep_research.reputation_score}/100</strong> (${dossier.deep_research.community_sentiment?.toUpperCase()}).
+  </div>
+  ` : ""}
+
   <div style="font-size:13px; font-weight:700; color:#1e3a8a; border-bottom:1.5px solid #2563eb; padding-bottom:4px; margin:14px 0 8px 0;">
     Báo Cáo Thẩm Định Chi Tiết
   </div>
@@ -1019,6 +1029,47 @@ export default function DueDiligenceModal({
                       <span>8.5%/năm • 20 năm</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Deep Research Toggle Card */}
+                <div className="dd-deep-research-toggle-card">
+                  <div className="dd-deep-research-header">
+                    <label className="dd-toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={enableDeepResearch}
+                        disabled={isAnalyzing}
+                        onChange={(e) => setEnableDeepResearch(e.target.checked)}
+                      />
+                      <span className="dd-toggle-slider"></span>
+                    </label>
+                    <div className="dd-toggle-info">
+                      <div className="dd-toggle-title">
+                        <Search size={15} style={{ color: "#2563eb" }} />
+                        <span>Kích hoạt Deep Research (Điều tra sâu chủ đầu tư & lịch sử tranh chấp)</span>
+                        <span className="dd-pill-hybrid">Hybrid Deep Agent</span>
+                      </div>
+                      <p className="dd-toggle-desc">
+                        Tác tử tự trị sẽ quét sâu báo chí, cổng pháp lý và diễn đàn để phát hiện rủi ro chậm cấp sổ đỏ, khiếu nại cư dân hoặc thế chấp ngân hàng.
+                      </p>
+                    </div>
+                  </div>
+
+                  {enableDeepResearch && (
+                    <div className="dd-deep-research-inputs">
+                      <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>
+                        Tên Chủ đầu tư / Dự án cần điều tra:
+                      </label>
+                      <input
+                        type="text"
+                        className="dd-input-text"
+                        placeholder="VD: Sun Group, FPT City, Đất Xanh Miền Trung, The Royal..."
+                        value={developerName}
+                        disabled={isAnalyzing}
+                        onChange={(e) => setDeveloperName(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Start Button */}
@@ -1322,6 +1373,19 @@ export default function DueDiligenceModal({
                   <Flame size={14} />
                   <span>Phản biện rủi ro</span>
                 </button>
+
+                {dossier?.deep_research && (
+                  <button
+                    type="button"
+                    className={`dd-tab-btn ${activeTab === "deep_research" ? "active" : ""}`}
+                    onClick={() => setActiveTab("deep_research")}
+                    style={{ borderColor: "#38bdf8" }}
+                  >
+                    <Search size={14} style={{ color: "#0284c7" }} />
+                    <span style={{ fontWeight: 600 }}>Deep Research</span>
+                    <span className="dd-pill-hybrid-badge">AI</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -1705,6 +1769,100 @@ export default function DueDiligenceModal({
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Tab: Deep Developer & Dispute Investigation (Deep Research) */}
+              {activeTab === "deep_research" && dossier.deep_research && (
+                <div className="dd-tab-pane">
+                  <div className="dd-dr-overview-card">
+                    <div className="dd-dr-header">
+                      <div>
+                        <div className="dd-dr-target-title">
+                          <Search size={18} style={{ color: "#0284c7" }} />
+                          <span>Đối tượng điều tra: {dossier.deep_research.target_entity}</span>
+                        </div>
+                        {dossier.deep_research.developer_name && (
+                          <div className="dd-dr-dev-sub">
+                            Chủ đầu tư / Đơn vị phát triển: <b>{dossier.deep_research.developer_name}</b>
+                          </div>
+                        )}
+                      </div>
+                      <div className="dd-dr-score-badge">
+                        <div className="dd-dr-score-num">{dossier.deep_research.reputation_score}</div>
+                        <div className="dd-dr-score-label">Điểm tín nhiệm / 100</div>
+                      </div>
+                    </div>
+
+                    <div className="dd-dr-summary-box">
+                      <p><b>Tóm tắt năng lực bàn giao & lịch sử:</b> {dossier.deep_research.track_record_summary}</p>
+                      <div className="dd-dr-sentiment-tag">
+                        Đánh giá cộng đồng: <span className={`dd-sentiment-${dossier.deep_research.community_sentiment}`}>
+                          {dossier.deep_research.community_sentiment?.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Red Flags Alert */}
+                  {dossier.deep_research.red_flags && dossier.deep_research.red_flags.length > 0 && (
+                    <div className="dd-dr-section dd-dr-red-flags">
+                      <div className="dd-dr-section-title" style={{ color: "#b91c1c" }}>
+                        <ShieldAlert size={16} />
+                        <span>Cảnh báo rủi ro đỏ (Red Flags):</span>
+                      </div>
+                      <div className="dd-dr-list">
+                        {dossier.deep_research.red_flags.map((flag, idx) => (
+                          <div key={idx} className="dd-dr-item dd-dr-flag-item">
+                            <AlertTriangle size={15} style={{ color: "#ef4444", flexShrink: 0, marginTop: "2px" }} />
+                            <span>{flag}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dispute History */}
+                  {dossier.deep_research.dispute_history && dossier.deep_research.dispute_history.length > 0 && (
+                    <div className="dd-dr-section dd-dr-disputes">
+                      <div className="dd-dr-section-title" style={{ color: "#c2410c" }}>
+                        <Scale size={16} />
+                        <span>Tiền sử tranh chấp & Khiếu nại pháp lý:</span>
+                      </div>
+                      <div className="dd-dr-list">
+                        {dossier.deep_research.dispute_history.map((disp, idx) => (
+                          <div key={idx} className="dd-dr-item dd-dr-dispute-item">
+                            <span className="dd-bullet-orange">•</span>
+                            <span>{disp}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sources Analyzed */}
+                  {dossier.deep_research.sources_analyzed && dossier.deep_research.sources_analyzed.length > 0 && (
+                    <div className="dd-dr-section">
+                      <div className="dd-dr-section-title" style={{ color: "#334155" }}>
+                        <Globe size={16} />
+                        <span>Nguồn tin & Cổng pháp lý đã rà soát ({dossier.deep_research.sources_analyzed.length} nguồn):</span>
+                      </div>
+                      <div className="dd-dr-sources-grid">
+                        {dossier.deep_research.sources_analyzed.map((src, idx) => (
+                          <a
+                            key={idx}
+                            href={src.url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="dd-dr-source-card"
+                          >
+                            <span className="dd-dr-source-title">{src.title || "Tin bài rà soát"}</span>
+                            <ExternalLink size={12} style={{ color: "#94a3b8" }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
