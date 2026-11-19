@@ -406,3 +406,37 @@ def council_synthesizer_node(state: A2ACouncilState) -> Dict[str, Any]:
         "verdict": verdict,
         "debate_history": [turn]
     }
+
+
+from langgraph.graph import StateGraph, START, END
+
+def create_a2a_council_graph():
+    """Xây dựng và biên dịch đồ thị A2A Council StateGraph"""
+    builder = StateGraph(A2ACouncilState)
+    builder.add_node("planner", council_planner_node)
+    builder.add_node("property_expert", council_property_node)
+    builder.add_node("financial_analyst", council_mortgage_node)
+    builder.add_node("legal_advisor", council_legal_node)
+    builder.add_node("adversarial_critic", council_critic_node)
+    builder.add_node("synthesizer", council_synthesizer_node)
+
+    # START -> planner
+    builder.add_edge(START, "planner")
+
+    # Planner -> 3 chuyên gia song song (Parallel Fan-out)
+    builder.add_edge("planner", "property_expert")
+    builder.add_edge("planner", "financial_analyst")
+    builder.add_edge("planner", "legal_advisor")
+
+    # 3 chuyên gia -> Adversarial Critic (Fan-in)
+    builder.add_edge("property_expert", "adversarial_critic")
+    builder.add_edge("financial_analyst", "adversarial_critic")
+    builder.add_edge("legal_advisor", "adversarial_critic")
+
+    # Critic -> Synthesizer -> END
+    builder.add_edge("adversarial_critic", "synthesizer")
+    builder.add_edge("synthesizer", END)
+
+    return builder.compile()
+
+a2a_council_graph = create_a2a_council_graph()

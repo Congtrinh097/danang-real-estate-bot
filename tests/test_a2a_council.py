@@ -110,3 +110,31 @@ def test_council_specialist_and_critic_nodes():
     assert synth_res["verdict"].feasibility_score >= 0
     assert len(synth_res["debate_history"]) == 1
     assert synth_res["debate_history"][0].speaker == CouncilSpeaker.SYNTHESIZER
+
+
+from a2a_council import a2a_council_graph
+
+def test_a2a_council_graph_execution():
+    query = "Tôi có 1 tỷ, muốn mua căn 2.5 tỷ tại Hải Châu để cho thuê. Xin ý kiến hội đồng."
+    initial_state = {
+        "messages": [HumanMessage(content=query)],
+        "user_query": query,
+        "equity_capital": 0.0,
+        "target_price": 0.0,
+        "target_district": "",
+        "property_findings": [],
+        "mortgage_analysis": {},
+        "legal_citations": [],
+        "debate_history": [],
+        "verdict": None
+    }
+    result = a2a_council_graph.invoke(initial_state, config={"recursion_limit": 50})
+    assert result["verdict"] is not None
+    assert result["verdict"].feasibility_score >= 0
+    # Đã có đủ ít nhất 5 phát biểu từ các chuyên gia
+    speakers = [turn.speaker for turn in result["debate_history"]]
+    assert CouncilSpeaker.PLANNER in speakers
+    assert CouncilSpeaker.PROPERTY_EXPERT in speakers
+    assert CouncilSpeaker.FINANCIAL_ANALYST in speakers
+    assert CouncilSpeaker.CRITIC in speakers
+    assert CouncilSpeaker.SYNTHESIZER in speakers
