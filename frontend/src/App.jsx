@@ -32,7 +32,10 @@ import {
   BarChart3,
   DollarSign,
   Wallet,
-  CreditCard
+  CreditCard,
+  ShieldAlert,
+  Users,
+  Landmark
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
 import TopupModal from "./components/TopupModal";
@@ -357,6 +360,8 @@ export default function App() {
       text: "",
       properties: [],
       citations: [],
+      a2aDebate: [],
+      a2aVerdict: null,
       isThinking: true,
       thinkingStatus: "Đang phân tích yêu cầu...",
       thinkingHistory: ["Đang phân tích yêu cầu..."]
@@ -417,6 +422,12 @@ export default function App() {
               } else if (data.type === "hitl_approval_request") {
                 botMsg.hitlRequest = data.data;
                 botMsg.isThinking = false;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "a2a_debate") {
+                botMsg.a2aDebate = data.data;
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+              } else if (data.type === "a2a_verdict") {
+                botMsg.a2aVerdict = data.data;
                 updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
               } else if (data.type === "budget_update") {
                 if (data.data) {
@@ -811,6 +822,92 @@ export default function App() {
           </div>
         )}
 
+        {/* Khối hiển thị Hội đồng A2A War Room (Debate turns & Verdict) */}
+        {(msg.a2aDebate?.length > 0 || msg.a2aVerdict) && (
+          <div className="a2a-war-room-container">
+            <div className="a2a-war-room-header">
+              <div className="a2a-title-wrap">
+                <Users size={18} className="a2a-war-room-icon" />
+                <h4>Hội đồng A2A War Room Thẩm định & Phản biện</h4>
+              </div>
+              <span className="a2a-live-badge">Đa Tác tử Đồng thuận</span>
+            </div>
+
+            {/* Danh sách các phát biểu của chuyên gia */}
+            {msg.a2aDebate?.length > 0 && (
+              <div className="a2a-debate-list">
+                {msg.a2aDebate.map((turn, tIdx) => {
+                  const speakerMeta = {
+                    planner: { label: "Điều phối Hội đồng", icon: <Sparkles size={14} />, badgeClass: "speaker-planner" },
+                    property_expert: { label: "Chuyên viên BĐS Đà Nẵng", icon: <Building2 size={14} />, badgeClass: "speaker-property" },
+                    financial_analyst: { label: "Chuyên gia Tín dụng & Dòng tiền", icon: <Landmark size={14} />, badgeClass: "speaker-finance" },
+                    legal_advisor: { label: "Cố vấn Pháp lý BĐS", icon: <Scale size={14} />, badgeClass: "speaker-legal" },
+                    adversarial_critic: { label: "Tác tử Phản biện Rủi ro", icon: <ShieldAlert size={14} />, badgeClass: "speaker-critic" },
+                    council_synthesizer: { label: "Nghị Quyết Hội Đồng", icon: <CheckCircle2 size={14} />, badgeClass: "speaker-synthesizer" }
+                  }[turn.speaker] || { label: turn.speaker, icon: <Activity size={14} />, badgeClass: "speaker-default" };
+
+                  return (
+                    <div key={tIdx} className={`a2a-debate-turn ${speakerMeta.badgeClass}-border`}>
+                      <div className="a2a-turn-header">
+                        <span className={`a2a-speaker-tag ${speakerMeta.badgeClass}`}>
+                          {speakerMeta.icon}
+                          {speakerMeta.label}
+                        </span>
+                        <span className="a2a-turn-title">{turn.title}</span>
+                      </div>
+                      <p className="a2a-turn-content">{turn.content}</p>
+                      {turn.key_points?.length > 0 && (
+                        <div className="a2a-key-points">
+                          {turn.key_points.map((kp, kIdx) => (
+                            <span key={kIdx} className="a2a-kp-pill">• {kp}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Thẻ Nghị Quyết Hội Đồng (Council Verdict Card) */}
+            {msg.a2aVerdict && (
+              <div className={`a2a-verdict-card status-${msg.a2aVerdict.overall_feasibility}`}>
+                <div className="a2a-verdict-top">
+                  <div className="a2a-verdict-score-box">
+                    <span className="a2a-score-val">{msg.a2aVerdict.feasibility_score}</span>
+                    <span className="a2a-score-max">/100</span>
+                    <span className="a2a-score-label">Điểm An toàn</span>
+                  </div>
+                  <div className="a2a-verdict-info">
+                    <div className="a2a-status-row">
+                      <span className={`a2a-verdict-badge badge-${msg.a2aVerdict.overall_feasibility}`}>
+                        {msg.a2aVerdict.overall_feasibility === "feasible"
+                          ? "✅ Phương án Khả thi"
+                          : msg.a2aVerdict.overall_feasibility === "caution_required"
+                          ? "⚠️ Cần Thận Trọng Cao"
+                          : "🚨 Rủi ro Cao"}
+                      </span>
+                    </div>
+                    <p className="a2a-verdict-summary">{msg.a2aVerdict.summary_recommendation}</p>
+                  </div>
+                </div>
+
+                {/* Các khuyến nghị Checklist hành động */}
+                {msg.a2aVerdict.action_checklist?.length > 0 && (
+                  <div className="a2a-checklist-box">
+                    <h5>📋 Khuyến nghị Hành động từ Hội đồng:</h5>
+                    <ul>
+                      {msg.a2aVerdict.action_checklist.map((act, aIdx) => (
+                        <li key={aIdx}>{act}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Nút mở Modal nạp tiền khi bot thông báo hết hạn mức */}
         {(msg.isBudgetExceeded || msg.text?.includes("[Hết hạn mức]")) && !isStreaming && (
           <div className="budget-exceeded-cta-box">
@@ -1027,6 +1124,16 @@ export default function App() {
           >
             🏢 Căn hộ 2PN Sơn Trà (Mua bán)
           </button>
+          <button
+            className="prompt-btn prompt-btn-highlight"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsMobileSidebarOpen(false);
+              handleSend("Tôi có 1 tỷ, muốn mua căn 3 tỷ ở Sơn Trà để cho thuê thì vay ngân hàng thế nào và pháp lý rủi ro gì?");
+            }}
+          >
+            🏛️ Hội đồng A2A: Thẩm định căn 3 tỷ Sơn Trà
+          </button>
         </div>
       </div>
 
@@ -1239,6 +1346,13 @@ export default function App() {
                   onClick={() => handleSend("Tìm mua căn hộ 2 phòng ngủ Sơn Trà view biển dưới 3.5 tỷ")}
                 >
                   🏢 Căn hộ 2PN Sơn Trà (Mua bán)
+                </button>
+                <button
+                  type="button"
+                  className="quick-chip-btn highlight"
+                  onClick={() => handleSend("Tôi có 1 tỷ, muốn mua căn 3 tỷ ở Sơn Trà để cho thuê thì vay ngân hàng thế nào và pháp lý rủi ro gì?")}
+                >
+                  🏛️ Hội đồng A2A: Thẩm định căn 3 tỷ
                 </button>
               </div>
             )}
