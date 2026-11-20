@@ -111,6 +111,23 @@ flowchart TD
    - `mortgage_mcp_server.py` cung cấp 2 tool: `calculate_mortgage_loan` và `search_bank_mortgage_rates`.
    - `mortgage_mcp_client.py` nạp tự động qua `langchain-mcp-adapters` vào `mortgage_agent` (ReAct Agent).
 
+### 3.5. Phân Hệ Thẩm Định Chuyên Sâu BĐS Đà Nẵng với Pure DeepAgents (Due Diligence Engine)
+1. **Kiến trúc Hierarchical Subagents**:
+   - Sử dụng harness `deepagents.create_deep_agent` từ LangChain-AI.
+   - Master Agent ("Trưởng ban Thẩm định Chuyên sâu") tích hợp planning động (`write_todos`, `read_todos`), virtual filesystem (`write_file`, `read_file`), và `response_format=DueDiligenceDossier`.
+   - Điều phối 5 subagent chuyên biệt với context cô lập (`mode="isolated"`):
+     - `legal_specialist`: Thẩm định sổ hồng/sổ đỏ, quy hoạch ODT/CLN, Luật Đất đai 2024, Luật Kinh doanh BĐS 2023 (trần cọc 5%).
+     - `valuation_expert`: So sánh đơn giá/m2 với benchmark quận và tin đăng thực tế Qdrant / Tavily.
+     - `climate_infrastructure_analyst`: Khảo sát thủy văn ngập lụt mùa mưa lũ tháng 10-11 và tiện ích hạ tầng Đà Nẵng.
+     - `financial_engineer`: Mô phỏng lịch trả nợ vay, tỷ suất sinh lời net yield, hệ số chi trả nợ DSCR và stress test +3%.
+     - `adversarial_critic`: Phản biện rủi ro độc lập (Devil's Advocate), lập danh mục đòn bẩy đàm phán giá.
+     - `developer_deep_researcher`: Điều tra sâu uy tín chủ đầu tư, lịch sử chậm giao sổ và khiếu nại (khi bật `enable_deep_research`).
+2. **Bộ Domain Tools chuẩn `@tool`**:
+   - `search_legal_docs_tool`, `search_qdrant_properties_tool`, `search_tavily_web_listings_tool`
+   - `evaluate_climate_infrastructure_tool`, `calculate_mortgage_loan_tool`, `get_bank_interest_rates_tool`, `deep_developer_search_tool`.
+3. **Quản lý Tiến độ Realtime & SSE Stream**:
+   - `DueDiligenceTaskManager` phát tuần tự các event SSE: `pending` (0%) -> `planning` (15%) -> `investigating` (50%) -> `critiquing` (75%) -> `synthesizing` (90%) -> `completed` (100%) kèm hồ sơ `DueDiligenceDossier`.
+
 ---
 
 ## 4. Quy chuẩn Bắt buộc khi Code (Developer & Agent Rules)

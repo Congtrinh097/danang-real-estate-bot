@@ -326,6 +326,8 @@ class DueDiligenceTaskManager:
                     if curr and curr.get("status") in ["completed", "failed"]:
                         yield "data: [DONE]\n\n"
                         break
+                    # Keep-alive heartbeat comment for SSE connection stability
+                    yield ": ping\n\n"
                     continue
 
                 seq = event.get("seq", last_seq + 1)
