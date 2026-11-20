@@ -1,5 +1,6 @@
 import sys
 import os
+import uuid
 import pytest
 from pathlib import Path
 
@@ -15,7 +16,7 @@ client = TestClient(app)
 
 def test_admin_get_all_user_wallets():
     """Kiểm tra hàm get_all_user_wallets trả về danh sách ví người dùng đầy đủ các trường"""
-    test_user = "test_admin_user_list_001"
+    test_user = f"test_admin_user_list_{uuid.uuid4().hex[:8]}"
     user_wallet_service.get_or_create_wallet(test_user)
 
     wallets = user_wallet_service.get_all_user_wallets()
@@ -32,7 +33,7 @@ def test_admin_get_all_user_wallets():
 
 def test_admin_update_user_daily_free_limit():
     """Kiểm tra admin cập nhật hạn mức miễn phí hàng ngày cho user thành công"""
-    test_user = "test_admin_adjust_limit_002"
+    test_user = f"test_admin_adjust_limit_{uuid.uuid4().hex[:8]}"
     # Khởi tạo mặc định 5.000đ
     w1 = user_wallet_service.get_or_create_wallet(test_user)
     assert w1["daily_free_limit_vnd"] == 5000.0
@@ -53,7 +54,7 @@ def test_admin_update_user_daily_free_limit():
 
 def test_admin_free_limit_allows_more_chat():
     """Kiểm tra sau khi admin nâng hạn mức thì user được tiếp tục chat khi đã tiêu quá 5.000đ"""
-    test_user = "test_admin_allow_more_003"
+    test_user = f"test_admin_allow_more_{uuid.uuid4().hex[:8]}"
     user_wallet_service.get_or_create_wallet(test_user)
 
     # Tiêu hết 5.000đ
@@ -72,7 +73,7 @@ def test_admin_free_limit_allows_more_chat():
 
 def test_api_admin_user_wallets_endpoints():
     """Kiểm tra API endpoint GET và POST cho Admin điều chỉnh hạn mức ví user"""
-    test_user = "test_admin_api_user_004"
+    test_user = f"test_admin_api_user_{uuid.uuid4().hex[:8]}"
     user_wallet_service.get_or_create_wallet(test_user)
 
     # 1. Test GET /api/admin/user-wallets

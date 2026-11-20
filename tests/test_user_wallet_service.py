@@ -1,6 +1,14 @@
+import sys
+import os
+from pathlib import Path
 import pytest
 import uuid
-from backend.agentops.cost.user_wallet_service import user_wallet_service
+
+backend_dir = Path(__file__).resolve().parent.parent / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from agentops.cost.user_wallet_service import user_wallet_service
 
 @pytest.fixture
 def unique_user_id():
