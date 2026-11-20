@@ -1,5 +1,10 @@
 import os
+import sys
+from pathlib import Path
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+
 from backend.agentops.config.pricing_registry import pricing_registry, ModelPricing
 from backend.agentops.cost.cost_calculator import cost_calculator
 from backend.agentops.cost.token_tracker import UsageEvent
@@ -92,6 +97,18 @@ def test_budget_guard_allow_and_reject():
 
 def test_budget_separation():
     """Kiểm tra phân tách rạch ròi ngân sách chat vs evaluation"""
+    cost_reporting_service.update_budget(
+        workload_type="chat",
+        turn_limit_vnd=5000.0,
+        thread_limit_vnd=20000.0,
+        daily_limit_vnd=200000.0
+    )
+    cost_reporting_service.update_budget(
+        workload_type="evaluation",
+        turn_limit_vnd=10000.0,
+        thread_limit_vnd=50000.0,
+        daily_limit_vnd=100000.0
+    )
     chat_limits = budget_guard.get_budget_limits("chat")
     eval_limits = budget_guard.get_budget_limits("evaluation")
 

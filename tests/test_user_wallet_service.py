@@ -93,7 +93,15 @@ def test_api_user_wallet_endpoints(unique_user_id):
     wallet = res_get.json()
     assert wallet["user_id"] == unique_user_id
     assert wallet["balance_vnd"] == 0.0
+    assert wallet["balance"] == 0.0
     assert wallet["daily_free_limit_vnd"] == 5000.0
+
+    # 1b. GET alias /api/wallet/{user_id}
+    res_alias = client.get(f"/api/wallet/{unique_user_id}")
+    assert res_alias.status_code == 200
+    wallet_alias = res_alias.json()
+    assert wallet_alias["user_id"] == unique_user_id
+    assert wallet_alias["balance_vnd"] == 0.0
 
     # 2. POST /api/user/wallet/topup
     topup_payload = {

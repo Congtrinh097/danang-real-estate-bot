@@ -35,11 +35,14 @@ import {
   CreditCard,
   ShieldAlert,
   Users,
-  Landmark
+  Landmark,
+  History
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
 import TopupModal from "./components/TopupModal";
 import DueDiligenceModal from "./components/DueDiligenceModal";
+import DueDiligenceHistory from "./components/DueDiligenceHistory";
+import DueDiligenceSettingsModal from "./components/DueDiligenceSettingsModal";
 import "./components/DueDiligenceModal.css";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
@@ -162,15 +165,19 @@ export default function App() {
   // Quản lý Modal Thẩm Định Chuyên Sâu Bất Động Sản (Milestone 4)
   const [isDueDiligenceOpen, setIsDueDiligenceOpen] = useState(false);
   const [selectedDueDiligenceProperty, setSelectedDueDiligenceProperty] = useState(null);
+  const [showDueDiligenceSettings, setShowDueDiligenceSettings] = useState(false);
+  const [historyReviewData, setHistoryReviewData] = useState(null);
 
   const handleOpenDueDiligence = (prop) => {
     setSelectedDueDiligenceProperty(prop);
+    setHistoryReviewData(null);
     setIsDueDiligenceOpen(true);
   };
 
   const handleCloseDueDiligence = () => {
     setIsDueDiligenceOpen(false);
     setSelectedDueDiligenceProperty(null);
+    setHistoryReviewData(null);
   };
 
   // Drawer căn cứ pháp lý
@@ -1177,6 +1184,12 @@ export default function App() {
                   <MessageSquare size={14} /> <span className="nav-btn-text">Tư Vấn BĐS</span>
                 </button>
                 <button
+                  className={`nav-tab-btn ${activeTab === "due_diligence_history" ? "active" : ""}`}
+                  onClick={() => setActiveTab("due_diligence_history")}
+                >
+                  <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
+                </button>
+                <button
                   className={`nav-tab-btn ${activeTab === "admin_legal" ? "active" : ""}`}
                   onClick={() => setActiveTab("admin_legal")}
                 >
@@ -1448,6 +1461,57 @@ export default function App() {
             </form>
           </div>
         </div>
+      ) : activeTab === "due_diligence_history" ? (
+        /* ==================== MÀN HÌNH LỊCH SỬ THẨM ĐỊNH BĐS ==================== */
+        <div className="admin-view-container" style={{ background: "#0b1329", minHeight: "100vh" }}>
+          <div className="admin-header">
+            <div className="admin-header-title-group">
+              <button
+                className="btn-mobile-menu"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                title="Mở menu"
+              >
+                <Menu size={20} />
+              </button>
+              <div>
+                <h2 className="admin-title">Lịch Sử & Báo Cáo Thẩm Định</h2>
+                <p className="admin-subtitle">
+                  Tra cứu lại các thẩm định cũ và cơ chế Smart Cache 48h tự động
+                </p>
+              </div>
+            </div>
+
+            <div className="header-nav">
+              <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
+                <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
+              </button>
+              <button className="nav-tab-btn active">
+                <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
+              </button>
+              <button className="nav-tab-btn" onClick={() => setActiveTab("admin_legal")}>
+                <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
+              </button>
+            </div>
+          </div>
+
+          <DueDiligenceHistory
+            API_BASE={API_BASE}
+            userId={userId}
+            onOpenDossier={(dossier, prop, taskId, isCached) => {
+              const effectiveProp = prop || {
+                id: taskId,
+                title: dossier?.property_title || "Bất động sản thẩm định",
+                district: dossier?.district || "Đà Nẵng",
+                price: dossier?.property_price || 0,
+                area: dossier?.area_m2 || 0
+              };
+              setSelectedDueDiligenceProperty(effectiveProp);
+              setHistoryReviewData({ dossier, taskId, isCached });
+              setIsDueDiligenceOpen(true);
+            }}
+            onOpenSettings={() => setShowDueDiligenceSettings(true)}
+          />
+        </div>
       ) : (
         /* ==================== MÀN HÌNH QUẢN TRỊ HỆ THỐNG ==================== */
         <div className="admin-view-container">
@@ -1477,6 +1541,9 @@ export default function App() {
             <div className="header-nav">
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
                 <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
+              </button>
+              <button className="nav-tab-btn" onClick={() => setActiveTab("due_diligence_history")}>
+                <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
               </button>
               <button className="nav-tab-btn active">
                 <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
@@ -1941,6 +2008,9 @@ export default function App() {
           userId={userId}
           userWallet={userWallet}
           API_BASE={API_BASE}
+          initialDossier={historyReviewData?.dossier}
+          initialTaskId={historyReviewData?.taskId}
+          initialIsCached={historyReviewData?.isCached}
           onOpenTopup={() => {
             handleCloseDueDiligence();
             setShowTopupModal(true);
@@ -1952,6 +2022,13 @@ export default function App() {
           onWalletUpdate={(updatedWallet) => setUserWallet(updatedWallet)}
         />
       )}
+
+      {/* Modal Cài Đặt Thẩm Định & Cache */}
+      <DueDiligenceSettingsModal
+        isOpen={showDueDiligenceSettings}
+        onClose={() => setShowDueDiligenceSettings(false)}
+        API_BASE={API_BASE}
+      />
     </div>
   );
 }

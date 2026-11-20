@@ -70,6 +70,7 @@ class UserWalletService:
                 "user_id": row["user_id"],
                 "user_group": row["user_group"],
                 "group_name": row["group_name"],
+                "balance": balance,
                 "balance_vnd": balance,
                 "daily_free_limit_vnd": daily_free_limit,
                 "daily_spent_vnd": float(row["daily_spent_vnd"]),

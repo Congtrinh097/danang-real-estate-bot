@@ -39,7 +39,8 @@ import {
   ExternalLink,
   Download,
   FileText,
-  Printer
+  Printer,
+  Zap
 } from "lucide-react";
 import "./DueDiligenceModal.css";
 
@@ -128,7 +129,10 @@ export default function DueDiligenceModal({
   API_BASE = "",
   onOpenTopup,
   onRequireTopup,
-  onWalletUpdate
+  onWalletUpdate,
+  initialDossier = null,
+  initialTaskId = null,
+  initialIsCached = false
 }) {
   const [objective, setObjective] = useState("residential");
   const [equityRatio, setEquityRatio] = useState(0.7);
@@ -138,6 +142,7 @@ export default function DueDiligenceModal({
 
   // Execution & Stream State
   const [taskId, setTaskId] = useState(null);
+  const [isCached, setIsCached] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStage, setCurrentStage] = useState("idle");
   const [progress, setProgress] = useState(0);
@@ -162,7 +167,7 @@ export default function DueDiligenceModal({
     const isNewProp = prevPropIdRef.current !== property?.id;
     prevPropIdRef.current = property?.id;
 
-    if (!isOpen || isNewProp) {
+    if (!isOpen || (isNewProp && !initialDossier)) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -180,6 +185,7 @@ export default function DueDiligenceModal({
       // Reset all internal states cleanly
       setDossier(null);
       setTaskId(null);
+      setIsCached(false);
       setIsAnalyzing(false);
       setCurrentStage("idle");
       setProgress(0);
@@ -189,7 +195,18 @@ export default function DueDiligenceModal({
       setIsConfigCollapsed(false);
       setActiveTab("overview");
     }
-  }, [isOpen, property?.id]);
+
+    if (isOpen && initialDossier) {
+      setDossier(initialDossier);
+      if (initialTaskId) setTaskId(initialTaskId);
+      setIsCached(Boolean(initialIsCached));
+      setIsAnalyzing(false);
+      setCurrentStage("completed");
+      setProgress(100);
+      setIsConfigCollapsed(true);
+      setActiveTab("overview");
+    }
+  }, [isOpen, property?.id, initialDossier, initialTaskId, initialIsCached]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -275,10 +292,13 @@ export default function DueDiligenceModal({
 
       const newTaskId = data.task_id;
       setTaskId(newTaskId);
+      if (data.is_cached) {
+        setIsCached(true);
+      }
 
       // Trigger wallet refresh if caller provided a callback
       if (onWalletUpdate && userId) {
-        fetch(`${API_BASE}/api/wallet/${userId}`)
+        fetch(`${API_BASE}/api/user/wallet?user_id=${encodeURIComponent(userId)}`)
           .then((r) => r.json())
           .then((w) => onWalletUpdate(w))
           .catch(() => {});
@@ -330,12 +350,13 @@ export default function DueDiligenceModal({
           eventSourceRef.current = null;
           setIsAnalyzing(false);
           setProgress(100);
+          if (payload.is_cached) setIsCached(true);
           const finalDossier = payload.dossier || payload.result;
           if (finalDossier) setDossier(finalDossier);
 
           // Update user wallet balance if callback provided
           if (onWalletUpdate && userId) {
-            fetch(`${API_BASE}/api/wallet/${userId}`)
+            fetch(`${API_BASE}/api/user/wallet?user_id=${encodeURIComponent(userId)}`)
               .then((r) => r.json())
               .then((w) => onWalletUpdate(w))
               .catch(() => {});
@@ -401,7 +422,7 @@ export default function DueDiligenceModal({
             setDossier(data.dossier || data.result);
           }
           if (onWalletUpdate && userId) {
-            fetch(`${API_BASE}/api/wallet/${userId}`)
+            fetch(`${API_BASE}/api/user/wallet?user_id=${encodeURIComponent(userId)}`)
               .then((r) => r.json())
               .then((w) => onWalletUpdate(w))
               .catch(() => {});
@@ -880,9 +901,9 @@ export default function DueDiligenceModal({
                   </span>
                 )}
                 <span className="dd-property-price-tag">{formatMillionPrice(propertyPrice)}</span>
-                {userWallet?.balance !== undefined && (
+                {(userWallet?.balance_vnd !== undefined || userWallet?.balance !== undefined) && (
                   <span className="dd-property-tag" title="Số dư ví AI">
-                    <Wallet size={11} /> {formatVND(userWallet.balance)}
+                    <Wallet size={11} /> {formatVND(userWallet?.balance_vnd ?? userWallet?.balance)}
                   </span>
                 )}
               </div>
@@ -1186,6 +1207,26 @@ export default function DueDiligenceModal({
           {/* Dossier Viewer (when completed and dossier available) */}
           {dossier && (
             <>
+              {isCached && (
+                <div style={{
+                  background: "rgba(56, 189, 248, 0.12)",
+                  border: "1px solid rgba(56, 189, 248, 0.35)",
+                  borderRadius: "10px",
+                  padding: "12px 18px",
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  fontSize: "0.88rem",
+                  color: "#38bdf8"
+                }}>
+                  <Zap size={20} style={{ color: "#f59e0b", flexShrink: 0 }} />
+                  <div>
+                    <strong>🎯 Kết Quả Tái Sử Dụng Từ Kho Cache:</strong> Bất động sản này đã được thẩm định trong thời gian hiệu lực gần đây. Hệ thống tải ngay kết quả tức khắc và <strong>miễn phí 100%</strong> chi phí chạy lại.
+                  </div>
+                </div>
+              )}
+
               {/* Scorecard Gauge & Verdict Banner */}
               <div className="dd-scorecard-card">
                 <div className="dd-score-gauge-box">

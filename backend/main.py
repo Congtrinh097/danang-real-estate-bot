@@ -177,6 +177,11 @@ def get_user_wallet(user_id: str = "default_user"):
     """Lấy thông tin ví và hạn mức ngày 5.000đ của người dùng"""
     return user_wallet_service.get_or_create_wallet(user_id=user_id)
 
+@app.get("/api/wallet/{user_id}")
+def get_user_wallet_by_path(user_id: str):
+    """Alias endpoint hỗ trợ lấy thông tin ví người dùng qua đường dẫn /api/wallet/{user_id}"""
+    return user_wallet_service.get_or_create_wallet(user_id=user_id)
+
 @app.post("/api/user/wallet/topup")
 def topup_user_wallet(req: TopupRequest):
     """Nạp thêm tiền vào ví người dùng (hỗ trợ các gói 5k, 10k, 20k, 50k, 100k...)"""
@@ -664,13 +669,23 @@ async def evaluate_rag(node: Optional[str] = "all"):
 
 # ==================== PHÂN HỆ THẨM ĐỊNH BĐS CHUYÊN SÂU (DEEP DUE DILIGENCE) ====================
 
+class DueDiligenceSettingsRequest(BaseModel):
+    cache_enabled: Optional[bool] = True
+    cache_ttl_hours: Optional[int] = 48
+    cache_hit_cost_vnd: Optional[float] = 0.0
+    allow_force_refresh: Optional[bool] = True
+
+class DueDiligenceCacheClearRequest(BaseModel):
+    property_id: Optional[str] = None
+
+
 @app.post("/api/due-diligence")
 async def submit_due_diligence(req: DueDiligenceRequest):
     """
     Tiếp nhận yêu cầu thẩm định BĐS chuyên sâu Đà Nẵng:
     - Thiết lập AgentOps TraceContext với workload_type='due_diligence'
-    - Kiểm tra hạn mức / số dư ví người dùng (ước tính 150 VNĐ)
-    - Đẩy task vào hàng đợi thực thi nền (Redis / In-memory fallback)
+    - Kiểm tra Cache 48h; nếu Cache Hit -> miễn phí/áp dụng phí ưu đãi và trả về ngay
+    - Nếu Cache Miss -> Kiểm tra hạn mức / số dư ví và khởi chạy multi-agent workflow
     - Trả về task_id để client theo dõi tiến độ qua SSE hoặc Polling
     """
     effective_user_id = req.user_id or "default_user"
@@ -678,28 +693,92 @@ async def submit_due_diligence(req: DueDiligenceRequest):
     thread_id = f"dd_thread_{effective_user_id}"
     TraceContext.set_context(request_id=req_id, thread_id=thread_id, workload_type="due_diligence")
 
-    # Pre-flight check ngân sách người dùng
-    try:
-        can_proceed, budget_msg, wallet = user_wallet_service.check_user_can_chat(
-            user_id=effective_user_id,
-            estimated_cost_vnd=150.0
-        )
-        if not can_proceed:
-            raise HTTPException(
-                status_code=402,
-                detail="Ngân sách tài khoản không đủ để thực hiện thẩm định chuyên sâu. Vui lòng nạp thêm tiền vào ví."
+    req_dict = req.model_dump() if hasattr(req, "model_dump") else dict(req)
+    cached_record = due_diligence_task_manager.find_cached_dossier(req_dict)
+    settings = due_diligence_task_manager.get_settings()
+    is_cached_hit = bool(cached_record and cached_record.get("dossier_data"))
+    estimated_cost = float(settings.get("cache_hit_cost_vnd", 0.0)) if is_cached_hit else 150.0
+
+    if estimated_cost > 0:
+        # Pre-flight check ngân sách người dùng nếu có tính phí
+        try:
+            can_proceed, budget_msg, wallet = user_wallet_service.check_user_can_chat(
+                user_id=effective_user_id,
+                estimated_cost_vnd=estimated_cost
             )
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[WARN] Pre-flight budget check error: {e}")
+            if not can_proceed:
+                raise HTTPException(
+                    status_code=402,
+                    detail="Ngân sách tài khoản không đủ để thực hiện thẩm định chuyên sâu. Vui lòng nạp thêm tiền vào ví."
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[WARN] Pre-flight budget check error: {e}")
 
     task_id = await due_diligence_task_manager.submit_task(req, user_id=effective_user_id)
+
+    # Nếu có phí cache hit > 0, trừ tiền ví
+    if is_cached_hit and estimated_cost > 0:
+        try:
+            user_wallet_service.deduct_user_cost(user_id=effective_user_id, cost_vnd=estimated_cost)
+        except Exception as err:
+            print(f"[WARN] Failed to deduct cache hit cost: {err}")
+
     return {
         "success": True,
         "task_id": task_id,
-        "status": "pending"
+        "status": "completed" if is_cached_hit else "pending",
+        "is_cached": is_cached_hit
     }
+
+
+@app.get("/api/due-diligence/settings")
+def get_due_diligence_settings():
+    """Lấy cài đặt Admin cho phân hệ Thẩm định & Cache BĐS"""
+    st = due_diligence_task_manager.get_settings()
+    return {"success": True, "settings": st}
+
+
+@app.post("/api/due-diligence/settings")
+def update_due_diligence_settings(req: DueDiligenceSettingsRequest):
+    """Admin cập nhật cài đặt cho phân hệ Thẩm định & Cache BĐS"""
+    updates = req.model_dump(exclude_unset=True)
+    updated = due_diligence_task_manager.update_settings(updates)
+    return {"success": True, "settings": updated}
+
+
+@app.post("/api/due-diligence/cache/clear")
+def clear_due_diligence_cache(req: DueDiligenceCacheClearRequest):
+    """Admin xóa/vô hiệu hóa cache thẩm định toàn bộ hoặc theo property_id"""
+    count = due_diligence_task_manager.clear_cache(property_id=req.property_id)
+    return {"success": True, "cleared_count": count, "property_id": req.property_id}
+
+
+@app.get("/api/due-diligence/history")
+def get_due_diligence_history(
+    user_id: Optional[str] = None,
+    scope: str = "user",
+    limit: int = 50,
+    offset: int = 0
+):
+    """Lấy danh sách lịch sử các hồ sơ thẩm định BĐS đã thực hiện"""
+    history = due_diligence_task_manager.get_history(
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        scope=scope
+    )
+    return {"success": True, "history": history, "total": len(history)}
+
+
+@app.get("/api/due-diligence/history/{task_id}")
+def get_due_diligence_history_detail(task_id: str):
+    """Lấy chi tiết đầy đủ hồ sơ thẩm định cũ từ PostgreSQL"""
+    record = due_diligence_task_manager.get_dossier_by_task_id(task_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy hồ sơ thẩm định cho mã {task_id}")
+    return {"success": True, "task": record}
 
 
 @app.get("/api/due-diligence/{task_id}")
