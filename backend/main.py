@@ -781,6 +781,35 @@ def get_due_diligence_history_detail(task_id: str):
     return {"success": True, "task": record}
 
 
+@app.delete("/api/due-diligence/history/{task_id}")
+def delete_due_diligence_history_item(task_id: str):
+    """Xóa một bản ghi hồ sơ thẩm định khỏi lịch sử"""
+    success = due_diligence_task_manager.delete_record(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy bản ghi {task_id} hoặc xóa không thành công")
+    return {"success": True, "message": f"Đã xóa thành công bản ghi thẩm định {task_id}", "task_id": task_id}
+
+
+@app.delete("/api/due-diligence/history")
+@app.post("/api/due-diligence/history/clear")
+def clear_due_diligence_history_api(
+    scope: str = "test",
+    user_id: Optional[str] = None
+):
+    """
+    Xóa lịch sử thẩm định:
+    - scope='test': chỉ xóa các bản ghi thử nghiệm (test)
+    - scope='user': xóa các bản ghi của user_id
+    - scope='all': xóa toàn bộ
+    """
+    test_only = (scope == "test")
+    count = due_diligence_task_manager.clear_history(
+        test_only=test_only,
+        user_id=user_id if scope == "user" else None
+    )
+    return {"success": True, "cleared_count": count, "scope": scope}
+
+
 @app.get("/api/due-diligence/{task_id}")
 async def get_due_diligence_status(task_id: str):
     """

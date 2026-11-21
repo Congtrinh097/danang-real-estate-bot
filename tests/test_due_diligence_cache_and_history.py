@@ -23,8 +23,25 @@ def unique_user_id():
     return f"usr_test_{uuid.uuid4().hex[:8]}"
 
 
+@pytest.fixture(autouse=True)
+def cleanup_test_records_fixture():
+    # Trước khi chạy test
+    due_diligence_task_manager.clear_history(test_only=True)
+    yield
+    # Sau khi chạy test: dọn dẹp sạch sẽ không để lại rác trong DB
+    due_diligence_task_manager.clear_history(test_only=True)
+
+
 def test_due_diligence_settings_crud():
     """Kiểm tra đọc và cập nhật cài đặt Admin cho phân hệ Thẩm định & Cache"""
+    # Khởi tạo mặc định 48h
+    due_diligence_task_manager.update_settings({
+        "cache_enabled": True,
+        "cache_ttl_hours": 48,
+        "cache_hit_cost_vnd": 0.0,
+        "allow_force_refresh": True
+    })
+
     # 1. Đọc cài đặt mặc định
     settings = due_diligence_task_manager.get_settings()
     assert isinstance(settings, dict)
@@ -372,5 +389,62 @@ def test_api_due_diligence_post_cache_hit_flow(unique_prop_id, unique_user_id):
     status_data = res_status.json()
     assert status_data["status"] == "completed"
     assert status_data["result"]["overall_score"] == 8.8
+
+
+def test_api_due_diligence_delete_single_history_record(unique_prop_id, unique_user_id):
+    """Kiểm tra API DELETE /api/due-diligence/history/{task_id} xóa hoàn toàn bản ghi khỏi DB"""
+    task_id = f"task_{uuid.uuid4().hex[:10]}"
+    due_diligence_task_manager.save_dossier_record(
+        task_id=task_id,
+        user_id=unique_user_id,
+        request_data={"property_id": unique_prop_id, "property_title": "Nhà phố cần xóa test"},
+        dossier_data={"verdict": "PROCEED_WITH_CAUTION", "overall_score": 7.0}
+    )
+
+    # 1. Kiểm tra tồn tại
+    rec = due_diligence_task_manager.get_dossier_by_task_id(task_id)
+    assert rec is not None
+
+    # 2. Xóa qua API DELETE
+    del_res = client.delete(f"/api/due-diligence/history/{task_id}")
+    assert del_res.status_code == 200
+    assert del_res.json()["success"] is True
+
+    # 3. Kiểm tra không còn trong database
+    assert due_diligence_task_manager.get_dossier_by_task_id(task_id) is None
+
+
+def test_api_due_diligence_clear_test_history():
+    """Kiểm tra API DELETE /api/due-diligence/history?scope=test chỉ xóa các bản ghi test"""
+    # Tạo 1 bản ghi test và 1 bản ghi thực tế
+    test_task = f"task_{uuid.uuid4().hex[:10]}"
+    real_task = f"dd_task_{uuid.uuid4().hex[:10]}"
+    due_diligence_task_manager.save_dossier_record(
+        task_id=test_task,
+        user_id="usr_test_xyz",
+        request_data={"property_id": "prop_test_1", "property_title": "Nhà Test 123"},
+        dossier_data={"verdict": "STRONGLY_RECOMMENDED"}
+    )
+    due_diligence_task_manager.save_dossier_record(
+        task_id=real_task,
+        user_id="usr_real_999",
+        request_data={"property_id": "dn-sale-999", "property_title": "Nhà Phố Hải Châu Xịn"},
+        dossier_data={"verdict": "STRONGLY_RECOMMENDED"}
+    )
+
+    # Gọi API xóa test scope
+    res = client.delete("/api/due-diligence/history?scope=test")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["cleared_count"] >= 1
+
+    # Kiểm tra test_task đã bị xóa, real_task vẫn còn nguyên
+    assert due_diligence_task_manager.get_dossier_by_task_id(test_task) is None
+    assert due_diligence_task_manager.get_dossier_by_task_id(real_task) is not None
+
+    # Dọn dẹp real_task
+    due_diligence_task_manager.delete_record(real_task)
+
 
 

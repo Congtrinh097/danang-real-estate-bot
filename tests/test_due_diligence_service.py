@@ -397,6 +397,9 @@ def test_tracecontext_and_wallet_deduction_invocation():
         assert wallet_calls[0].get("user_id") == "wallet_audit_user"
         assert wallet_calls[0].get("request_id") == task_id
 
+        # Cleanup test record
+        manager.delete_record(task_id)
+
     asyncio.run(_test())
 
 

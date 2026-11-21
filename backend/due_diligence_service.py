@@ -341,6 +341,48 @@ class DueDiligenceTaskManager:
             logger.error(f"Error clearing due diligence cache: {e}")
             return 0
 
+    def delete_record(self, task_id: str) -> bool:
+        """Xóa vĩnh viễn một bản ghi thẩm định theo task_id"""
+        try:
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM due_diligence_records WHERE task_id = %s;", (task_id,))
+                    count = cur.rowcount
+                conn.commit()
+            self._in_memory_tasks.pop(task_id, None)
+            return count > 0
+        except Exception as e:
+            logger.error(f"Error deleting due diligence record {task_id}: {e}")
+            return False
+
+    def clear_history(self, test_only: bool = False, user_id: Optional[str] = None) -> int:
+        """Xóa lịch sử thẩm định: chỉ xóa dữ liệu test hoặc toàn bộ"""
+        try:
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    if test_only:
+                        cur.execute("""
+                            DELETE FROM due_diligence_records
+                            WHERE task_id LIKE 'task_%'
+                               OR task_id LIKE '%test%'
+                               OR user_id LIKE 'usr_test_%'
+                               OR user_id LIKE '%test%'
+                               OR user_id = 'wallet_audit_user'
+                               OR property_id LIKE 'prop_test_%'
+                               OR property_id LIKE '%test%'
+                               OR property_title ILIKE '%test%';
+                        """)
+                    elif user_id:
+                        cur.execute("DELETE FROM due_diligence_records WHERE user_id = %s;", (user_id,))
+                    else:
+                        cur.execute("DELETE FROM due_diligence_records;")
+                    count = cur.rowcount
+                conn.commit()
+            return count
+        except Exception as e:
+            logger.error(f"Error clearing due diligence history: {e}")
+            return 0
+
     def get_history(
         self,
         user_id: Optional[str] = None,

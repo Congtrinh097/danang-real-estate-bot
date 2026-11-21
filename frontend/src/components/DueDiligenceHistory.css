@@ -77,6 +77,18 @@
   color: #ffffff;
 }
 
+.btn-clear-test {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.btn-clear-test:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
 .btn-settings {
   background: #2563eb;
   border: 1px solid #3b82f6;

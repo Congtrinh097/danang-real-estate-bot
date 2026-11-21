@@ -92,6 +92,8 @@ export default function DueDiligenceHistory({
   const [verdictFilter, setVerdictFilter] = useState("all");
   const [settings, setSettings] = useState(null);
   const [openingTaskId, setOpeningTaskId] = useState(null);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [clearingTest, setClearingTest] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -151,27 +153,52 @@ export default function DueDiligenceHistory({
     }
   };
 
-  const handleClearSingleCache = async (e, item) => {
+  const handleDeleteHistoryItem = async (e, item) => {
     e.stopPropagation();
-    if (!item.property_id) {
-      alert("Hồ sơ này không có mã định danh tài sản cụ thể.");
+    if (!item.task_id) return;
+    const title = item.property_title || "BĐS này";
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN hồ sơ thẩm định "${title}" khỏi lịch sử?`)) {
       return;
     }
-    if (!window.confirm(`Xóa Cache cho BĐS "${item.property_title}"? Lần thẩm định tiếp theo sẽ chạy lại toàn bộ từ đầu.`)) {
-      return;
-    }
+    setDeletingTaskId(item.task_id);
     try {
-      const res = await fetch(`${API_BASE}/api/due-diligence/cache/clear`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ property_id: item.property_id })
+      const res = await fetch(`${API_BASE}/api/due-diligence/history/${item.task_id}`, {
+        method: "DELETE"
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        fetchHistory(true);
+        // Cập nhật state ngay lập tức để biến mất khỏi màn hình
+        setHistoryList((prev) => prev.filter((h) => h.task_id !== item.task_id));
+      } else {
+        alert("Không thể xóa: " + (data.detail || data.message || "Lỗi không xác định"));
       }
     } catch (err) {
-      alert("Lỗi xóa cache: " + err.message);
+      alert("Lỗi khi xóa hồ sơ thẩm định: " + err.message);
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const handleClearTestData = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn dọn dẹp và XÓA TOÀN BỘ dữ liệu thẩm định thử nghiệm (test) khỏi database?")) {
+      return;
+    }
+    setClearingTest(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/due-diligence/history?scope=test`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(`Đã dọn dẹp thành công ${data.cleared_count} bản ghi thử nghiệm!`);
+        fetchHistory(true);
+      } else {
+        alert("Không thể dọn dẹp dữ liệu test: " + (data.detail || "Lỗi server"));
+      }
+    } catch (err) {
+      alert("Lỗi khi dọn dẹp dữ liệu test: " + err.message);
+    } finally {
+      setClearingTest(false);
     }
   };
 
@@ -248,6 +275,15 @@ export default function DueDiligenceHistory({
           >
             <RotateCw size={16} className={refreshing ? "spin" : ""} />
             <span>Làm Mới</span>
+          </button>
+          <button
+            className="btn-clear-test"
+            onClick={handleClearTestData}
+            disabled={clearingTest || loading}
+            title="Xóa sạch các bản ghi thử nghiệm (test) khỏi cơ sở dữ liệu"
+          >
+            <Trash2 size={16} />
+            <span>{clearingTest ? "Đang dọn..." : "Dọn Dữ Liệu Test"}</span>
           </button>
           {onOpenSettings && (
             <button
@@ -430,15 +466,18 @@ export default function DueDiligenceHistory({
                   </div>
 
                   <div className="card-actions-group">
-                    {item.property_id && (
-                      <button
-                        className="btn-clear-single-cache"
-                        onClick={(e) => handleClearSingleCache(e, item)}
-                        title="Xóa cache của BĐS này để ép buộc thẩm định mới"
-                      >
+                    <button
+                      className="btn-clear-single-cache"
+                      onClick={(e) => handleDeleteHistoryItem(e, item)}
+                      disabled={deletingTaskId === item.task_id}
+                      title="Xóa vĩnh viễn hồ sơ thẩm định này khỏi lịch sử"
+                    >
+                      {deletingTaskId === item.task_id ? (
+                        <RotateCw size={13} className="spin" />
+                      ) : (
                         <Trash2 size={13} />
-                      </button>
-                    )}
+                      )}
+                    </button>
                     <button
                       className="btn-view-report"
                       onClick={(e) => {
