@@ -824,11 +824,11 @@ html, body {
   object-fit: cover;
 }
 
-.card-body {
+.property-card .card-body {
   padding: 14px;
 }
 
-.card-badge {
+.property-card .card-badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
@@ -839,10 +839,10 @@ html, body {
   margin-bottom: 8px;
 }
 
-.card-title {
+.property-card .card-title {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: #0f172a !important;
   margin-bottom: 6px;
   line-height: 1.4;
   height: 40px;
@@ -853,14 +853,14 @@ html, body {
   -webkit-box-orient: vertical;
 }
 
-.card-price {
+.property-card .card-price {
   font-size: 16px;
   font-weight: 800;
-  color: #dc2626;
+  color: #dc2626 !important;
   margin-bottom: 10px;
 }
 
-.card-meta {
+.property-card .card-meta {
   display: flex;
   gap: 12px;
   font-size: 12px;

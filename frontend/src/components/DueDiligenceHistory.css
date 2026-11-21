@@ -115,7 +115,7 @@
   gap: 16px;
 }
 
-.stat-card {
+.dd-history-stats-grid .stat-card {
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 12px;
@@ -125,7 +125,7 @@
   gap: 4px;
 }
 
-.stat-label {
+.dd-history-stats-grid .stat-label {
   font-size: 0.82rem;
   color: #94a3b8;
   text-transform: uppercase;
@@ -133,7 +133,7 @@
   font-weight: 600;
 }
 
-.stat-value {
+.dd-history-stats-grid .stat-value {
   font-size: 1.7rem;
   font-weight: 700;
   color: #f8fafc;
@@ -146,7 +146,7 @@
   color: #f59e0b;
 }
 
-.stat-sub {
+.dd-history-stats-grid .stat-sub {
   font-size: 0.78rem;
   color: #64748b;
 }
@@ -305,7 +305,7 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
-.card-top-row {
+.dd-history-card .card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -374,7 +374,7 @@
   border: 1px solid #334155;
 }
 
-.card-title {
+.dd-history-card .card-title {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
@@ -386,13 +386,13 @@
   overflow: hidden;
 }
 
-.card-meta-list {
+.dd-history-card .card-meta-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.meta-item {
+.dd-history-card .meta-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -400,20 +400,20 @@
   color: #94a3b8;
 }
 
-.meta-row-two {
+.dd-history-card .meta-row-two {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 2px;
 }
 
-.price-tag {
+.dd-history-card .price-tag {
   font-size: 1rem;
   font-weight: 700;
   color: #38bdf8;
 }
 
-.area-tag {
+.dd-history-card .area-tag {
   font-size: 0.84rem;
   color: #cbd5e1;
   background: #0f172a;
@@ -422,7 +422,7 @@
   border: 1px solid #334155;
 }
 
-.card-footer {
+.dd-history-card .card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -430,7 +430,7 @@
   border-top: 1px solid #334155;
 }
 
-.card-date {
+.dd-history-card .card-date {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -438,7 +438,7 @@
   color: #64748b;
 }
 
-.card-actions-group {
+.dd-history-card .card-actions-group {
   display: flex;
   align-items: center;
   gap: 6px;
