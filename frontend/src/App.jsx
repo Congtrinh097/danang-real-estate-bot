@@ -262,7 +262,7 @@ export default function App() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
   // Load thông tin ví người dùng và hạn mức 5.000đ mỗi ngày
   const fetchUserWallet = async () => {
@@ -690,8 +690,8 @@ export default function App() {
 
   // Render text có chèn các badge trích dẫn [1], [2] tương tác, trạng thái đang suy nghĩ và hiệu ứng stream cursor
   const renderMessageContent = (msg, isStreaming = false) => {
-    // 1. Trạng thái Đang suy nghĩ / Xử lý: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking (và không có hitlRequest hoặc properties)
-    if ((msg.isThinking || !msg.text) && (!msg.properties || msg.properties.length === 0) && !msg.hitlRequest) {
+    // 1. Trạng thái Đang suy nghĩ / Xử lý: khi bot message chưa nhận được text đầu tiên và đang ở trạng thái thinking (và không có hitlRequest)
+    if ((msg.isThinking || !msg.text) && !msg.hitlRequest) {
       const currentStatus = msg.thinkingStatus || "Đang phân tích yêu cầu...";
       const history = msg.thinkingHistory || [currentStatus];
 
@@ -1278,8 +1278,8 @@ export default function App() {
                   <div className="message-content">
                     {msg.sender === "bot" ? renderMessageContent(msg, isStreaming) : <div className="bubble" style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>}
 
-                  {/* Property Carousel Cards */}
-                  {msg.properties && msg.properties.length > 0 && (
+                  {/* Property Carousel Cards - chỉ hiển thị sau khi chatbot phản hồi xong message (!isStreaming) */}
+                  {!isStreaming && msg.properties && msg.properties.length > 0 && (
                     <div className="cards-scroll-container">
                       {msg.properties.map((item) => (
                         <div key={item.id} className="property-card">
