@@ -15,7 +15,8 @@ import {
   AlertCircle,
   FileText,
   User,
-  Users
+  Users,
+  Trash2
 } from "lucide-react";
 import "./DueDiligenceHistory.css";
 
@@ -41,7 +42,7 @@ const getVerdictBadge = (verdict) => {
       };
     default:
       return {
-        label: verdict || "Đã thẩm định",
+        label: (typeof verdict === "string" ? verdict : "Đã thẩm định") || "Đã thẩm định",
         className: "badge-gray",
         icon: FileText
       };
@@ -176,7 +177,9 @@ export default function DueDiligenceHistory({
 
   // Lọc danh sách theo thanh tìm kiếm và bộ lọc
   const filteredList = useMemo(() => {
+    if (!Array.isArray(historyList)) return [];
     return historyList.filter((item) => {
+      if (!item) return false;
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -199,8 +202,9 @@ export default function DueDiligenceHistory({
 
   // Thống kê nhanh
   const stats = useMemo(() => {
-    const total = historyList.length;
-    const cachedCount = historyList.filter((h) => h.is_cached).length;
+    const list = Array.isArray(historyList) ? historyList : [];
+    const total = list.length;
+    const cachedCount = list.filter((h) => h?.is_cached).length;
     const cacheTtl = settings?.cache_ttl_hours || 48;
     return {
       total,
@@ -212,9 +216,11 @@ export default function DueDiligenceHistory({
 
   const uniqueDistricts = useMemo(() => {
     const set = new Set();
-    historyList.forEach((h) => {
-      if (h.district) set.add(h.district);
-    });
+    if (Array.isArray(historyList)) {
+      historyList.forEach((h) => {
+        if (h?.district) set.add(h.district);
+      });
+    }
     return Array.from(set);
   }, [historyList]);
 
@@ -364,22 +370,23 @@ export default function DueDiligenceHistory({
         </div>
       ) : (
         <div className="dd-history-grid">
-          {filteredList.map((item) => {
+          {filteredList.map((item, index) => {
+            if (!item) return null;
             const badge = getVerdictBadge(item.verdict);
-            const BadgeIcon = badge.icon;
+            const BadgeIcon = badge?.icon;
             const isOpening = openingTaskId === item.task_id;
 
             return (
               <div
-                key={item.task_id}
+                key={item.task_id || `item-${index}`}
                 className="dd-history-card"
                 onClick={() => handleOpenDetail(item)}
               >
                 {/* Card Top: Badges */}
                 <div className="card-top-row">
-                  <div className={`verdict-pill ${badge.className}`}>
-                    <BadgeIcon size={14} />
-                    <span>{badge.label}</span>
+                  <div className={`verdict-pill ${badge?.className || "badge-gray"}`}>
+                    {BadgeIcon && <BadgeIcon size={14} />}
+                    <span>{badge?.label || "Đã thẩm định"}</span>
                   </div>
 
                   <div className="right-badges">

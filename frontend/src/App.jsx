@@ -43,6 +43,7 @@ import TopupModal from "./components/TopupModal";
 import DueDiligenceModal from "./components/DueDiligenceModal";
 import DueDiligenceHistory from "./components/DueDiligenceHistory";
 import DueDiligenceSettingsModal from "./components/DueDiligenceSettingsModal";
+import ErrorBoundary from "./components/ErrorBoundary";
 import "./components/DueDiligenceModal.css";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
@@ -1494,23 +1495,25 @@ export default function App() {
             </div>
           </div>
 
-          <DueDiligenceHistory
-            API_BASE={API_BASE}
-            userId={userId}
-            onOpenDossier={(dossier, prop, taskId, isCached) => {
-              const effectiveProp = prop || {
-                id: taskId,
-                title: dossier?.property_title || "Bất động sản thẩm định",
-                district: dossier?.district || "Đà Nẵng",
-                price: dossier?.property_price || 0,
-                area: dossier?.area_m2 || 0
-              };
-              setSelectedDueDiligenceProperty(effectiveProp);
-              setHistoryReviewData({ dossier, taskId, isCached });
-              setIsDueDiligenceOpen(true);
-            }}
-            onOpenSettings={() => setShowDueDiligenceSettings(true)}
-          />
+          <ErrorBoundary title="Không thể tải màn hình Lịch Sử Thẩm Định">
+            <DueDiligenceHistory
+              API_BASE={API_BASE}
+              userId={userId}
+              onOpenDossier={(dossier, prop, taskId, isCached) => {
+                const effectiveProp = prop || {
+                  id: taskId,
+                  title: dossier?.property_title || "Bất động sản thẩm định",
+                  district: dossier?.district || "Đà Nẵng",
+                  price: dossier?.property_price || 0,
+                  area: dossier?.area_m2 || 0
+                };
+                setSelectedDueDiligenceProperty(effectiveProp);
+                setHistoryReviewData({ dossier, taskId, isCached });
+                setIsDueDiligenceOpen(true);
+              }}
+              onOpenSettings={() => setShowDueDiligenceSettings(true)}
+            />
+          </ErrorBoundary>
         </div>
       ) : (
         /* ==================== MÀN HÌNH QUẢN TRỊ HỆ THỐNG ==================== */
