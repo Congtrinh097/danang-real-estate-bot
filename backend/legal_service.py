@@ -46,6 +46,12 @@ class LegalService:
                     vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
                 )
                 print(f"[OK] Collection created: {self.collection_name}")
+
+            # Đảm bảo payload index cho doc_id trên Qdrant Cloud
+            try:
+                self.client.create_payload_index(collection_name=self.collection_name, field_name="doc_id", field_schema="keyword")
+            except Exception:
+                pass
         except Exception as e:
             print(f"[WARN] Error ensuring legal collection: {e}")
 

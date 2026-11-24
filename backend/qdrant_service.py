@@ -15,15 +15,18 @@ class QdrantService:
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         self.vector_size = 1536  # Chuẩn của text-embedding-3-small
 
-        # Thử kết nối Docker Qdrant trước (nếu Docker đang chạy)
+        # Thử kết nối Qdrant từ xa (Docker hoặc Qdrant Cloud) trước
         try:
-            temp_client = QdrantClient(url=settings.QDRANT_URL, timeout=1.0)
+            client_kwargs = {"url": settings.QDRANT_URL, "timeout": 3.0}
+            if getattr(settings, "QDRANT_API_KEY", None):
+                client_kwargs["api_key"] = settings.QDRANT_API_KEY
+            temp_client = QdrantClient(**client_kwargs)
             temp_client.get_collections()
             self.client = temp_client
-            print("[INFO] Connected to Qdrant Docker at " + settings.QDRANT_URL)
-        except Exception:
-            # Nếu Docker chưa bật, tự động fallback sang Qdrant Local file storage
-            print("[INFO] Docker Qdrant not available. Using local file-based Qdrant storage...")
+            print(f"[INFO] Connected to Remote Qdrant at {settings.QDRANT_URL}")
+        except Exception as e:
+            # Nếu không kết nối được Qdrant từ xa, tự động fallback sang Qdrant Local file storage
+            print(f"[INFO] Remote Qdrant not available ({e}). Using local file-based Qdrant storage...")
             local_path = os.path.abspath("./data/qdrant_local")
             os.makedirs(local_path, exist_ok=True)
             self.client = QdrantClient(path=local_path)
@@ -85,7 +88,7 @@ class QdrantService:
         return vecs
 
     def ensure_collection(self):
-        """Khởi tạo collection nếu chưa tồn tại"""
+        """Khởi tạo collection nếu chưa tồn tại kèm theo payload indices"""
         collections = [c.name for c in self.client.get_collections().collections]
         if self.collection_name not in collections:
             self.client.create_collection(
@@ -94,8 +97,27 @@ class QdrantService:
             )
             print(f"[OK] Collection created: {self.collection_name}")
 
-    def ingest_dataset(self, json_file_path: Optional[str] = None, clear_existing: bool = True):
-        """Nạp dữ liệu BĐS vào Qdrant với cơ chế dọn dẹp dữ liệu cũ và định vị đường dẫn linh hoạt"""
+        # Đảm bảo các trường filter có payload index để tương thích với Qdrant Cloud
+        for field, schema in [("category", "keyword"), ("district", "keyword"), ("price_vnd", "integer")]:
+            try:
+                self.client.create_payload_index(collection_name=self.collection_name, field_name=field, field_schema=schema)
+            except Exception:
+                pass
+
+    def ingest_dataset(self, json_file_path: Optional[str] = None, clear_existing: bool = False):
+        """Nạp dữ liệu BĐS vào Qdrant với cơ chế an toàn: kiểm tra collection hiện có để tránh nạp lặp lãng phí token OpenAI"""
+        self.ensure_collection()
+
+        # Nếu không yêu cầu xóa và collection đã có dữ liệu, bỏ qua để tiết kiệm token embedding
+        if not clear_existing:
+            try:
+                count_res = self.client.count(collection_name=self.collection_name, exact=True)
+                if count_res.count > 0:
+                    print(f"[INFO] Collection '{self.collection_name}' already contains {count_res.count} points. Skipping re-ingestion to save OpenAI tokens.")
+                    return
+            except Exception as e:
+                print(f"[WARN] Unable to check collection count: {e}")
+
         if json_file_path is None or not os.path.exists(json_file_path):
             base_data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "danang_properties.json"))
             if os.path.exists(base_data_path):
@@ -110,8 +132,7 @@ class QdrantService:
             if self.collection_name in collections:
                 self.client.delete_collection(collection_name=self.collection_name)
                 print(f"[INFO] Cleared old collection: {self.collection_name}")
-
-        self.ensure_collection()
+                self.ensure_collection()
         with open(json_file_path, "r", encoding="utf-8") as f:
             properties = json.load(f)
 

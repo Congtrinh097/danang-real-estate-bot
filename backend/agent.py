@@ -576,7 +576,7 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
             updated_messages = [sanitized_messages[-1]]
 
     def make_result(intent_val: str) -> Dict[str, Any]:
-        ret = {"intent": intent_val, "citations": []}
+        ret = {"intent": intent_val, "citations": [], "found_properties": []}
         if updated_messages:
             ret["messages"] = updated_messages
         return ret
@@ -964,8 +964,19 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
         found_properties: List[Dict[str, Any]] = []
         extracted_criteria = dict(current_criteria)
 
-        # Duyệt qua các thông điệp để trích xuất ToolMessage và tool call arguments
-        for msg in agent_messages:
+        # Chỉ trích xuất kết quả tìm kiếm BĐS mới nếu tool 'search_danang_properties' được gọi trong lượt hội thoại hiện tại.
+        # Lượt hội thoại hiện tại bắt đầu sau HumanMessage cuối cùng trong agent_messages.
+        last_human_idx = -1
+        for idx in range(len(agent_messages) - 1, -1, -1):
+            msg_item = agent_messages[idx]
+            if isinstance(msg_item, HumanMessage) or getattr(msg_item, "type", "") == "human" or getattr(msg_item, "role", "") == "user":
+                last_human_idx = idx
+                break
+
+        current_turn_messages = agent_messages[last_human_idx + 1:] if last_human_idx != -1 else agent_messages
+
+        # Duyệt qua các thông điệp của LƯỢT HIỆN TẠI để trích xuất ToolMessage và tool call arguments
+        for msg in current_turn_messages:
             # 1. Trích xuất tham số criteria từ tool call
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:

@@ -127,3 +127,38 @@ def test_router_classifies_complex_multi_domain_query_as_a2a_council():
     assert len(messages) >= 2
     reply_text = messages[-1].content.lower()
     assert "hội đồng" in reply_text or "khả thi" in reply_text or "nghị quyết" in reply_text
+
+
+def test_followup_question_does_not_repeat_previous_properties():
+    """
+    Test theo TDD & chống hồi quy (Regression test):
+    Sau khi người dùng hỏi tìm kiếm BĐS và nhận được danh sách kết quả (Turn 1),
+    ở lượt tiếp theo (Turn 2) khi hỏi câu hỏi chi tiết về căn nhà hoặc câu hỏi follow-up:
+    1. Agent phản hồi câu trả lời tương ứng
+    2. found_properties của lượt 2 PHẢI là rỗng ([]) để tránh hiển thị lặp lại carousel BĐS cũ
+    """
+    thread_id = "test_tdd_followup_no_repeat_props_005"
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "tags": ["test_followup_no_repeat", thread_id],
+        "metadata": {"thread_id": thread_id},
+        "run_name": "Test-Followup-No-Repeat-Properties"
+    }
+
+    # Turn 1: Tìm kiếm BĐS
+    state1 = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Tìm giúp tôi căn hộ ở quận Sơn Trà")]},
+        config=config,
+    )
+    assert state1.get("intent") == "search_property"
+    assert len(state1.get("found_properties") or []) > 0
+
+    # Turn 2: Câu hỏi tiếp theo về căn nhà
+    state2 = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Căn này view sông hay view biển vậy em?")]},
+        config=config,
+    )
+    # Lượt 2 không được mang theo found_properties của lượt 1
+    assert state2.get("found_properties") == []
+    assert len(state2.get("messages", [])) >= 4
+

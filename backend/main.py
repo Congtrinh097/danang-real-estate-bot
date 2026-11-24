@@ -104,15 +104,20 @@ class SetUserGroupRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    # Tự động nạp dữ liệu mẫu vào Qdrant khi backend khởi động
+    # Tự động nạp dữ liệu mẫu vào Qdrant khi backend khởi động (chỉ nạp nếu chưa có dữ liệu)
     try:
-        qdrant_service.ingest_dataset()
+        qdrant_service.ingest_dataset(clear_existing=False)
     except Exception as e:
         print(f"[WARN] Ingest Qdrant lỗi hoặc đã nạp: {e}")
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "city": "Đà Nẵng"}
+    return {
+        "status": "ok",
+        "city": "Đà Nẵng",
+        "service": "danang-real-estate-bot",
+        "version": "1.0.0"
+    }
 
 # ==================== PHÂN HỆ BÁO CÁO AGENTOPS ====================
 @app.get("/api/agentops/reports/workload")

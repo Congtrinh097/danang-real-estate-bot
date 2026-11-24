@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: danang-bds-backend
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENAI_MODEL_NAME
+        value: gpt-4o-mini
+      - key: EMBEDDING_MODEL_NAME
+        value: text-embedding-3-small
+      - key: QDRANT_COLLECTION_NAME
+        value: danang_properties
+      - key: LANGCHAIN_TRACING_V2
+        value: "false"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false

@@ -36,7 +36,8 @@ import {
   ShieldAlert,
   Users,
   Landmark,
-  History
+  History,
+  Lock
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
 import TopupModal from "./components/TopupModal";
@@ -96,9 +97,36 @@ const getOrCreateUserId = () => {
 const STORAGE_KEY = "danang_re_threads";
 const ACTIVE_THREAD_KEY = "danang_re_active_thread_id";
 const API_BASE = import.meta.env.VITE_API_BASE || "";
+const REQUIRED_PIN = import.meta.env.VITE_ACCESS_PIN || "123456";
+const PIN_AUTH_KEY = "danang_bds_pin_verified";
 
 export default function App() {
   const [userId] = useState(() => getOrCreateUserId());
+  // Lớp bảo vệ mã PIN cho 5 người dùng nội bộ
+  const [isPinVerified, setIsPinVerified] = useState(() => {
+    try {
+      return localStorage.getItem(PIN_AUTH_KEY) === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+
+  const handleVerifyPin = (e) => {
+    e.preventDefault();
+    if (pinInput.trim() === REQUIRED_PIN) {
+      try {
+        localStorage.setItem(PIN_AUTH_KEY, "true");
+      } catch (err) {
+        console.error(err);
+      }
+      setIsPinVerified(true);
+      setPinError("");
+    } else {
+      setPinError("Mã PIN không chính xác. Vui lòng kiểm tra lại!");
+    }
+  };
   // Navigation: "chat" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
   // Admin Sub-Navigation: "legal" | "agentops"
@@ -1008,6 +1036,103 @@ export default function App() {
       alert("Lỗi tải bản xem trước: " + err.message);
     }
   };
+
+  if (!isPinVerified) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0f172a",
+        padding: "20px",
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif"
+      }}>
+        <div style={{
+          backgroundColor: "#1e293b",
+          border: "1px solid #334155",
+          borderRadius: "16px",
+          padding: "36px 32px",
+          maxWidth: "420px",
+          width: "100%",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+          textAlign: "center",
+          color: "#f8fafc"
+        }}>
+          <div style={{
+            width: "56px",
+            height: "56px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(37, 99, 235, 0.15)",
+            color: "#38bdf8",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: "20px"
+          }}>
+            <Lock size={28} />
+          </div>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", marginBottom: "8px" }}>
+            Xác Thực Quyền Truy Cập
+          </h2>
+          <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "24px", lineHeight: "1.5" }}>
+            Hệ thống AI Bất động sản Đà Nẵng đang hoạt động ở chế độ nội bộ. Vui lòng nhập mã PIN bảo mật để tiếp tục.
+          </p>
+          <form onSubmit={handleVerifyPin}>
+            <input
+              type="password"
+              placeholder="Nhập mã PIN..."
+              value={pinInput}
+              onChange={(e) => {
+                setPinInput(e.target.value);
+                setPinError("");
+              }}
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "10px",
+                border: pinError ? "1px solid #ef4444" : "1px solid #475569",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                fontSize: "16px",
+                textAlign: "center",
+                letterSpacing: "4px",
+                outline: "none",
+                marginBottom: "12px",
+                boxSizing: "border-box"
+              }}
+            />
+            {pinError && (
+              <p style={{ color: "#ef4444", fontSize: "12px", marginBottom: "16px" }}>
+                {pinError}
+              </p>
+            )}
+            <button
+              type="submit"
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                fontWeight: "600",
+                fontSize: "14px",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Mở Khóa Hệ Thống
+            </button>
+          </form>
+          <div style={{ marginTop: "24px", fontSize: "11px", color: "#64748b" }}>
+            Bảo mật nội bộ • Giới hạn 5 người dùng
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
