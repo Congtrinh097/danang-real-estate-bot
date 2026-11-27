@@ -12,6 +12,10 @@ from langgraph.types import Command
 from appointment_tools import set_current_user_id
 from agent import property_agent
 
+@pytest.mark.skipif(
+    os.getenv("RUN_LIVE_EVALS") != "1" or not os.getenv("OPENAI_API_KEY"),
+    reason="Live HITL agent chỉ chạy khi RUN_LIVE_EVALS=1 và có OPENAI_API_KEY",
+)
 def test_hitl_appointment_flow():
     test_uid = "test_hitl_user_e2e"
     set_current_user_id(test_uid)

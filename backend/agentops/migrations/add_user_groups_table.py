@@ -51,6 +51,10 @@ def run_user_groups_migrations():
             END IF;
         END $$;
         """)
+        cur.execute("""
+        ALTER TABLE user_wallets
+        ADD COLUMN IF NOT EXISTS daily_free_limit_override_vnd NUMERIC(14, 2);
+        """)
 
         print("[OK] User groups and user_wallets group column initialized successfully.")
     finally:

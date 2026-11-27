@@ -34,7 +34,7 @@ def init_agentops_database():
         # Nạp dữ liệu hạn mức mặc định
         cur.execute("""
         INSERT INTO agentops_budgets (workload_type, turn_limit_vnd, thread_limit_vnd, daily_limit_vnd)
-        VALUES 
+        VALUES
             ('chat', 5000.00, 20000.00, 200000.00),
             ('evaluation', 10000.00, 50000.00, 100000.00),
             ('default', 5000.00, 20000.00, 100000.00)
@@ -53,7 +53,7 @@ def init_agentops_database():
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMP WITH TIME ZONE NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_reservations_lookup 
+        CREATE INDEX IF NOT EXISTS idx_reservations_lookup
         ON agentops_budget_reservations (thread_id, workload_type, status);
         """)
 

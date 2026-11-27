@@ -103,7 +103,7 @@ export default function AgentOpsAdmin({ API_BASE = "" }) {
     if (!iso) return "-";
     try {
       const d = new Date(iso);
-      return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + 
+      return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) +
         " " + d.toLocaleDateString("vi-VN");
     } catch {
       return iso;

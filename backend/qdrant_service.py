@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range
@@ -175,6 +176,11 @@ class QdrantService:
         limit: int = 3
     ) -> List[Dict[str, Any]]:
         """Truy vấn Vector kết hợp Payload Filter"""
+        self.ensure_collection()
+        collection = self.client.get_collection(self.collection_name)
+        if not (collection.points_count or 0):
+            self.ingest_dataset()
+
         must_conditions = []
 
         if category:

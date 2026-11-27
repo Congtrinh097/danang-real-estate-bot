@@ -95,12 +95,12 @@ class PricingRegistry:
         key = model_name.strip().lower()
         if key in self._pricing:
             return self._pricing[key]
-        
+
         # Thử tìm partial match (ví dụ: gpt-4o-mini-2024-07-18 -> gpt-4o-mini)
         for name, pricing in self._pricing.items():
             if name in key:
                 return pricing
-                
+
         return self._default_fallback_pricing
 
     def register_pricing(self, pricing: ModelPricing):

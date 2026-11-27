@@ -8,9 +8,22 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from fastapi.testclient import TestClient
-from main import app
+from main import app, legal_service
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolate_legal_api_storage(tmp_path):
+    original_storage = legal_service.storage_dir
+    original_meta = legal_service.meta_file
+    legal_service.storage_dir = tmp_path / "legal_api_docs"
+    legal_service.storage_dir.mkdir(parents=True, exist_ok=True)
+    legal_service.meta_file = legal_service.storage_dir / "documents_meta.json"
+    legal_service.meta_file.write_text("[]", encoding="utf-8")
+    yield
+    legal_service.storage_dir = original_storage
+    legal_service.meta_file = original_meta
 
 def test_legal_upload_and_preview_and_delete():
     # 1. Upload file markdown

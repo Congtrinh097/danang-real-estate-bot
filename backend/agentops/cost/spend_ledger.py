@@ -102,7 +102,7 @@ class SpendLedger:
             cur.execute("""
                 SELECT COALESCE(SUM(amount_vnd), 0.0) AS total_spend
                 FROM agentops_spend_ledger
-                WHERE workload_type = %s 
+                WHERE workload_type = %s
                   AND created_at >= CURRENT_DATE;
             """, (workload_type,))
             row = cur.fetchone()

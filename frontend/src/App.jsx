@@ -31,6 +31,10 @@ import {
   Activity,
   BarChart3,
   DollarSign,
+  LifeBuoy,
+  Clock,
+  ShieldCheck,
+  RefreshCw,
   Wallet,
   CreditCard,
   ShieldAlert,
@@ -100,6 +104,232 @@ const API_BASE = import.meta.env.VITE_API_BASE || "";
 const REQUIRED_PIN = import.meta.env.VITE_ACCESS_PIN || "123456";
 const PIN_AUTH_KEY = "danang_bds_pin_verified";
 
+function TenantSupportPanel({ onNavigate }) {
+  const [form, setForm] = useState({
+    tenant_name: "", email: "", phone: "", property_id: "", unit: "", subject: "", message: ""
+  });
+  const [result, setResult] = useState(null);
+  const [threadId, setThreadId] = useState(null);
+  const [history, setHistory] = useState(null);
+  const historyRequest = useRef(null);
+  const [metrics, setMetrics] = useState(null);
+  const [tickets, setTickets] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [adminKey, setAdminKey] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
+  const [staffName, setStaffName] = useState("");
+  const [pendingAction, setPendingAction] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadDashboard = async () => {
+    setDashboardError("");
+    try {
+      const headers = adminKey ? { "X-Admin-Key": adminKey } : {};
+      const [metricsResponse, ticketsResponse, alertsResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/tenant/sla/metrics`, { headers }),
+        fetch(`${API_BASE}/api/tenant/tickets?limit=8`, { headers }),
+        fetch(`${API_BASE}/api/tenant/sla/alerts`, { headers })
+      ]);
+      const responses = [metricsResponse, ticketsResponse, alertsResponse];
+      if (responses.some((response) => response.status === 401)) {
+        throw new Error("Nhập khóa quản trị để xem ticket và cảnh báo SLA.");
+      }
+      if (responses.some((response) => !response.ok)) throw new Error("Không tải được dữ liệu SLA.");
+      const [metricsPayload, ticketsPayload, alertsPayload] = await Promise.all(
+        responses.map((response) => response.json())
+      );
+      setMetrics(metricsPayload.data);
+      setTickets(ticketsPayload.data);
+      setAlerts(alertsPayload.data);
+    } catch (dashboardLoadError) {
+      setMetrics(null);
+      setTickets([]);
+      setAlerts([]);
+      setDashboardError(dashboardLoadError.message);
+    }
+  };
+
+  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => () => historyRequest.current?.abort(), []);
+
+  const loadHistory = async (ticketId) => {
+    historyRequest.current?.abort();
+    const request = new AbortController();
+    historyRequest.current = request;
+    setHistory({ ticketId });
+    try {
+      const response = await fetch(`${API_BASE}/api/tenant/tickets/${ticketId}/history`, {
+        headers: { "X-Admin-Key": adminKey },
+        signal: request.signal
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Không tải được lịch sử hỗ trợ.");
+      if (!request.signal.aborted) setHistory({ ticketId, ...payload.data });
+    } catch (historyError) {
+      if (!request.signal.aborted) setHistory({ ticketId, error: historyError.message });
+    }
+  };
+
+  const applyHumanAction = async (ticketId, action) => {
+    const approvedBy = staffName.trim();
+    if (approvedBy.length < 2) {
+      setDashboardError("Nhập tên nhân viên trước khi cập nhật ticket.");
+      return;
+    }
+    setPendingAction(ticketId);
+    setDashboardError("");
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (adminKey) headers["X-Admin-Key"] = adminKey;
+      const response = await fetch(`${API_BASE}/api/tenant/tickets/${ticketId}/human-action`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ approved_by: approvedBy, action })
+      });
+      if (!response.ok) throw new Error("Không cập nhật được ticket. Kiểm tra khóa quản trị và thử lại.");
+      await loadDashboard();
+    } catch (actionError) {
+      setDashboardError(actionError.message);
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/tenant/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, channel: "web", ...(threadId && { thread_id: threadId }) })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Không thể tạo ticket");
+      setResult(payload.data);
+      if (payload.data.ticket.verification_passed) setThreadId(payload.data.ticket.thread_id);
+      setForm((current) => ({ ...current, subject: "", message: "" }));
+      await loadDashboard();
+    } catch (submitError) {
+      setError(submitError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="tenant-view">
+      <div className="admin-header">
+        <div>
+          <h2>Tenant Support & SLA Assurance</h2>
+          <p>Tiếp nhận sự cố, tra cứu chính sách thuê và theo dõi SLA có human oversight.</p>
+        </div>
+        <div className="header-nav">
+          <button className="nav-tab-btn" onClick={() => onNavigate("chat")}><MessageSquare size={14} /> Tư vấn BĐS</button>
+          <button className="nav-tab-btn active"><LifeBuoy size={14} /> Tenant Support</button>
+          <button className="nav-tab-btn" onClick={() => onNavigate("admin_legal")}><Scale size={14} /> Quản trị</button>
+        </div>
+      </div>
+      <div className="tenant-metrics">
+        {[
+          ["Tổng ticket", metrics?.total ?? 0, <FileText size={20} />],
+          ["Đang xử lý", metrics?.active ?? 0, <Clock size={20} />],
+          ["Chờ nhân viên", metrics?.awaiting_human ?? 0, <ShieldCheck size={20} />],
+          ["Vi phạm SLA", metrics?.breached ?? 0, <AlertCircle size={20} />]
+        ].map(([label, value, icon]) => (
+          <div className="tenant-metric-card" key={label}>{icon}<div><span>{label}</span><strong>{value}</strong></div></div>
+        ))}
+        <button className="tenant-refresh" onClick={loadDashboard} title="Làm mới"><RefreshCw size={16} /></button>
+      </div>
+      <div className="tenant-grid">
+        <form className="tenant-form" onSubmit={submit}>
+          <h3>Gửi yêu cầu hỗ trợ</h3>
+          <div className="tenant-form-row">
+            <label>Họ tên<input value={form.tenant_name} onChange={(e) => setForm({ ...form, tenant_name: e.target.value })} /></label>
+            <label>Căn hộ<input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="A-1203" /></label>
+          </div>
+          <div className="tenant-form-row">
+            <label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label>Điện thoại<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+          </div>
+          <label>Tiêu đề<input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Ví dụ: Rò nước trong căn hộ" /></label>
+          <label>Nội dung<textarea required rows="6" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></label>
+          <button className="btn-book" disabled={loading}>{loading ? "Đang phân loại và tạo ticket..." : threadId ? "Gửi cập nhật" : "Gửi yêu cầu"}</button>
+          {threadId && (
+            <button type="button" className="nav-tab-btn" disabled={loading} onClick={() => { setThreadId(null); setResult(null); }}>
+              Bắt đầu yêu cầu mới
+            </button>
+          )}
+          {error && <div className="tenant-error">{error}</div>}
+          {result && (
+            <div className={`tenant-result urgency-${result.ticket.urgency}`}>
+              <strong>{result.ticket.id} · {result.ticket.intent} · {result.ticket.urgency}</strong>
+              <p style={{ whiteSpace: "pre-line" }}>{result.reply}</p>
+              <small>Luồng: {result.supervisor_route.join(" → ")}</small>
+            </div>
+          )}
+        </form>
+        <div className="tenant-ticket-list">
+          <h3>Ticket gần đây</h3>
+          <form className="tenant-form" onSubmit={(event) => { event.preventDefault(); loadDashboard(); }}>
+            <label>Khóa quản trị<input type="password" value={adminKey} onChange={(event) => {
+              historyRequest.current?.abort();
+              setHistory(null);
+              setAdminKey(event.target.value);
+            }} /></label>
+            <label>Tên nhân viên<input maxLength={120} value={staffName} onChange={(event) => setStaffName(event.target.value)} /></label>
+            <button className="btn-book">Tải dashboard</button>
+          </form>
+          {dashboardError && <p className="tenant-error" role="alert">{dashboardError}</p>}
+          {alerts.length > 0 && (
+            <ul aria-label="Cảnh báo SLA">
+              {alerts.map((alert) => (
+                <li key={alert.ticket_id}>{alert.ticket_id} · {alert.type === "breached" ? "Vi phạm SLA" : "Sắp đến hạn SLA"}</li>
+              ))}
+            </ul>
+          )}
+          {metrics && tickets.length === 0 && <p className="tenant-empty">Chưa có ticket.</p>}
+          {tickets.map((ticket) => (
+            <article key={ticket.id}>
+              <div><strong>{ticket.id}</strong><span className={`tenant-pill urgency-${ticket.urgency}`}>{ticket.urgency}</span></div>
+              <p>{ticket.subject || ticket.description}</p>
+              <small>{ticket.intent} · {ticket.status} · SLA {new Date(ticket.sla_due_at).toLocaleString("vi-VN")}</small>
+              {adminKey && (
+                <button type="button" className="nav-tab-btn" onClick={() => loadHistory(ticket.id)}>
+                  Xem lịch sử
+                </button>
+              )}
+              {history?.ticketId === ticket.id && (
+                <section aria-label="Lịch sử hỗ trợ" aria-live="polite">
+                  {history.error && <p className="tenant-error">{history.error}</p>}
+                  {!history.error && !history.turns && <p>Đang tải lịch sử…</p>}
+                  {history.has_earlier && <p>Đang hiển thị 50 lượt gần nhất.</p>}
+                  {history.turns?.map((turn) => (
+                    <div key={turn.ticket_id}>
+                      <small>{turn.ticket_id} · {turn.channel} · {new Date(turn.created_at).toLocaleString("vi-VN")}</small>
+                      <p><strong>Người thuê</strong> {turn.subject && `${turn.subject} · `}{turn.message}</p>
+                      {turn.assistant_reply && <p style={{ whiteSpace: "pre-line" }}><strong>Trợ lý</strong> {turn.assistant_reply}</p>}
+                    </div>
+                  ))}
+                </section>
+              )}
+              {ticket.status === "awaiting_human" && (
+                <button className="nav-tab-btn" disabled={pendingAction !== null} onClick={() => applyHumanAction(ticket.id, "approve")}>Nhận xử lý</button>
+              )}
+              {ticket.status === "in_progress" && (
+                <button className="nav-tab-btn" disabled={pendingAction !== null} onClick={() => applyHumanAction(ticket.id, "resolve")}>Hoàn tất</button>
+              )}
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [userId] = useState(() => getOrCreateUserId());
   // Lớp bảo vệ mã PIN cho 5 người dùng nội bộ
@@ -127,7 +357,7 @@ export default function App() {
       setPinError("Mã PIN không chính xác. Vui lòng kiểm tra lại!");
     }
   };
-  // Navigation: "chat" | "admin_legal"
+  // Navigation: "chat" | "tenant" | "due_diligence_history" | "admin_legal"
   const [activeTab, setActiveTab] = useState("chat");
   // Admin Sub-Navigation: "legal" | "agentops"
   const [adminSubTab, setAdminSubTab] = useState("legal");
@@ -1210,6 +1440,15 @@ export default function App() {
           <button
             className="prompt-btn prompt-btn-highlight"
             onClick={() => {
+              setActiveTab("tenant");
+              setIsMobileSidebarOpen(false);
+            }}
+          >
+            🛟 Báo sự cố & theo dõi SLA
+          </button>
+          <button
+            className="prompt-btn prompt-btn-highlight"
+            onClick={() => {
               setActiveTab("chat");
               setIsMobileSidebarOpen(false);
               handleSend("Tôi muốn đặt lịch xem nhà tại dự án Monarchy Sơn Trà");
@@ -1310,6 +1549,12 @@ export default function App() {
                   <MessageSquare size={14} /> <span className="nav-btn-text">Tư Vấn BĐS</span>
                 </button>
                 <button
+                  className={`nav-tab-btn ${activeTab === "tenant" ? "active" : ""}`}
+                  onClick={() => setActiveTab("tenant")}
+                >
+                  <LifeBuoy size={14} /> <span className="nav-btn-text">Tenant</span>
+                </button>
+                <button
                   className={`nav-tab-btn ${activeTab === "due_diligence_history" ? "active" : ""}`}
                   onClick={() => setActiveTab("due_diligence_history")}
                 >
@@ -1324,7 +1569,7 @@ export default function App() {
               </div>
 
               {/* Widget Ví & Ngân Sách Cá Nhân User */}
-              <div 
+              <div
                 className="user-wallet-header-widget"
                 onClick={() => setShowTopupModal(true)}
                 title={`Hạng: ${userWallet?.group_name || "Tiêu chuẩn"} | Số dư: ${userWallet?.balance_vnd != null ? Math.round(userWallet.balance_vnd).toLocaleString("vi-VN") : 0}đ | Free hôm nay: ${userWallet?.daily_free_remaining_vnd != null ? Math.round(userWallet.daily_free_remaining_vnd).toLocaleString("vi-VN") : "5.000"}đ / ${userWallet?.daily_free_limit_vnd != null ? Math.round(userWallet.daily_free_limit_vnd).toLocaleString("vi-VN") : "5.000"}đ. Bấm để nạp thêm tiền!`}
@@ -1358,19 +1603,19 @@ export default function App() {
 
               {/* Widget hiển thị ngân sách thread */}
               {threadBudget && (
-                <div 
+                <div
                   className={`thread-budget-badge ${
-                    threadBudget.is_exceeded 
-                      ? "danger" 
-                      : threadBudget.is_near_limit 
-                      ? "warning" 
+                    threadBudget.is_exceeded
+                      ? "danger"
+                      : threadBudget.is_near_limit
+                      ? "warning"
                       : "normal"
                   }`}
                   title={`Đã dùng: ${Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / ${Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ (${threadBudget.utilization_pct}%)`}
                 >
                   <div className="budget-progress-track">
-                    <div 
-                      className="budget-progress-bar" 
+                    <div
+                      className="budget-progress-bar"
                       style={{ width: `${Math.min(threadBudget.utilization_pct, 100)}%` }}
                     />
                   </div>
@@ -1501,7 +1746,7 @@ export default function App() {
               <div className="budget-alert-banner danger">
                 <AlertCircle size={16} />
                 <span>
-                  Phiên hội thoại này đã đạt hạn mức ({Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / {Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ). 
+                  Phiên hội thoại này đã đạt hạn mức ({Math.round(threadBudget.spent_vnd).toLocaleString("vi-VN")}đ / {Math.round(threadBudget.thread_limit_vnd).toLocaleString("vi-VN")}đ).
                   Vui lòng bấm <strong>"Tạo đoạn chat mới"</strong> để tiếp tục trò chuyện.
                 </span>
               </div>
@@ -1510,7 +1755,7 @@ export default function App() {
               <div className="budget-alert-banner warning">
                 <AlertCircle size={16} />
                 <span>
-                  Hạn mức phiên hội thoại sắp hết (còn lại {Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ). 
+                  Hạn mức phiên hội thoại sắp hết (còn lại {Math.round(threadBudget.remaining_vnd).toLocaleString("vi-VN")}đ).
                   Bạn có thể tạo đoạn chat mới bất cứ lúc nào.
                 </span>
               </div>
@@ -1577,9 +1822,9 @@ export default function App() {
                 onChange={(e) => setInput(e.target.value)}
                 disabled={loading || threadBudget?.is_exceeded}
               />
-              <button 
-                type="submit" 
-                className="btn-send" 
+              <button
+                type="submit"
+                className="btn-send"
                 disabled={loading || uploadingContract || threadBudget?.is_exceeded}
               >
                 <Send size={18} />
@@ -1587,6 +1832,8 @@ export default function App() {
             </form>
           </div>
         </div>
+      ) : activeTab === "tenant" ? (
+        <TenantSupportPanel onNavigate={setActiveTab} />
       ) : activeTab === "due_diligence_history" ? (
         /* ==================== MÀN HÌNH LỊCH SỬ THẨM ĐỊNH BĐS ==================== */
         <div className="admin-view-container" style={{ background: "#0b1329", minHeight: "100vh" }}>
@@ -1610,6 +1857,9 @@ export default function App() {
             <div className="header-nav">
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
                 <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
+              </button>
+              <button className="nav-tab-btn" onClick={() => setActiveTab("tenant")}>
+                <LifeBuoy size={14} /> <span className="nav-btn-text">Tenant Support</span>
               </button>
               <button className="nav-tab-btn active">
                 <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
@@ -1670,8 +1920,12 @@ export default function App() {
               <button className="nav-tab-btn" onClick={() => setActiveTab("chat")}>
                 <MessageSquare size={14} /> <span className="nav-btn-text">Về Khung Chat</span>
               </button>
+              <button className="nav-tab-btn" onClick={() => setActiveTab("tenant")}>
+                <LifeBuoy size={14} /> <span className="nav-btn-text">Tenant Support</span>
+              </button>
               <button className="nav-tab-btn" onClick={() => setActiveTab("due_diligence_history")}>
                 <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
+              </button>
               </button>
               <button className="nav-tab-btn active">
                 <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>

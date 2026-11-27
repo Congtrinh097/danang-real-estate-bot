@@ -16,6 +16,7 @@ from config import settings
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from mortgage_calculator import MortgageCalculator, MortgageInput
+from checkpointing import create_agent_checkpointer
 from agentops import (
     ModelCallGuard,
     BudgetExceededException,
@@ -118,7 +119,7 @@ def sanitize_messages_for_react_agent(messages: Sequence[BaseMessage], max_messa
         return []
 
     recent = list(messages[-max_messages:])
-    
+
     # Tập hợp các tool_call_id có ToolMessage phản hồi trong slice
     responded_tool_call_ids = set()
     for m in recent:
@@ -673,7 +674,8 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
         ]
         rental_keywords = ["thuê", "cho thuê", "tìm thuê", "thuê nhà", "thuê phòng", "thuê trọ", "thuê căn hộ", "phòng trọ"]
         legal_keywords = ["pháp lý", "sổ đỏ", "sổ hồng", "sang tên", "công chứng", "đặt cọc", "hợp đồng", "thủ tục", "tranh chấp", "người nước ngoài", "thuế", "luật nhà ở", "luật đất đai", "quy định", "sở hữu"]
-        search_keywords = ["mua", "bán", "căn hộ", "chung cư", "nhà phố", "đất nền", "biệt thự", "villa", "phòng ngủ", "tỷ", "sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "hòa vang", "tìm"]
+        explicit_legal_keywords = ["pháp lý", "sổ đỏ", "sổ hồng", "sang tên", "công chứng", "tranh chấp", "người nước ngoài", "thuế", "luật nhà ở", "luật đất đai", "quy định", "sở hữu"]
+        search_keywords = ["mua", "bán", "căn hộ", "chung cư", "nhà phố", "đất nền", "biệt thự", "villa", "phòng ngủ", "triệu", "tỷ", "ngân sách", "vnđ", "sơn trà", "hải châu", "ngũ hành sơn", "thanh khê", "cẩm lệ", "liên chiểu", "hòa vang", "tìm"]
         contract_keywords = ["hợp đồng", "bẫy cọc", "phạt cọc", "thẩm định hợp đồng", "rà soát", "thỏa thuận đặt cọc"]
         
         # Hệ thống chỉ hỗ trợ Mua Bán, mọi yêu cầu hỏi thuê thuần túy được chuyển vào out_of_scope
@@ -685,10 +687,12 @@ def route_intent_node(state: AgentState, config: Optional[RunnableConfig] = None
             intent = "mortgage_calculation"
         elif any(kw in text_lower for kw in contract_keywords) and ("kiểm tra" in text_lower or "rà soát" in text_lower or "thẩm định" in text_lower or "bẫy" in text_lower or "điều 1" in text_lower or "điều khoản" in text_lower or "bên a" in text_lower):
             intent = "contract_audit"
-        elif any(kw in text_lower for kw in legal_keywords):
+        elif any(kw in text_lower for kw in explicit_legal_keywords):
             intent = "legal_consultation"
         elif any(kw in text_lower for kw in search_keywords):
             intent = "search_property"
+        elif any(kw in text_lower for kw in legal_keywords):
+            intent = "legal_consultation"
         else:
             intent = "general_chat"
 
@@ -1029,15 +1033,36 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
         print(f"[WARN] Property Agent error: {exc}")
         # Heuristic fallback an toàn nếu gặp sự cố kết nối (luôn ưu tiên BĐS mua bán)
         text_lower = last_user_message.lower()
-        cat = "sale"
-        dist = "Sơn Trà" if "sơn trà" in text_lower else ("hải châu" if "hải châu" in text_lower else None)
-        price = 3000000000.0 if "3 tỷ" in text_lower else (2000000000.0 if "2 tỷ" in text_lower else None)
+        cat = "rent" if "thuê" in text_lower else ("sale" if "mua" in text_lower else "sale")
+        district_names = {
+            "sơn trà": "Sơn Trà",
+            "hải châu": "Hải Châu",
+            "ngũ hành sơn": "Ngũ Hành Sơn",
+            "thanh khê": "Thanh Khê",
+            "cẩm lệ": "Cẩm Lệ",
+            "liên chiểu": "Liên Chiểu",
+            "hòa vang": "Hòa Vang",
+        }
+        dist = next((canonical for raw, canonical in district_names.items() if raw in text_lower), None)
+
+        price = None
+        amount_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(triệu|tỷ|vnđ|vnd)", text_lower)
+        if amount_match:
+            amount = float(amount_match.group(1).replace(",", "."))
+            unit = amount_match.group(2)
+            multiplier = 1_000_000_000 if unit == "tỷ" else (1_000_000 if unit == "triệu" else 1)
+            price = amount * multiplier
+
+        fallback_criteria = merge_criteria(
+            current_criteria,
+            {"category": cat, "district": dist, "max_price": price},
+        )
 
         props = qdrant_service.search_properties(
             query=last_user_message,
-            category=cat,
-            district=dist,
-            max_price=price,
+            category=fallback_criteria.get("category"),
+            district=fallback_criteria.get("district"),
+            max_price=fallback_criteria.get("max_price"),
             limit=3
         )
         if props:
@@ -1049,7 +1074,7 @@ def property_agent_node(state: AgentState, config: Optional[RunnableConfig] = No
         return {
             "messages": [AIMessage(content=reply_text)],
             "found_properties": props,
-            "criteria": {"category": cat, "district": dist, "max_price": price},
+            "criteria": fallback_criteria,
             "citations": []
         }
 
@@ -1146,5 +1171,5 @@ workflow.add_edge("property_agent", END)
 workflow.add_edge("a2a_council", END)
 
 # Checkpointer lưu state bộ nhớ cho từng thread_id
-memory = MemorySaver()
+memory = create_agent_checkpointer()
 real_estate_agent = workflow.compile(checkpointer=memory)

@@ -133,8 +133,8 @@ class AppointmentService:
     ) -> Optional[Dict[str, Any]]:
         """Hủy lịch hẹn của người dùng"""
         sql = """
-        UPDATE viewing_appointments 
-        SET status = 'cancelled', 
+        UPDATE viewing_appointments
+        SET status = 'cancelled',
             note = CASE WHEN %s IS NOT NULL AND %s != '' THEN note || ' (Lý do hủy: ' || %s || ')' ELSE note END,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = %s

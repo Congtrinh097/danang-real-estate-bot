@@ -9,8 +9,12 @@ if backend_dir not in sys.path:
 from legal_service import LegalService
 
 @pytest.fixture
-def legal_service():
+def legal_service(tmp_path):
     service = LegalService()
+    service.storage_dir = tmp_path / "legal_docs"
+    service.storage_dir.mkdir(parents=True, exist_ok=True)
+    service.meta_file = service.storage_dir / "documents_meta.json"
+    service.meta_file.write_text("[]", encoding="utf-8")
     # Đảm bảo collection tồn tại
     service.ensure_collection()
     return service
