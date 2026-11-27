@@ -120,6 +120,16 @@ const getStageLabel = (stage) => {
   }
 };
 
+const SUB_AGENT_ORDER = [
+  { key: "legal", defaultLabel: "Pháp lý & Quy hoạch" },
+  { key: "valuation", defaultLabel: "Định giá & So sánh" },
+  { key: "climate", defaultLabel: "Thủy văn & Hạ tầng" },
+  { key: "financial", defaultLabel: "Tài chính & Lãi suất" },
+  { key: "deep_research", defaultLabel: "Deep Research Web" },
+  { key: "critic", defaultLabel: "Phản biện Độc lập" },
+  { key: "deep_agent", defaultLabel: "DeepAgent Tổng hợp" },
+];
+
 export default function DueDiligenceModal({
   isOpen,
   onClose,
@@ -147,6 +157,7 @@ export default function DueDiligenceModal({
   const [currentStage, setCurrentStage] = useState("idle");
   const [progress, setProgress] = useState(0);
   const [stageDescription, setStageDescription] = useState("");
+  const [agentSteps, setAgentSteps] = useState({});
   const [errorMessage, setErrorMessage] = useState(null);
   const [isQuotaError, setIsQuotaError] = useState(false);
 
@@ -190,6 +201,7 @@ export default function DueDiligenceModal({
       setCurrentStage("idle");
       setProgress(0);
       setStageDescription("");
+      setAgentSteps({});
       setErrorMessage(null);
       setIsQuotaError(false);
       setIsConfigCollapsed(false);
@@ -251,8 +263,9 @@ export default function DueDiligenceModal({
     setErrorMessage(null);
     setIsQuotaError(false);
     setCurrentStage("planning");
-    setProgress(15);
+    setProgress(10);
     setStageDescription(getStageLabel("planning"));
+    setAgentSteps({});
     setDossier(null);
     setIsConfigCollapsed(true);
 
@@ -342,7 +355,14 @@ export default function DueDiligenceModal({
         if (typeof payload.progress === "number") {
           setProgress((prev) => Math.max(prev, payload.progress));
         }
-        if (payload.stage) setStageDescription(getStageLabel(payload.stage));
+        if (payload.message) {
+          setStageDescription(payload.message);
+        } else if (payload.stage) {
+          setStageDescription(getStageLabel(payload.stage));
+        }
+        if (payload.agent_steps && typeof payload.agent_steps === "object") {
+          setAgentSteps(payload.agent_steps);
+        }
 
         if (payload.status === "completed" || payload.type === "completed") {
           isDone = true;
@@ -411,7 +431,14 @@ export default function DueDiligenceModal({
         if (typeof data.progress === "number") {
           setProgress((prev) => Math.max(prev, data.progress));
         }
-        if (data.stage) setStageDescription(getStageLabel(data.stage));
+        if (data.current_message) {
+          setStageDescription(data.current_message);
+        } else if (data.stage) {
+          setStageDescription(getStageLabel(data.stage));
+        }
+        if (data.agent_steps && typeof data.agent_steps === "object") {
+          setAgentSteps(data.agent_steps);
+        }
 
         if (data.status === "completed") {
           clearInterval(pollIntervalRef.current);
@@ -1199,6 +1226,45 @@ export default function DueDiligenceModal({
                 <div className="dd-stage-msg-box">
                   <AlertCircle size={14} />
                   <span>{stageDescription}</span>
+                </div>
+              )}
+
+              {/* Live Sub-Agent Activity Cards */}
+              {Object.keys(agentSteps).length > 0 && (
+                <div className="dd-subagents-grid">
+                  {SUB_AGENT_ORDER.map(({ key, defaultLabel }) => {
+                    const step = agentSteps[key];
+                    if (!step && key === "deep_research" && !enableDeepResearch) return null;
+                    const st = step?.status || "pending";
+                    const durText = typeof step?.duration_ms === "number"
+                      ? `${(step.duration_ms / 1000).toFixed(1)}s`
+                      : null;
+                    const detailText =
+                      step?.summary ||
+                      (st === "running" ? step?.message : null) ||
+                      (st === "skipped" ? "Bỏ qua" : "Đang chờ...");
+
+                    return (
+                      <div key={key} className={`dd-subagent-card ${st}`}>
+                        <div className="dd-subagent-header">
+                          <div className="dd-subagent-title-wrap">
+                            {st === "completed" ? (
+                              <CheckCircle2 size={14} className="dd-subagent-icon-done" />
+                            ) : st === "running" ? (
+                              <Loader2 size={14} className="spin-icon dd-subagent-icon-run" />
+                            ) : (
+                              <span className="dd-subagent-dot-pending" />
+                            )}
+                            <span className="dd-subagent-name">{step?.label || defaultLabel}</span>
+                          </div>
+                          {durText && <span className="dd-subagent-dur">{durText}</span>}
+                        </div>
+                        <div className="dd-subagent-detail" title={detailText}>
+                          {detailText}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

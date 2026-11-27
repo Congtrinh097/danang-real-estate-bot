@@ -21,6 +21,7 @@ Features:
 
 import os
 import json
+import time
 import asyncio
 import logging
 from urllib.parse import urlparse
@@ -1524,42 +1525,189 @@ class DeepDueDiligenceGraph:
         return asyncio.run(self.ainvoke(state, config=config))
 
     async def ainvoke(self, state: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Asynchronous execution of due diligence using Pure DeepAgents."""
+        """Asynchronous execution of due diligence using Pure DeepAgents with parallel fan-out and real-time event streaming."""
         info = _extract_property_info(state)
         enable_deep = info.get("enable_deep_research", False)
 
+        # Extract optional progress_callback and create a serializable config copy for LangGraph/DeepAgent
+        progress_callback = None
+        clean_config = None
+        if config:
+            clean_config = dict(config)
+            cfg_inner = dict(config.get("configurable") or {})
+            progress_callback = cfg_inner.pop("progress_callback", None)
+            clean_config["configurable"] = cfg_inner
+
+        async def _emit(
+            node_name: str,
+            node_status: str,
+            stage: str,
+            progress: int,
+            message: str,
+            label: Optional[str] = None,
+            summary: Optional[str] = None,
+            duration_ms: Optional[int] = None,
+        ) -> None:
+            if not progress_callback:
+                return
+            try:
+                res = progress_callback(
+                    node_name=node_name,
+                    node_status=node_status,
+                    stage=stage,
+                    progress=progress,
+                    message=message,
+                    label=label,
+                    summary=summary,
+                    duration_ms=duration_ms,
+                )
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as cb_err:
+                logger.debug(f"Progress callback skipped for {node_name}: {cb_err}")
+
         # 1. Planning stage
-        plan_dict = plan_investigation_node(state)
+        t_plan = time.time()
+        await _emit(
+            "planning", "running", "planning", 12,
+            "Đang lập kế hoạch & phân rã mục tiêu thẩm định...",
+            label="Lập kế hoạch"
+        )
+        plan_dict = await asyncio.to_thread(plan_investigation_node, state)
         current_state = {**state, **plan_dict}
+        await _emit(
+            "planning", "completed", "planning", 15,
+            "Hoàn tất kế hoạch thẩm định đa nguồn.",
+            label="Lập kế hoạch",
+            summary="Đã phân rã 4 mũi điều tra chuyên sâu",
+            duration_ms=int((time.time() - t_plan) * 1000)
+        )
 
-        # 2. Analytical nodes/tools execution (ensures state keys are populated)
-        legal_dict = legal_investigation_node(current_state)
-        current_state.update(legal_dict)
-
-        val_dict = valuation_investigation_node(current_state)
-        current_state.update(val_dict)
-
-        climate_dict = climate_investigation_node(current_state)
-        current_state.update(climate_dict)
-
-        fin_dict = financial_simulation_node(current_state)
-        current_state.update(fin_dict)
-
+        # 2. Analytical nodes/tools execution IN PARALLEL (reduces latency 2-3x + streams per-node progress)
+        investigation_specs = [
+            ("legal", "Pháp lý & Quy hoạch", legal_investigation_node),
+            ("valuation", "Định giá & So sánh", valuation_investigation_node),
+            ("climate", "Thủy văn & Hạ tầng", climate_investigation_node),
+            ("financial", "Tài chính & Lãi suất", financial_simulation_node),
+        ]
         if enable_deep:
-            deep_dict = deep_research_node(current_state)
-            current_state.update(deep_dict)
+            investigation_specs.append(("deep_research", "Deep Research Web", deep_research_node))
         else:
             current_state["deep_research"] = None
+            await _emit(
+                "deep_research", "skipped", "investigating", 20,
+                "Bỏ qua Deep Research chuyên sâu (không bật).",
+                label="Deep Research Web",
+                summary="Chưa bật"
+            )
 
-        critic_dict = adversarial_critic_node(current_state)
+        for n_key, n_label, _ in investigation_specs:
+            await _emit(
+                n_key, "running", "investigating", 20,
+                f"Đang điều tra: {n_label}...",
+                label=n_label
+            )
+
+        async def _run_investigation(n_key: str, n_label: str, fn):
+            t0 = time.time()
+            res_dict = await asyncio.to_thread(fn, dict(current_state))
+            dur_ms = int((time.time() - t0) * 1000)
+            return n_key, n_label, res_dict, dur_ms
+
+        def _summarize_node(n_key: str, res_dict: Dict[str, Any]) -> str:
+            try:
+                if n_key == "legal":
+                    leg = _to_dict(res_dict.get("legal") or {})
+                    cites = leg.get("citations") or []
+                    risk = leg.get("risk_level", "Trung bình")
+                    return f"{len(cites)} trích dẫn luật • Rủi ro: {risk}"
+                if n_key == "valuation":
+                    val = _to_dict(res_dict.get("valuation") or {})
+                    pm2 = val.get("price_per_m2_vnd") or 0
+                    status = val.get("valuation_status", "Đã định giá")
+                    if pm2:
+                        return f"{pm2 / 1_000_000:.1f} tr/m² • {status}"
+                    return str(status)
+                if n_key == "climate":
+                    cli = _to_dict(res_dict.get("climate") or {})
+                    flood = cli.get("flood_risk", "Thấp")
+                    zone = cli.get("coastal_or_river_zone") or "Đà Nẵng"
+                    return f"Ngập: {flood} • {zone}"
+                if n_key == "financial":
+                    fin = _to_dict(res_dict.get("financial") or {})
+                    rate = fin.get("average_interest_rate") or 0
+                    monthly = fin.get("monthly_payment_vnd") or 0
+                    return f"Lãi ~{rate:.1f}% • Trả {monthly / 1_000_000:.1f} tr/tháng"
+                if n_key == "deep_research":
+                    dr = _to_dict(res_dict.get("deep_research") or {})
+                    sources = dr.get("sources") or dr.get("findings") or []
+                    return f"{len(sources)} nguồn thông tin thực tế"
+            except Exception:
+                pass
+            return "Hoàn tất phân tích"
+
+        tasks = [
+            asyncio.create_task(_run_investigation(k, lbl, fn))
+            for k, lbl, fn in investigation_specs
+        ]
+        total_inv = len(tasks)
+        completed_inv = 0
+
+        for fut in asyncio.as_completed(tasks):
+            n_key, n_label, res_dict, dur_ms = await fut
+            current_state.update(res_dict)
+            completed_inv += 1
+            prog = 20 + int(45 * completed_inv / max(1, total_inv))
+            summary = _summarize_node(n_key, res_dict)
+            await _emit(
+                n_key, "completed", "investigating", prog,
+                f"Đã xong {n_label} ({completed_inv}/{total_inv}): {summary}",
+                label=n_label,
+                summary=summary,
+                duration_ms=dur_ms
+            )
+
+        # 3. Adversarial Critic stage
+        t_critic = time.time()
+        await _emit(
+            "critic", "running", "critiquing", 68,
+            "Đang phản biện rủi ro độc lập (Devil's Advocate)...",
+            label="Phản biện Độc lập"
+        )
+        critic_dict = await asyncio.to_thread(adversarial_critic_node, current_state)
         current_state.update(critic_dict)
+        critic_data = _to_dict(critic_dict.get("critic") or {})
+        critic_risks = critic_data.get("key_risks") or critic_data.get("blind_spots") or []
+        await _emit(
+            "critic", "completed", "critiquing", 74,
+            f"Hoàn tất phản biện: phát hiện {len(critic_risks)} điểm cần lưu ý.",
+            label="Phản biện Độc lập",
+            summary=f"{len(critic_risks)} điểm rủi ro / phản biện",
+            duration_ms=int((time.time() - t_critic) * 1000)
+        )
 
-        # 3. Autonomous DeepAgent invocation if live API key is present and not running under pytest
+        # 4. Autonomous DeepAgent invocation with live tool-call streaming (astream_events)
+        TOOL_LABELS = {
+            "search_legal_docs_tool": "Tra cứu văn bản pháp luật (Qdrant)",
+            "search_qdrant_properties_tool": "Tìm BĐS tương đương (Qdrant)",
+            "search_tavily_web_listings_tool": "Quét tin rao thị trường (Tavily)",
+            "evaluate_climate_infrastructure_tool": "Đánh giá ngập lụt & hạ tầng",
+            "calculate_mortgage_loan_tool": "Tính toán lịch trả nợ vay",
+            "get_bank_interest_rates_tool": "Tra cứu lãi suất ngân hàng",
+            "deep_developer_search_tool": "Điều tra uy tín chủ đầu tư",
+        }
+
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             try:
                 from config import settings
                 api_key = getattr(settings, "OPENAI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
                 if api_key and not api_key.startswith("sk-your") and not api_key.startswith("your-"):
+                    t_da = time.time()
+                    await _emit(
+                        "deep_agent", "running", "critiquing", 76,
+                        "DeepAgent đang kiểm chứng chéo & lập luận tổng hợp...",
+                        label="DeepAgent Tổng hợp"
+                    )
                     agent = self._agent_factory(enable_deep_research=enable_deep)
                     prompt = (
                         f"Thực hiện thẩm định chuyên sâu cho tài sản: {info['title']}\n"
@@ -1568,12 +1716,44 @@ class DeepDueDiligenceGraph:
                         f"- Mục đích đầu tư: {info['objective']}, Vốn tự có: {info['equity']:,} VNĐ, Khoản vay: {info['loan']:,} VNĐ"
                     )
                     deep_input = {"messages": [{"role": "user", "content": prompt}]}
-                    if config:
-                        agent_res = await asyncio.wait_for(agent.ainvoke(deep_input, config=config), timeout=40.0)
-                    else:
-                        agent_res = await asyncio.wait_for(agent.ainvoke(deep_input), timeout=40.0)
+                    agent_res = None
 
-                    structured = agent_res.get("structured_response")
+                    if hasattr(agent, "astream_events"):
+                        async def _run_streamed_agent():
+                            captured = None
+                            tool_step = 0
+                            stream_iter = (
+                                agent.astream_events(deep_input, config=clean_config, version="v2")
+                                if clean_config
+                                else agent.astream_events(deep_input, version="v2")
+                            )
+                            async for ev in stream_iter:
+                                ev_type = ev.get("event")
+                                ev_name = ev.get("name", "")
+                                if ev_type == "on_tool_start" and ev_name:
+                                    tool_step += 1
+                                    friendly = TOOL_LABELS.get(ev_name, ev_name)
+                                    prog_val = min(88, 76 + tool_step * 2)
+                                    await _emit(
+                                        "deep_agent", "running", "critiquing", prog_val,
+                                        f"DeepAgent đang chạy công cụ: {friendly}...",
+                                        label="DeepAgent Tổng hợp",
+                                        summary=f"Đang gọi: {friendly}"
+                                    )
+                                elif ev_type == "on_chain_end":
+                                    out = (ev.get("data") or {}).get("output")
+                                    if isinstance(out, dict) and out.get("structured_response"):
+                                        captured = out
+                            return captured
+
+                        agent_res = await asyncio.wait_for(_run_streamed_agent(), timeout=45.0)
+                    else:
+                        if clean_config:
+                            agent_res = await asyncio.wait_for(agent.ainvoke(deep_input, config=clean_config), timeout=40.0)
+                        else:
+                            agent_res = await asyncio.wait_for(agent.ainvoke(deep_input), timeout=40.0)
+
+                    structured = agent_res.get("structured_response") if isinstance(agent_res, dict) else None
                     if structured:
                         if hasattr(structured, "model_dump"):
                             dossier_data = structured.model_dump()
@@ -1582,20 +1762,46 @@ class DeepDueDiligenceGraph:
                         else:
                             dossier_data = None
                         if dossier_data:
+                            await _emit(
+                                "deep_agent", "completed", "synthesizing", 90,
+                                "DeepAgent hoàn tất tổng hợp hồ sơ thẩm định.",
+                                label="DeepAgent Tổng hợp",
+                                summary="Hoàn tất lập luận đa tác nhân",
+                                duration_ms=int((time.time() - t_da) * 1000)
+                            )
                             if not dossier_data.get("full_markdown_report"):
                                 current_state.update(dossier_data)
-                                synth_temp = synthesize_dossier_node(current_state)
+                                synth_temp = await asyncio.to_thread(synthesize_dossier_node, current_state)
                                 dossier_data["full_markdown_report"] = synth_temp.get("full_markdown_report", "")
                             current_state["stage"] = "completed"
                             current_state["dossier"] = dossier_data
                             return current_state
             except Exception as e:
                 logger.warning(f"DeepAgent LLM execution deferred to deterministic synthesis: {type(e).__name__}: {e}")
+                await _emit(
+                    "deep_agent", "completed", "synthesizing", 88,
+                    "Chuyển sang tổng hợp chuẩn hóa từ dữ liệu đã điều tra.",
+                    label="DeepAgent Tổng hợp",
+                    summary="Tổng hợp từ kết quả phân tích"
+                )
 
-        # 4. Synthesis stage
-        synth_dict = synthesize_dossier_node(current_state)
+        # 5. Synthesis stage
+        t_syn = time.time()
+        await _emit(
+            "synthesize", "running", "synthesizing", 92,
+            "Đang tổng hợp Dossier và tính toán điểm số đầu tư...",
+            label="Tổng hợp Dossier"
+        )
+        synth_dict = await asyncio.to_thread(synthesize_dossier_node, current_state)
         current_state.update(synth_dict)
         current_state["stage"] = "completed"
+        await _emit(
+            "synthesize", "completed", "synthesizing", 98,
+            "Hoàn tất hồ sơ Dossier.",
+            label="Tổng hợp Dossier",
+            summary="Đã xuất báo cáo chi tiết",
+            duration_ms=int((time.time() - t_syn) * 1000)
+        )
 
         return current_state
 

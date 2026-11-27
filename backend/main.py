@@ -104,6 +104,17 @@ class SetUserGroupRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
+    # Tự động khởi tạo bảng AgentOps / Wallet / Groups nếu chưa có trên DB (Supabase/Postgres)
+    try:
+        from agentops.migrations.init_agentops_schema import init_agentops_database
+        from agentops.migrations.add_user_wallet_tables import run_user_wallet_migrations
+        from agentops.migrations.add_user_groups_table import run_user_groups_migrations
+        init_agentops_database()
+        run_user_wallet_migrations()
+        run_user_groups_migrations()
+    except Exception as e:
+        print(f"[WARN] Init AgentOps/Wallet schema lỗi hoặc đã tồn tại: {e}")
+
     # Tự động nạp dữ liệu mẫu vào Qdrant khi backend khởi động (chỉ nạp nếu chưa có dữ liệu)
     try:
         qdrant_service.ingest_dataset(clear_existing=False)

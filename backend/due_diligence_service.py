@@ -606,11 +606,14 @@ class DueDiligenceTaskManager:
                     req_val = json.loads(raw["request"]) if raw.get("request") else None
                     dossier_val = json.loads(raw["dossier"]) if raw.get("dossier") else None
                     events_val = json.loads(raw["events"]) if raw.get("events") else []
+                    steps_val = json.loads(raw["agent_steps"]) if raw.get("agent_steps") else {}
                     redis_task = {
                         "task_id": raw.get("task_id", task_id),
                         "status": raw.get("status", "pending"),
                         "stage": raw.get("stage", raw.get("status", "pending")),
                         "progress": int(raw.get("progress", 0)),
+                        "current_message": raw.get("current_message") or None,
+                        "agent_steps": steps_val,
                         "request": req_val,
                         "dossier": dossier_val,
                         "result": dossier_val,
@@ -639,6 +642,8 @@ class DueDiligenceTaskManager:
         progress: Optional[int] = None,
         result: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
+        message: Optional[str] = None,
+        agent_steps: Optional[Dict[str, Any]] = None,
     ) -> None:
         stage_val = stage or status
         prog_val = progress if progress is not None else 0
@@ -648,6 +653,7 @@ class DueDiligenceTaskManager:
             "task_id": task_id,
             "created_at": now,
             "events": [],
+            "agent_steps": {},
         })
 
         # Terminal state protection: once completed or failed, do not regress to non-terminal
@@ -661,6 +667,10 @@ class DueDiligenceTaskManager:
         task["stage"] = stage_val
         task["progress"] = prog_val
         task["updated_at"] = now
+        if message is not None:
+            task["current_message"] = message
+        if agent_steps is not None:
+            task["agent_steps"] = agent_steps
         if result is not None:
             task["dossier"] = result
             task["result"] = result
@@ -679,6 +689,10 @@ class DueDiligenceTaskManager:
             "seq": seq,
             "timestamp": now,
         }
+        if message is not None:
+            event_payload["message"] = message
+        if task.get("agent_steps"):
+            event_payload["agent_steps"] = task["agent_steps"]
         if result is not None:
             event_payload["dossier"] = result
             event_payload["result"] = result
@@ -700,6 +714,10 @@ class DueDiligenceTaskManager:
                     "updated_at": now,
                     "events": json.dumps(events, ensure_ascii=False),
                 }
+                if task.get("current_message"):
+                    mapping["current_message"] = task["current_message"]
+                if task.get("agent_steps"):
+                    mapping["agent_steps"] = json.dumps(task["agent_steps"], ensure_ascii=False)
                 if result is not None:
                     mapping["dossier"] = json.dumps(result, ensure_ascii=False) if not isinstance(result, str) else result
                 if error is not None:
@@ -709,6 +727,46 @@ class DueDiligenceTaskManager:
                 await self._redis.expire(key, 86400)
             except Exception as e:
                 logger.warning(f"Redis update error on update_task_status for {task_id}: {e}")
+
+    async def emit_node_event(
+        self,
+        task_id: str,
+        node_name: str,
+        node_status: str,
+        stage: str,
+        progress: int,
+        message: str,
+        label: Optional[str] = None,
+        summary: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+    ) -> None:
+        """Cập nhật trạng thái chi tiết cho từng node sub-agent và phát SSE event."""
+        task = self._in_memory_tasks.get(task_id)
+        if task and task.get("status") in ["completed", "failed"]:
+            return
+
+        now = self._now_iso()
+        agent_steps = dict((task or {}).get("agent_steps") or {})
+        prev_step = dict(agent_steps.get(node_name) or {})
+        agent_steps[node_name] = {
+            "node": node_name,
+            "label": label or prev_step.get("label") or node_name,
+            "status": node_status,
+            "message": message,
+            "summary": summary if summary is not None else prev_step.get("summary"),
+            "duration_ms": duration_ms if duration_ms is not None else prev_step.get("duration_ms"),
+            "updated_at": now,
+        }
+        current_prog = (task or {}).get("progress", 0)
+        safe_prog = max(current_prog, progress)
+        await self.update_task_status(
+            task_id,
+            status=stage,
+            stage=stage,
+            progress=safe_prog,
+            message=message,
+            agent_steps=agent_steps,
+        )
 
     async def update_task_stage(
         self,
@@ -815,12 +873,13 @@ class DueDiligenceTaskManager:
         try:
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
-            await self.update_task_status(task_id, status="planning", stage="planning", progress=15)
-            await asyncio.sleep(0.01)
-
-            if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
-                return
-            await self.update_task_status(task_id, status="investigating", stage="investigating", progress=50)
+            await self.update_task_status(
+                task_id,
+                status="planning",
+                stage="planning",
+                progress=10,
+                message="Đang khởi tạo kế hoạch thẩm định đa tác nhân...",
+            )
             await asyncio.sleep(0.01)
 
             req_obj = req if isinstance(req, DueDiligenceRequest) else DueDiligenceRequest(**req)
@@ -828,12 +887,34 @@ class DueDiligenceTaskManager:
                 **req_obj.model_dump(),
                 "request": req_obj,
                 "stage": "planning",
-                "progress": 15,
+                "progress": 10,
                 "user_id": effective_user_id,
             }
 
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
+
+            async def _on_node_progress(
+                node_name: str,
+                node_status: str,
+                stage: str,
+                progress: int,
+                message: str,
+                label: Optional[str] = None,
+                summary: Optional[str] = None,
+                duration_ms: Optional[int] = None,
+            ) -> None:
+                await self.emit_node_event(
+                    task_id=task_id,
+                    node_name=node_name,
+                    node_status=node_status,
+                    stage=stage,
+                    progress=progress,
+                    message=message,
+                    label=label,
+                    summary=summary,
+                    duration_ms=duration_ms,
+                )
 
             callbacks = [AgentOpsCallbackHandler(agent_name="DueDiligenceAgent")]
             lf_cb = langfuse_manager.get_callback_handler(
@@ -846,7 +927,10 @@ class DueDiligenceTaskManager:
                 callbacks.append(lf_cb)
 
             config = {
-                "configurable": {"thread_id": f"thread_{task_id}"},
+                "configurable": {
+                    "thread_id": f"thread_{task_id}",
+                    "progress_callback": _on_node_progress,
+                },
                 "callbacks": callbacks,
                 "metadata": {
                     "thread_id": f"thread_{task_id}",
@@ -870,13 +954,6 @@ class DueDiligenceTaskManager:
 
             if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
                 return
-            await self.update_task_status(task_id, status="critiquing", stage="critiquing", progress=75)
-            await asyncio.sleep(0.01)
-
-            if self._in_memory_tasks.get(task_id, {}).get("status") in ["completed", "failed"]:
-                return
-            await self.update_task_status(task_id, status="synthesizing", stage="synthesizing", progress=90)
-            await asyncio.sleep(0.01)
 
             dossier = final_state.get("dossier")
             if hasattr(dossier, "model_dump"):
@@ -891,6 +968,7 @@ class DueDiligenceTaskManager:
                 status="completed",
                 stage="completed",
                 progress=100,
+                message="Hoàn tất thẩm định và tổng hợp hồ sơ Dossier.",
                 result=dossier_data,
             )
 
