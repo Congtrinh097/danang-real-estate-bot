@@ -31,20 +31,28 @@ class ModelCallGuard:
         )
 
         # 2. Giữ chỗ ngân sách trước khi gọi LLM
-        reservation_id = budget_guard.check_and_reserve(
-            request_id=request_id,
-            thread_id=thread_id,
-            workload_type=w_type,
-            estimated_cost_vnd=est_cost_vnd
-        )
+        reservation_id = None
+        try:
+            reservation_id = budget_guard.check_and_reserve(
+                request_id=request_id,
+                thread_id=thread_id,
+                workload_type=w_type,
+                estimated_cost_vnd=est_cost_vnd
+            )
+        except BudgetExceededException:
+            raise
+        except Exception:
+            reservation_id = None
 
         try:
             # 3. Thực thi cuộc gọi LLM thực tế
             result = func()
             # 4. Thành công -> commit reservation
-            budget_guard.commit_reservation(reservation_id)
+            if reservation_id:
+                budget_guard.commit_reservation(reservation_id)
             return result
         except Exception:
             # 5. Lỗi hoặc hủy -> release reservation ngay
-            budget_guard.release_reservation(reservation_id)
+            if reservation_id:
+                budget_guard.release_reservation(reservation_id)
             raise

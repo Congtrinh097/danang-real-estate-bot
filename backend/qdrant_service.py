@@ -98,7 +98,13 @@ class QdrantService:
             print(f"[OK] Collection created: {self.collection_name}")
 
         # Đảm bảo các trường filter có payload index để tương thích với Qdrant Cloud
-        for field, schema in [("category", "keyword"), ("district", "keyword"), ("price_vnd", "integer")]:
+        for field, schema in [
+            ("category", "keyword"),
+            ("district", "keyword"),
+            ("price", "integer"),
+            ("price_vnd", "integer"),
+            ("bedrooms", "integer")
+        ]:
             try:
                 self.client.create_payload_index(collection_name=self.collection_name, field_name=field, field_schema=schema)
             except Exception:
@@ -180,8 +186,9 @@ class QdrantService:
                 FieldCondition(key="district", match=MatchValue(value=district))
             )
         if max_price:
+            norm_price = int(max_price * 1_000_000_000) if max_price <= 1000 else int(max_price)
             must_conditions.append(
-                FieldCondition(key="price", range=Range(lte=max_price))
+                FieldCondition(key="price", range=Range(lte=norm_price))
             )
         if min_bedrooms:
             must_conditions.append(

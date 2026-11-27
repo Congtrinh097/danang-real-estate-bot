@@ -396,7 +396,11 @@ def call_jev_decisions(model_name: str, api_key: str, messages: list) -> IntentC
     start_time = time.time()
     resp = httpx.post(url, json=payload, headers=headers, timeout=10.0)
     latency_ms = int((time.time() - start_time) * 1000)
+    if resp.status_code != 200:
+        raise RuntimeError(f"TypeSafe Jev API returned HTTP {resp.status_code}: {resp.text}")
     data = resp.json()
+    if not isinstance(data, dict) or "answers" not in data:
+        raise RuntimeError(f"TypeSafe Jev API response missing 'answers': {data}")
     choice = data.get("answers", {}).get("intent", {}).get("choice", "general_chat")
     confidence = data.get("answers", {}).get("intent", {}).get("confidence", 1)
 

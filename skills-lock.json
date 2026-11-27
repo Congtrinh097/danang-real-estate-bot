@@ -1,6 +1,13 @@
 {
   "version": 2,
   "skills": {
+    "deepeval": {
+      "source": "confident-ai/deepeval",
+      "commit": "dee2d7a077f3598cfdb9b3a58f1887c919829294",
+      "sourceType": "github",
+      "skillPath": "skills/deepeval/SKILL.md",
+      "computedHash": "55c8d336b5cfed32a4ea055ae3480291f52debd696db54f9df4b54db9f5d3b26"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",

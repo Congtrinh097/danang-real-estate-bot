@@ -90,3 +90,56 @@ def test_isolated_threads():
     assert len(state_b["messages"]) == 2
     assert "Liên Chiểu" in state_b["messages"][0].content
     assert "Hải Châu" not in state_b["messages"][0].content
+
+
+def test_citation_cleanup_on_intent_switch():
+    """
+    Tầng 4: Kiểm thử reset sạch citations khi chuyển ý định hội thoại.
+    Lượt 1: Hỏi pháp lý -> State có citations.
+    Lượt 2: Chuyển sang tìm BĐS -> State citations phải lập tức được reset về []
+    để không làm rò rỉ nút mở drawer xem văn bản luật trên UI.
+    """
+    thread_id = "test_tdd_intent_switch_citations_111"
+    config = {"configurable": {"thread_id": thread_id}}
+
+    # Turn 1: Hỏi câu pháp lý
+    state_turn_1 = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Người nước ngoài có được mua chung cư tại Đà Nẵng không?")]},
+        config=config,
+    )
+    assert state_turn_1.get("intent") == "legal_consultation"
+    assert len(state_turn_1.get("citations", [])) > 0
+
+    # Turn 2: Chuyển sang tìm nhà
+    state_turn_2 = real_estate_agent.invoke(
+        {"messages": [HumanMessage(content="Tìm giúp tôi căn hộ quận Hải Châu dưới 3 tỷ")]},
+        config=config,
+    )
+    assert state_turn_2.get("intent") == "search_property"
+    # Citations phải được reset về []
+    assert state_turn_2.get("citations") == []
+
+
+def test_sanitize_orphan_tool_calls():
+    """
+    Tầng 4: Kiểm thử hàm sanitize_messages_for_prompt và sanitize_messages_for_react_agent
+    loại bỏ các AIMessage có tool_calls mồ côi khi cắt lát hội thoại để tránh lỗi 400 Bad Request.
+    """
+    from agent import sanitize_messages_for_prompt, sanitize_messages_for_react_agent
+
+    orphan_ai_msg = AIMessage(
+        content="",
+        tool_calls=[{"id": "orphan_call_999", "name": "search_danang_properties", "args": {}}]
+    )
+    history = [HumanMessage(content="Chào bot"), orphan_ai_msg]
+
+    # Với LCEL chain không dùng tool: phải chuyển thành plain AIMessage
+    cleaned_prompt = sanitize_messages_for_prompt(history)
+    assert len(cleaned_prompt) == 2
+    assert not hasattr(cleaned_prompt[1], "tool_calls") or not cleaned_prompt[1].tool_calls
+
+    # Với ReAct Agent: do thiếu ToolMessage phản hồi cho orphan_call_999, phải chuyển thành text thường
+    cleaned_react = sanitize_messages_for_react_agent(history)
+    assert len(cleaned_react) == 2
+    assert not hasattr(cleaned_react[1], "tool_calls") or not cleaned_react[1].tool_calls
+

@@ -84,3 +84,6 @@ data/traces/
 
 # Cloudflare
 .cloudflared*
+
+# DeepEval Cache
+.deepeval/
