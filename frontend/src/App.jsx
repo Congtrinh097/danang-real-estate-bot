@@ -1926,7 +1926,6 @@ export default function App() {
               <button className="nav-tab-btn" onClick={() => setActiveTab("due_diligence_history")}>
                 <History size={14} /> <span className="nav-btn-text">Lịch Sử Thẩm Định</span>
               </button>
-              </button>
               <button className="nav-tab-btn active">
                 <Scale size={14} /> <span className="nav-btn-text">Quản Trị</span>
               </button>
