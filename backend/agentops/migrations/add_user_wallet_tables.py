@@ -20,12 +20,15 @@ def run_user_wallet_migrations():
         CREATE TABLE IF NOT EXISTS user_wallets (
             user_id VARCHAR(128) PRIMARY KEY,
             balance_vnd NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
-            daily_free_limit_vnd NUMERIC(14, 2) NOT NULL DEFAULT 5000.00,
+            daily_free_limit_vnd NUMERIC(14, 2) DEFAULT 5000.00,
+            daily_free_limit_override_vnd NUMERIC(14, 2) DEFAULT NULL,
             total_deposited_vnd NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
             total_spent_vnd NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+        ALTER TABLE user_wallets ALTER COLUMN daily_free_limit_vnd DROP NOT NULL;
+        ALTER TABLE user_wallets ADD COLUMN IF NOT EXISTS daily_free_limit_override_vnd NUMERIC(14, 2) DEFAULT NULL;
         """)
 
         # 2. Bảng theo dõi chi tiêu từng ngày của user (user_daily_usage)
