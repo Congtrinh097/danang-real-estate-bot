@@ -41,6 +41,10 @@ class TenantTicketStore:
                         )
                         """
                     )
+                    cursor.execute(
+                        "CREATE INDEX IF NOT EXISTS tenant_tickets_thread_created_idx "
+                        "ON tenant_tickets (thread_id, (payload->>'created_at'), id)"
+                    )
                 connection.commit()
                 self._postgres_ready = True
             return connection
@@ -111,6 +115,31 @@ class TenantTicketStore:
                 )
                 rows = cursor.fetchall()
             return [TenantTicket.model_validate(row[0]) for row in rows]
+        finally:
+            connection.close()
+
+    def list_thread(self, thread_id: str, limit: int = 50) -> List[TenantTicket]:
+        """Return the latest tickets in a thread, oldest first for handoff."""
+        connection = self._connect()
+        if connection is None:
+            with self._lock:
+                tickets = sorted(
+                    (ticket for ticket in self._memory.values() if ticket.thread_id == thread_id),
+                    key=lambda ticket: (ticket.created_at, ticket.id),
+                    reverse=True,
+                )
+                return [ticket.model_copy(deep=True) for ticket in reversed(tickets[:limit])]
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payload FROM tenant_tickets
+                    WHERE thread_id = %s
+                    ORDER BY payload->>'created_at' DESC, id DESC LIMIT %s
+                    """,
+                    (thread_id, limit),
+                )
+                return [TenantTicket.model_validate(row[0]) for row in reversed(cursor.fetchall())]
         finally:
             connection.close()
 

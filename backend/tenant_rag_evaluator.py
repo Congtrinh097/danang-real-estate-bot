@@ -2,8 +2,9 @@ from math import isfinite
 from typing import Any, Dict, List, Optional
 
 from datasets import Dataset
+from langchain_core.embeddings import Embeddings
 
-from tenant_knowledge import tenant_knowledge_service
+from tenant_knowledge import select_tenant_guidance, tenant_knowledge_service
 
 
 GOLDEN_TENANT_EVAL_SAMPLES = [
@@ -24,7 +25,8 @@ class TenantRAGEvaluator:
             hits = tenant_knowledge_service.search(row["user_input"], limit=3)
             hit_contexts = [hit.content for hit in hits]
             contexts.append(hit_contexts)
-            responses.append(hit_contexts[0] if hit_contexts else "")
+            guidance = select_tenant_guidance(hits)
+            responses.append(guidance.answer if guidance else "")
         return Dataset.from_dict(
             {
                 "user_input": [row["user_input"] for row in rows],
@@ -34,7 +36,9 @@ class TenantRAGEvaluator:
             }
         )
 
-    def evaluate(self, dataset: Optional[Dataset] = None) -> Dict[str, Any]:
+    def evaluate(
+        self, dataset: Optional[Dataset] = None, *, embeddings: Optional[Embeddings] = None
+    ) -> Dict[str, Any]:
         sample_count = 0
         try:
             target = dataset if dataset is not None else self.prepare_dataset()
@@ -45,7 +49,7 @@ class TenantRAGEvaluator:
             from ragas.metrics import answer_relevancy, context_precision, faithfulness
             from rag_evaluator import RAGEvaluator
 
-            judge = RAGEvaluator()
+            judge = RAGEvaluator(embeddings=embeddings)
 
             result = evaluate(
                 dataset=target,

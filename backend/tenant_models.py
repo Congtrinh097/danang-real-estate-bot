@@ -46,7 +46,7 @@ class TenantIntake(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=30)
     property_id: Optional[str] = Field(default=None, max_length=80)
     unit: Optional[str] = Field(default=None, max_length=40)
-    thread_id: str = Field(default_factory=lambda: f"tenant-{uuid4().hex[:12]}")
+    thread_id: str = Field(default_factory=lambda: f"tenant-{uuid4().hex}", min_length=1, max_length=128)
 
     @field_validator("subject", "message", mode="before")
     @classmethod
@@ -61,7 +61,7 @@ class EmailIntake(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
     property_id: Optional[str] = None
     unit: Optional[str] = None
-    thread_id: Optional[str] = None
+    thread_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
 
     def to_tenant_intake(self) -> TenantIntake:
         return TenantIntake(
@@ -72,7 +72,7 @@ class EmailIntake(BaseModel):
             email=self.from_email,
             property_id=self.property_id,
             unit=self.unit,
-            thread_id=self.thread_id or f"email-{uuid4().hex[:12]}",
+            thread_id=self.thread_id or f"email-{uuid4().hex}",
         )
 
 
@@ -82,6 +82,7 @@ class KnowledgeHit(BaseModel):
     category: str
     content: str
     score: float
+    answer: Optional[str] = None
 
 
 class TenantTicket(BaseModel):
@@ -105,6 +106,7 @@ class TenantTicket(BaseModel):
     verification_passed: bool = False
     knowledge: List[KnowledgeHit] = Field(default_factory=list)
     audit_events: List[Dict[str, Any]] = Field(default_factory=list)
+    assistant_reply: Optional[str] = None
 
 
 class TenantSupportResult(BaseModel):

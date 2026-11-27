@@ -6,7 +6,7 @@ from langgraph.graph.message import add_messages
 from langsmith import trace, tracing_context
 
 from pii_utils import redact_pii
-from tenant_knowledge import tenant_knowledge_service
+from tenant_knowledge import select_tenant_guidance, tenant_knowledge_service
 from tenant_models import (
     KnowledgeHit,
     TenantIntake,
@@ -132,6 +132,7 @@ def verification_agent(state: TenantAgentState) -> Dict[str, Any]:
         {"event": "verification_passed" if passed else "verification_failed", "at": datetime.now(timezone.utc).isoformat(), "agent": "validator"}
     )
     if passed:
+        ticket.assistant_reply = build_ticket_reply(ticket)
         persisted = ticketing_mcp_client.call_tool(
             "create_tenant_ticket", {"ticket": ticket.model_dump(mode="json")}
         )
@@ -143,22 +144,23 @@ def verification_agent(state: TenantAgentState) -> Dict[str, Any]:
     }
 
 
-def sla_monitor_agent(state: TenantAgentState) -> Dict[str, Any]:
-    ticket = TenantTicket.model_validate(state["ticket"])
-    primary = ticket.knowledge[0] if ticket.knowledge else None
-    guidance = primary.content if primary else "Ban quản lý sẽ kiểm tra và phản hồi theo SLA của ticket."
-    if not state["verification_passed"]:
-        reply = "Yêu cầu chưa vượt qua bước xác minh nên chưa được gửi tới hệ thống ticket."
-    elif ticket.escalation_required:
-        reply = (
+def build_ticket_reply(ticket: TenantTicket) -> str:
+    primary = select_tenant_guidance(ticket.knowledge)
+    if ticket.escalation_required:
+        confirmation = (
             f"Đã tạo ticket {ticket.id} ở mức {ticket.urgency.value}. "
-            f"Ticket đang chờ nhân viên trực xác nhận trước khi xử lý. Hướng dẫn an toàn: {guidance}"
+            "Ticket đang chờ nhân viên trực xác nhận."
         )
     else:
-        reply = (
-            f"Đã tạo ticket {ticket.id} với SLA phản hồi trước {ticket.sla_due_at.isoformat()}. "
-            f"Thông tin tham khảo: {guidance}"
-        )
+        confirmation = f"Đã tạo ticket {ticket.id} với SLA phản hồi trước {ticket.sla_due_at.isoformat()}."
+    if primary:
+        return f"{primary.answer}\n\nNguồn: {primary.title}.\n\n{confirmation}"
+    return confirmation
+
+
+def sla_monitor_agent(state: TenantAgentState) -> Dict[str, Any]:
+    ticket = TenantTicket.model_validate(state["ticket"])
+    reply = ticket.assistant_reply or "Yêu cầu chưa vượt qua bước xác minh nên chưa được gửi tới hệ thống ticket."
     return {
         "reply": reply,
         "supervisor_route": [*state["supervisor_route"], "sla_monitor"],

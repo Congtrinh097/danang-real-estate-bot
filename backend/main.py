@@ -538,6 +538,35 @@ def human_action(ticket_id: str, request: ApprovalRequest):
     return {"success": True, "data": ticket.model_dump(mode="json")}
 
 
+@app.get("/api/tenant/tickets/{ticket_id}/history", dependencies=[Depends(require_admin)])
+def get_tenant_handoff_history(ticket_id: str):
+    if not settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Cần cấu hình khóa quản trị để xem lịch sử tenant.")
+    ticket = tenant_ticket_store.get(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+    history = tenant_ticket_store.list_thread(ticket.thread_id, limit=51)
+    return {
+        "success": True,
+        "data": {
+            "has_earlier": len(history) > 50,
+            "turns": [
+                {
+                    "ticket_id": turn.id,
+                    "channel": turn.channel,
+                    "created_at": turn.created_at,
+                    "subject": turn.subject,
+                    "message": turn.description,
+                    "assistant_reply": turn.assistant_reply,
+                    "status": turn.status,
+                    "urgency": turn.urgency,
+                }
+                for turn in history[-50:]
+            ],
+        },
+    }
+
+
 @app.get("/api/tenant/sla/metrics", dependencies=[Depends(require_admin)])
 def tenant_sla_metrics():
     return {"success": True, "data": tenant_ticket_store.sla_metrics()}

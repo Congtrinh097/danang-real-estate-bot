@@ -50,7 +50,25 @@ def test_payment_question_uses_hybrid_tenant_knowledge():
     assert result.ticket.intent.value == "payment"
     assert result.knowledge
     assert result.knowledge[0].category == "payment"
+    assert result.reply.startswith("Trong nội dung chuyển khoản tiền thuê, ghi mã căn hộ và kỳ thanh toán.")
+    assert result.ticket.assistant_reply == result.reply
     assert result.ticket.sla_due_at > result.ticket.created_at
+
+
+def test_faq_evaluator_uses_the_live_answer():
+    from tenant_rag_evaluator import GOLDEN_TENANT_EVAL_SAMPLES, TenantRAGEvaluator
+
+    sample = GOLDEN_TENANT_EVAL_SAMPLES[1]
+    dataset = TenantRAGEvaluator().prepare_dataset([sample])
+    result = process_tenant_intake(TenantIntake(message=sample["user_input"]))
+    assert dataset[0]["response"] == result.reply.split("\n\n")[0]
+    assert dataset[0]["response"] != dataset[0]["retrieved_contexts"][0]
+
+
+def test_generic_followup_does_not_show_unrelated_faq():
+    result = process_tenant_intake(TenantIntake(message="Sao rồi?"))
+    assert result.reply.startswith("Đã tạo ticket")
+    assert "Nguồn:" not in result.reply
 
 
 def test_web_and_email_intake_share_ticket_contract():
@@ -162,3 +180,32 @@ def test_staff_api_requires_key_when_configured(monkeypatch):
     allowed = client.get("/api/tenant/tickets", headers={"X-Admin-Key": "staff-secret"})
     assert denied.status_code == 401
     assert allowed.status_code == 200
+
+
+def test_handoff_loads_only_the_selected_ticket_thread(monkeypatch):
+    from config import settings
+
+    first = client.post("/api/tenant/intake", json={"message": "Ống nước bị vỡ", "phone": "0905123456"}).json()["data"]
+    second = client.post("/api/tenant/email", json={
+        "thread_id": first["ticket"]["thread_id"],
+        "from_email": "tenant@example.com",
+        "body": "Nước đã ngập phòng khách",
+    }).json()["data"]
+    client.post("/api/tenant/intake", json={"message": "Tôi cần gia hạn hợp đồng"})
+
+    endpoint = f"/api/tenant/tickets/{second['ticket']['id']}/history"
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
+    assert client.get(endpoint).status_code == 503
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "staff-secret")
+    assert client.get(endpoint).status_code == 401
+    headers = {"X-Admin-Key": "staff-secret"}
+    response = client.get(endpoint, headers=headers)
+    assert response.status_code == 200
+    history = response.json()["data"]
+    assert history["has_earlier"] is False
+    assert [turn["ticket_id"] for turn in history["turns"]] == [first["ticket"]["id"], second["ticket"]["id"]]
+    assert [turn["channel"] for turn in history["turns"]] == ["web", "email"]
+    assert history["turns"][0]["assistant_reply"] == first["reply"]
+    assert "0905123456" not in response.text
+    assert "tenant@example.com" not in response.text
+    assert client.get("/api/tenant/tickets/unknown/history", headers=headers).status_code == 404

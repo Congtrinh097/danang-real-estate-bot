@@ -45,16 +45,16 @@ Merge request đã tạo: [!1 — feat: tenant support and SLA assurance](https:
 | 1 | LangGraph RAG | ✅ | Supervisor graph trong `backend/tenant_agent.py` | Theo dõi chất lượng retrieval bằng dữ liệu production |
 | 1 | Structured ticket output: intent, urgency | ✅ | `TenantTicket`, `TicketIntent`, `TicketUrgency` trong `backend/tenant_models.py` | Không |
 | 1 | Vector database | ✅ | Qdrant hybrid retrieval; uploads lưu bền khi cấu hình `TENANT_QDRANT_URL` | Cấu hình Qdrant có volume trong môi trường triển khai |
-| 1 | RAGAS evaluation | ✅ | Live report đủ 5 mẫu tại `docs/TENANT-RAGAS-LIVE-REPORT-2026-11-27.md` | Cải thiện answer relevancy 0.5995 và thêm dữ liệu đánh giá |
+| 1 | RAGAS evaluation | ✅ | FAQ mới đạt faithfulness 1.0000, answer relevancy 0.8997 và context precision 0.9667 trong lượt so sánh cùng cấu hình. Xem `docs/TENANT-RAGAS-LIVE-REPORT-2026-11-27.md` | Đánh giá trên bộ mẫu độc lập |
 | 1 | LangSmith traces | ✅ | [Trace live với dữ liệu giả](https://smith.langchain.com/o/7566a48f-0180-4d02-a771-c075cfe2fb53/projects/p/5b6d9532-2ce5-4be7-9502-ab49682f2347/r/01a21d67-1ff9-7195-8c23-3fc7bc9950c2). Payload chỉ gồm channel, intent, urgency, verification và route | Kiểm tra định kỳ trên môi trường triển khai |
 | 1 | Demo tenant FAQ | ✅ | Web UI Tenant Support và API `/api/tenant/intake` | Chuẩn bị kịch bản demo chính thức |
 | 2 | Web-form intake | ✅ | Tenant Support form trong `frontend/src/App.jsx` | Không |
 | 2 | Email intake normalization | 🟡 | API `/api/tenant/email` chuẩn hóa về `TenantIntake` | Kết nối mailbox/provider webhook thực tế |
 | 2 | Intent/urgency routing | ✅ | Deterministic, auditable classifier trong tenant graph | Mở rộng benchmark false-positive/false-negative |
 | 2 | MCP ticketing | ✅ | Tenant client khởi tạo MCP ClientSession và gọi FastMCP qua in-process transport | Kết nối ticket platform thật nếu dự án yêu cầu |
-| 2 | Conversation/escalation context | 🟡 | Ticket liên kết theo `thread_id`; high/critical chuyển `awaiting_human` | Nạp lịch sử theo thread và chuyển context nhiều lượt cho nhân viên |
+| 2 | Conversation/escalation context | ✅ | Dashboard nhân viên tải 50 lượt gần nhất theo `thread_id`, gồm yêu cầu và phản hồi đã lưu | Xác thực danh tính nhân viên qua SSO/RBAC trên deployment |
 | 2 | Short-term memory | 🟡 | Property graph có checkpointer; tenant graph chạy từng intake độc lập | Bổ sung session memory cho tenant workflow |
-| 2 | Long-term memory | 🟡 | Ticket tenant và LangGraph checkpoint được đọc lại sau restart PostgreSQL cô lập | Bổ sung và kiểm thử lịch sử tenant qua nhiều lượt |
+| 2 | Long-term memory | ✅ | Hai lượt tenant và phản hồi đọc lại đúng thứ tự sau restart PostgreSQL cô lập | Xác minh trên môi trường triển khai |
 | 2 | Hybrid retrieval | ✅ | Dense hashed-vector Qdrant + lexical score | Không |
 | 2 | Reranking | ✅ | Hybrid reranking trong `TenantKnowledgeService.search()` | Có thể thay bằng cross-encoder khi corpus lớn |
 | 2 | Query rewriting | ✅ | Tenant synonym/query expansion | Mở rộng synonym từ log thực tế |
@@ -112,6 +112,7 @@ Merge request đã tạo: [!1 — feat: tenant support and SLA assurance](https:
 - [x] Thêm intent/urgency routing.
 - [x] Tạo ticketing MCP server và client, gọi qua MCP session.
 - [x] Gắn ticket với `thread_id`.
+- [x] Lưu phản hồi từng lượt và hiển thị lịch sử thread cho handoff có xác thực.
 - [x] Thêm PostgreSQL ticket persistence với memory fallback.
 - [x] Thêm tùy chọn PostgreSQL LangGraph checkpointer.
 - [x] Thêm hybrid retrieval, query rewriting và reranking.
@@ -159,7 +160,7 @@ Merge request đã tạo: [!1 — feat: tenant support and SLA assurance](https:
 
 ## Ưu tiên sau lần kiểm tra này
 
-1. Bổ sung lịch sử tenant theo `thread_id` và kiểm thử hai lượt intake, restart và bàn giao. Hiện ticket có định danh thread và lưu được qua restart, nhưng graph tenant chưa nạp lại lịch sử.
-2. Cải thiện câu trả lời FAQ và đo lại RAGAS bằng bộ mẫu độc lập. Đây là điểm yếu nhất trong benchmark live.
+1. Bổ sung bộ mẫu FAQ độc lập để đánh giá khả năng trả lời ngoài 5 câu hỏi hiện tại.
+2. Bổ sung session memory nếu cần để trợ lý hiểu câu hỏi nối tiếp. Nhân viên đã có lịch sử handoff để xử lý các câu hỏi này.
 3. Chốt tích hợp deployment cho SSO/RBAC, mailbox và thông báo SLA. Xác minh LangFuse trên môi trường đó.
 4. Đối chiếu rubric A2A và Deep Agent. Workflow hiện có các node nội bộ và endpoint index tài liệu; tài liệu upload được lưu qua restart khi bật Qdrant.

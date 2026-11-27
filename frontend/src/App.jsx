@@ -99,6 +99,9 @@ function TenantSupportPanel({ onNavigate }) {
     tenant_name: "", email: "", phone: "", property_id: "", unit: "", subject: "", message: ""
   });
   const [result, setResult] = useState(null);
+  const [threadId, setThreadId] = useState(null);
+  const [history, setHistory] = useState(null);
+  const historyRequest = useRef(null);
   const [metrics, setMetrics] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -138,6 +141,25 @@ function TenantSupportPanel({ onNavigate }) {
   };
 
   useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => () => historyRequest.current?.abort(), []);
+
+  const loadHistory = async (ticketId) => {
+    historyRequest.current?.abort();
+    const request = new AbortController();
+    historyRequest.current = request;
+    setHistory({ ticketId });
+    try {
+      const response = await fetch(`${API_BASE}/api/tenant/tickets/${ticketId}/history`, {
+        headers: { "X-Admin-Key": adminKey },
+        signal: request.signal
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Không tải được lịch sử hỗ trợ.");
+      if (!request.signal.aborted) setHistory({ ticketId, ...payload.data });
+    } catch (historyError) {
+      if (!request.signal.aborted) setHistory({ ticketId, error: historyError.message });
+    }
+  };
 
   const applyHumanAction = async (ticketId, action) => {
     const approvedBy = staffName.trim();
@@ -173,11 +195,12 @@ function TenantSupportPanel({ onNavigate }) {
       const response = await fetch(`${API_BASE}/api/tenant/intake`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, channel: "web" })
+        body: JSON.stringify({ ...form, channel: "web", ...(threadId && { thread_id: threadId }) })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || "Không thể tạo ticket");
       setResult(payload.data);
+      if (payload.data.ticket.verification_passed) setThreadId(payload.data.ticket.thread_id);
       setForm((current) => ({ ...current, subject: "", message: "" }));
       await loadDashboard();
     } catch (submitError) {
@@ -224,12 +247,17 @@ function TenantSupportPanel({ onNavigate }) {
           </div>
           <label>Tiêu đề<input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Ví dụ: Rò nước trong căn hộ" /></label>
           <label>Nội dung<textarea required rows="6" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></label>
-          <button className="btn-book" disabled={loading}>{loading ? "Đang phân loại và tạo ticket..." : "Gửi yêu cầu"}</button>
+          <button className="btn-book" disabled={loading}>{loading ? "Đang phân loại và tạo ticket..." : threadId ? "Gửi cập nhật" : "Gửi yêu cầu"}</button>
+          {threadId && (
+            <button type="button" className="nav-tab-btn" disabled={loading} onClick={() => { setThreadId(null); setResult(null); }}>
+              Bắt đầu yêu cầu mới
+            </button>
+          )}
           {error && <div className="tenant-error">{error}</div>}
           {result && (
             <div className={`tenant-result urgency-${result.ticket.urgency}`}>
               <strong>{result.ticket.id} · {result.ticket.intent} · {result.ticket.urgency}</strong>
-              <p>{result.reply}</p>
+              <p style={{ whiteSpace: "pre-line" }}>{result.reply}</p>
               <small>Luồng: {result.supervisor_route.join(" → ")}</small>
             </div>
           )}
@@ -237,7 +265,11 @@ function TenantSupportPanel({ onNavigate }) {
         <div className="tenant-ticket-list">
           <h3>Ticket gần đây</h3>
           <form className="tenant-form" onSubmit={(event) => { event.preventDefault(); loadDashboard(); }}>
-            <label>Khóa quản trị<input type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label>
+            <label>Khóa quản trị<input type="password" value={adminKey} onChange={(event) => {
+              historyRequest.current?.abort();
+              setHistory(null);
+              setAdminKey(event.target.value);
+            }} /></label>
             <label>Tên nhân viên<input maxLength={120} value={staffName} onChange={(event) => setStaffName(event.target.value)} /></label>
             <button className="btn-book">Tải dashboard</button>
           </form>
@@ -255,6 +287,25 @@ function TenantSupportPanel({ onNavigate }) {
               <div><strong>{ticket.id}</strong><span className={`tenant-pill urgency-${ticket.urgency}`}>{ticket.urgency}</span></div>
               <p>{ticket.subject || ticket.description}</p>
               <small>{ticket.intent} · {ticket.status} · SLA {new Date(ticket.sla_due_at).toLocaleString("vi-VN")}</small>
+              {adminKey && (
+                <button type="button" className="nav-tab-btn" onClick={() => loadHistory(ticket.id)}>
+                  Xem lịch sử
+                </button>
+              )}
+              {history?.ticketId === ticket.id && (
+                <section aria-label="Lịch sử hỗ trợ" aria-live="polite">
+                  {history.error && <p className="tenant-error">{history.error}</p>}
+                  {!history.error && !history.turns && <p>Đang tải lịch sử…</p>}
+                  {history.has_earlier && <p>Đang hiển thị 50 lượt gần nhất.</p>}
+                  {history.turns?.map((turn) => (
+                    <div key={turn.ticket_id}>
+                      <small>{turn.ticket_id} · {turn.channel} · {new Date(turn.created_at).toLocaleString("vi-VN")}</small>
+                      <p><strong>Người thuê</strong> {turn.subject && `${turn.subject} · `}{turn.message}</p>
+                      {turn.assistant_reply && <p style={{ whiteSpace: "pre-line" }}><strong>Trợ lý</strong> {turn.assistant_reply}</p>}
+                    </div>
+                  ))}
+                </section>
+              )}
               {ticket.status === "awaiting_human" && (
                 <button className="nav-tab-btn" disabled={pendingAction !== null} onClick={() => applyHumanAction(ticket.id, "approve")}>Nhận xử lý</button>
               )}

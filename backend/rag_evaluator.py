@@ -80,12 +80,13 @@ class RAGEvaluator:
         eval_key = settings.JUDGE_API_KEY or settings.OPENAI_API_KEY or "dummy_key_mock"
         base_url = settings.JUDGE_BASE_URL or settings.OPENAI_BASE_URL
         judge_model = settings.JUDGE_MODEL_NAME or settings.OPENAI_MODEL_NAME
+        uses_reasoning = any(marker in judge_model.lower() for marker in ("luna", "o1", "o3", "gpt-cosmos-6"))
 
         eval_llm_kwargs = {
             "model": judge_model,
             "api_key": eval_key,
         }
-        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+        if uses_reasoning:
             eval_llm_kwargs["temperature"] = 1.0
         else:
             eval_llm_kwargs["temperature"] = 0.0
@@ -100,7 +101,7 @@ class RAGEvaluator:
         base_chat_llm = llm or ChatOpenAI(**eval_llm_kwargs)
 
         # Nếu dùng reasoning model như luna, o1, o3, bọc LangchainLLMWrapper với bypass_temperature=True
-        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+        if uses_reasoning:
             from ragas.llms.base import LangchainLLMWrapper
             self.llm = LangchainLLMWrapper(base_chat_llm, bypass_temperature=True, bypass_n=True)
         else:

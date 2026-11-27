@@ -27,6 +27,25 @@ def _tokens(text: str) -> List[str]:
     return [token.lower() for token in TOKEN_RE.findall(text)]
 
 
+def _matching_phrase(query: str, keywords: List[str]) -> bool:
+    return any(f" {' '.join(_tokens(keyword))} " in query for keyword in keywords)
+
+
+def _faq_answer(document: Dict, query: str, score: float) -> str | None:
+    for variant in document.get("answer_variants", []):
+        if _matching_phrase(query, variant["keywords"]):
+            return variant["answer"]
+    if _matching_phrase(query, document.get("keywords", [])):
+        return document.get("answer")
+    if document["category"] == "uploaded_policy" and score >= 0.45:
+        return document["content"]
+    return None
+
+
+def select_tenant_guidance(hits: List[KnowledgeHit]) -> KnowledgeHit | None:
+    return next((hit for hit in hits if hit.answer), None)
+
+
 def _vector(text: str, size: int = 256) -> List[float]:
     values = [0.0] * size
     for token in _tokens(text):
@@ -96,6 +115,7 @@ class TenantKnowledgeService:
             hybrid_score = (float(point.score) * 0.65) + (keyword_score * 0.35)
             reranked.append((hybrid_score, document))
         reranked.sort(key=lambda item: item[0], reverse=True)
+        normalized_query = f" {' '.join(_tokens(rewritten))} "
         return [
             KnowledgeHit(
                 id=document["id"],
@@ -103,6 +123,7 @@ class TenantKnowledgeService:
                 category=document["category"],
                 content=document["content"],
                 score=round(max(0.0, min(score, 1.0)), 4),
+                answer=_faq_answer(document, normalized_query, score),
             )
             for score, document in reranked[:limit]
         ]

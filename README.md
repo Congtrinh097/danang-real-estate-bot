@@ -55,11 +55,14 @@ Các endpoint tenant chính:
 
 - `POST /api/tenant/intake` và `POST /api/tenant/email`
 - `GET /api/tenant/tickets`, `POST /api/tenant/tickets/{id}/human-action`
+- `GET /api/tenant/tickets/{id}/history` tải 50 lượt gần nhất cùng thread cho nhân viên, yêu cầu `ADMIN_API_KEY`
 - `GET /api/tenant/sla/metrics`
 - `POST /api/tenant/documents/index` và `POST /api/tenant/rag/evaluate`
 
 Trong production, cấu hình `ADMIN_API_KEY`, gửi header `X-Admin-Key` cho staff API, và đặt `TENANT_STORAGE_MODE=auto` để lưu ticket vào PostgreSQL.
 Đặt `TENANT_QDRANT_URL=http://localhost:6333` theo địa chỉ Qdrant có volume để giữ tài liệu tenant đã index qua lần khởi động lại.
+
+Để gửi lượt tiếp theo cùng một yêu cầu, dùng lại `data.ticket.thread_id` trong payload intake hoặc email. Giao diện Tenant Support tự dùng lại mã này khi chọn **Gửi cập nhật** trong cùng phiên của tab. Lịch sử lưu ở PostgreSQL khi kết nối khả dụng; chế độ `memory` dành cho dev/test. Ticket cũ vẫn xuất hiện trong lịch sử với phần phản hồi trống nếu được tạo trước khi hệ thống lưu phản hồi.
 
 ---
 
