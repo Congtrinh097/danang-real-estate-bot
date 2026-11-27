@@ -3,6 +3,7 @@ import json
 import sys
 import io
 import os
+import uuid
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Optional, Dict, Any, List
@@ -17,7 +18,8 @@ load_dotenv(dotenv_path=backend_dir / ".env", override=False)
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
-from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -44,6 +46,17 @@ from agentops import (
     cost_alert_engine,
     BudgetExceededException
 )
+from agentops.cost.user_wallet_service import user_wallet_service
+from pydantic.fields import FieldInfo
+from due_diligence_agent import DueDiligenceRequest, DueDiligenceDossier, FinancialFeasibilityAssessment
+from due_diligence_service import due_diligence_task_manager
+
+if "loan_amount_vnd" not in FinancialFeasibilityAssessment.model_fields:
+    FinancialFeasibilityAssessment.__annotations__["loan_amount_vnd"] = Optional[float]
+    FinancialFeasibilityAssessment.model_fields["loan_amount_vnd"] = FieldInfo.from_annotation(Optional[float])
+    FinancialFeasibilityAssessment.model_fields["loan_amount_vnd"].default = 0.0
+    FinancialFeasibilityAssessment.model_rebuild(force=True)
+    DueDiligenceDossier.model_rebuild(force=True)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -99,11 +112,31 @@ class BudgetUpdateRequest(BaseModel):
     thread_limit_vnd: float
     daily_limit_vnd: float
 
-
 def require_admin(x_admin_key: str | None = Header(default=None)):
     """Protect staff APIs when ADMIN_API_KEY is configured; local dev remains frictionless."""
     if settings.ADMIN_API_KEY and x_admin_key != settings.ADMIN_API_KEY:
         raise HTTPException(status_code=401, detail="Admin key không hợp lệ")
+
+
+class TopupRequest(BaseModel):
+    user_id: str
+    amount_vnd: float
+    description: Optional[str] = None
+
+class UserFreeLimitUpdateRequest(BaseModel):
+    user_id: str
+    daily_free_limit_vnd: float
+
+class UserGroupRequest(BaseModel):
+    group_code: str
+    group_name: str
+    daily_free_limit_vnd: float
+    description: Optional[str] = ""
+    is_default: Optional[bool] = False
+
+class SetUserGroupRequest(BaseModel):
+    user_id: str
+    group_code: str
 
 @app.get("/api/health")
 def health_check():
@@ -166,6 +199,83 @@ def get_recent_usage_events(limit: int = 25):
     """Lấy danh sách các cuộc gọi LLM chi tiết gần đây"""
     return cost_reporting_service.get_recent_usage_events(limit=limit)
 
+# ==================== PHÂN HỆ VÍ & HẠN MỨC NGƯỜI DÙNG ====================
+@app.get("/api/user/wallet")
+def get_user_wallet(user_id: str = "default_user"):
+    """Lấy thông tin ví và hạn mức ngày 5.000đ của người dùng"""
+    return user_wallet_service.get_or_create_wallet(user_id=user_id)
+
+@app.post("/api/user/wallet/topup")
+def topup_user_wallet(req: TopupRequest):
+    """Nạp thêm tiền vào ví người dùng (hỗ trợ các gói 5k, 10k, 20k, 50k, 100k...)"""
+    wallet = user_wallet_service.topup_wallet(
+        user_id=req.user_id,
+        amount_vnd=req.amount_vnd,
+        description=req.description or ""
+    )
+    return {"success": True, "wallet": wallet}
+
+@app.get("/api/user/wallet/transactions")
+def get_user_wallet_transactions(user_id: str = "default_user", limit: int = 20):
+    """Lấy lịch sử giao dịch nạp và khấu trừ của ví người dùng"""
+    return user_wallet_service.get_user_transactions(user_id=user_id, limit=limit)
+
+# ==================== PHÂN HỆ QUẢN LÝ NHÓM NGƯỜI DÙNG & HẠN MỨC FREE ====================
+@app.get("/api/user/groups")
+def get_user_groups():
+    """Lấy danh sách các nhóm người dùng và hạn mức miễn phí mỗi ngày"""
+    return {"success": True, "groups": user_wallet_service.get_all_user_groups()}
+
+@app.post("/api/user/groups")
+def save_user_group(req: UserGroupRequest):
+    """Tạo mới hoặc cập nhật một nhóm người dùng (ví dụ: standard, vip, pro...)"""
+    try:
+        group = user_wallet_service.save_user_group(
+            group_code=req.group_code,
+            group_name=req.group_name,
+            daily_free_limit_vnd=req.daily_free_limit_vnd,
+            description=req.description or "",
+            is_default=bool(req.is_default)
+        )
+        return {"success": True, "group": group}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/user/groups/{group_code}")
+def delete_user_group(group_code: str):
+    """Xóa nhóm người dùng tùy chỉnh"""
+    try:
+        user_wallet_service.delete_user_group(group_code=group_code)
+        return {"success": True, "message": f"Đã xóa nhóm '{group_code}' thành công"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/user/wallet/set-group")
+def set_user_group(req: SetUserGroupRequest):
+    """Gán nhóm người dùng cho một user (ví dụ: chuyển user sang nhóm VIP)"""
+    try:
+        wallet = user_wallet_service.set_user_group(user_id=req.user_id, group_code=req.group_code)
+        return {"success": True, "wallet": wallet}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/admin/user-wallets")
+def get_admin_user_wallets():
+    """Lấy danh sách tất cả ví người dùng và hạn mức free (dành cho Admin)"""
+    return {"success": True, "users": user_wallet_service.get_all_user_wallets()}
+
+@app.post("/api/admin/user-wallets/free-limit")
+def update_user_free_limit(req: UserFreeLimitUpdateRequest):
+    """Admin điều chỉnh hạn mức miễn phí hàng ngày (daily_free_limit_vnd) cho user cụ thể"""
+    try:
+        updated = user_wallet_service.update_user_daily_free_limit(
+            user_id=req.user_id,
+            new_limit_vnd=req.daily_free_limit_vnd
+        )
+        return {"success": True, "wallet": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming endpoint gửi phản hồi từng token và danh sách BĐS cho ReactJS"""
@@ -193,7 +303,22 @@ async def chat_stream(req: ChatRequest):
     inputs = {"messages": [HumanMessage(content=req.message)]}
 
     async def event_generator():
-        # Kiểm tra trước hạn mức thread: nếu đã hết ngân sách thì chặn ngay từ đầu
+        # 1. Kiểm tra trước ngân sách cá nhân của user: 5.000đ miễn phí / ngày + số dư ví nạp
+        effective_user_id = req.user_id or "default_user"
+        try:
+            can_chat, user_budget_msg, user_wallet = user_wallet_service.check_user_can_chat(
+                user_id=effective_user_id,
+                estimated_cost_vnd=50.0
+            )
+            if not can_chat:
+                yield f"data: {json.dumps({'type': 'user_budget_exceeded', 'message': user_budget_msg, 'wallet': user_wallet})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'content': user_budget_msg})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+        except Exception as u_err:
+            print(f"[WARN] Pre-check user wallet budget failed: {u_err}")
+
+        # 2. Kiểm tra trước hạn mức thread: nếu đã hết ngân sách thì chặn ngay từ đầu
         try:
             budget_status = cost_reporting_service.get_thread_budget_status(thread_id=req.thread_id)
             if budget_status.get("is_exceeded"):
@@ -281,6 +406,16 @@ async def chat_stream(req: ChatRequest):
                 yield f"data: {json.dumps({'type': 'budget_update', 'data': budget_status})}\n\n"
             except Exception as b_err:
                 print(f"[WARN] Failed to send budget_update event: {b_err}")
+
+            # Khấu trừ chi phí vào ví user (ưu tiên 5.000đ free quota, vượt quá trừ balance)
+            try:
+                updated_wallet = user_wallet_service.deduct_request_cost(
+                    user_id=effective_user_id,
+                    request_id=request_id
+                )
+                yield f"data: {json.dumps({'type': 'wallet_update', 'data': updated_wallet})}\n\n"
+            except Exception as w_err:
+                print(f"[WARN] Failed to deduct user wallet cost: {w_err}")
 
             yield "data: [DONE]\n\n"
         except BudgetExceededException as be:
@@ -559,6 +694,94 @@ async def evaluate_rag(node: Optional[str] = "all"):
         return {"success": True, "data": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== PHÂN HỆ THẨM ĐỊNH BĐS CHUYÊN SÂU (DEEP DUE DILIGENCE) ====================
+
+@app.post("/api/due-diligence")
+async def submit_due_diligence(req: DueDiligenceRequest):
+    """
+    Tiếp nhận yêu cầu thẩm định BĐS chuyên sâu Đà Nẵng:
+    - Thiết lập AgentOps TraceContext với workload_type='due_diligence'
+    - Kiểm tra hạn mức / số dư ví người dùng (ước tính 150 VNĐ)
+    - Đẩy task vào hàng đợi thực thi nền (Redis / In-memory fallback)
+    - Trả về task_id để client theo dõi tiến độ qua SSE hoặc Polling
+    """
+    effective_user_id = req.user_id or "default_user"
+    req_id = f"dd_req_{uuid.uuid4().hex[:8]}"
+    thread_id = f"dd_thread_{effective_user_id}"
+    TraceContext.set_context(request_id=req_id, thread_id=thread_id, workload_type="due_diligence")
+
+    # Pre-flight check ngân sách người dùng
+    try:
+        can_proceed, budget_msg, wallet = user_wallet_service.check_user_can_chat(
+            user_id=effective_user_id,
+            estimated_cost_vnd=150.0
+        )
+        if not can_proceed:
+            raise HTTPException(
+                status_code=402,
+                detail="Ngân sách tài khoản không đủ để thực hiện thẩm định chuyên sâu. Vui lòng nạp thêm tiền vào ví."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[WARN] Pre-flight budget check error: {e}")
+
+    task_id = await due_diligence_task_manager.submit_task(req, user_id=effective_user_id)
+    return {
+        "success": True,
+        "task_id": task_id,
+        "status": "pending"
+    }
+
+
+@app.get("/api/due-diligence/{task_id}")
+async def get_due_diligence_status(task_id: str):
+    """
+    Polling endpoint truy vấn trạng thái tiến độ và kết quả Dossier thẩm định BĐS.
+    """
+    status_data = await due_diligence_task_manager.get_task_status(task_id)
+    if not status_data:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy tác vụ thẩm định hoặc tác vụ đã hết hạn."
+        )
+    if isinstance(status_data, dict) and "dossier" in status_data and isinstance(status_data["dossier"], dict):
+        fin = status_data["dossier"].get("financial")
+        if isinstance(fin, dict) and "loan_amount_vnd" not in fin:
+            fin["loan_amount_vnd"] = 0.0
+    return Response(
+        content=json.dumps(jsonable_encoder(status_data), ensure_ascii=False, default=str),
+        media_type="application/json"
+    )
+
+
+@app.get("/api/due-diligence/{task_id}/stream")
+async def stream_due_diligence_progress(task_id: str):
+    """
+    Server-Sent Events (SSE) streaming endpoint phát trực tiếp tiến độ 4 giai đoạn
+    (Planning -> Evidence Retrieval -> Adversarial Critic -> Dossier Synthesis)
+    và kết quả báo cáo thẩm định.
+    """
+    bg_task = due_diligence_task_manager._background_tasks.get(task_id)
+    if bg_task is None or bg_task.done():
+        status_info = await due_diligence_task_manager.get_task_status(task_id)
+        if status_info and status_info.get("status") not in ["completed", "failed"]:
+            req_data = status_info.get("request") or {}
+            user_id = status_info.get("user_id") or "default_user"
+            new_bg = asyncio.create_task(due_diligence_task_manager._execute_task_workflow(task_id, req_data, user_id))
+            due_diligence_task_manager._background_tasks[task_id] = new_bg
+            new_bg.add_done_callback(lambda _: due_diligence_task_manager._background_tasks.pop(task_id, None))
+
+    return StreamingResponse(
+        due_diligence_task_manager.stream_progress(task_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn

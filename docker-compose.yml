@@ -25,3 +25,12 @@ services:
       POSTGRES_DB: danang_real_estate
     volumes:
       - ./data/postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: danang_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis_data:/data

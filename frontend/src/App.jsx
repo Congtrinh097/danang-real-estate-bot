@@ -34,9 +34,14 @@ import {
   LifeBuoy,
   Clock,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  CreditCard,
 } from "lucide-react";
 import AgentOpsAdmin from "./components/AgentOpsAdmin";
+import TopupModal from "./components/TopupModal";
+import DueDiligenceModal from "./components/DueDiligenceModal";
+import "./components/DueDiligenceModal.css";
 
 const SAMPLE_CONTRACT_PROMPT = `THỎA THUẬN ĐẶT CỌC MUA BÁN CĂN HỘ CHUNG CƯ HÌNH THÀNH TRONG TƯƠNG LAI
 Hôm nay, ngày 10/10/2024, tại quận Sơn Trà, TP. Đà Nẵng:
@@ -208,6 +213,10 @@ export default function App() {
   // Mobile Sidebar Drawer Toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Quản lý Ví và Ngân Sách Cá Nhân Người Dùng
+  const [userWallet, setUserWallet] = useState(null);
+  const [showTopupModal, setShowTopupModal] = useState(false);
+
   // 1. Quản lý danh sách threads & thread đang active
   const [threads, setThreads] = useState(() => {
     try {
@@ -260,6 +269,20 @@ export default function App() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", note: "" });
   const [leadSuccess, setLeadSuccess] = useState(false);
+
+  // Quản lý Modal Thẩm Định Chuyên Sâu Bất Động Sản (Milestone 4)
+  const [isDueDiligenceOpen, setIsDueDiligenceOpen] = useState(false);
+  const [selectedDueDiligenceProperty, setSelectedDueDiligenceProperty] = useState(null);
+
+  const handleOpenDueDiligence = (prop) => {
+    setSelectedDueDiligenceProperty(prop);
+    setIsDueDiligenceOpen(true);
+  };
+
+  const handleCloseDueDiligence = () => {
+    setIsDueDiligenceOpen(false);
+    setSelectedDueDiligenceProperty(null);
+  };
 
   // Drawer căn cứ pháp lý
   const [activeDrawerCitations, setActiveDrawerCitations] = useState(null);
@@ -343,6 +366,25 @@ export default function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load thông tin ví người dùng và hạn mức 5.000đ mỗi ngày
+  const fetchUserWallet = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/user/wallet?user_id=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data && data.user_id) {
+        setUserWallet(data);
+      }
+    } catch (err) {
+      console.error("Lỗi tải thông tin ví người dùng:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchUserWallet();
+    }
+  }, [userId]);
 
   // Load danh sách tài liệu khi mở tab admin
   useEffect(() => {
@@ -494,6 +536,19 @@ export default function App() {
                 if (data.data) {
                   setThreadBudget(data.data);
                 }
+              } else if (data.type === "wallet_update") {
+                if (data.data) {
+                  setUserWallet(data.data);
+                }
+              } else if (data.type === "user_budget_exceeded") {
+                botMsg.isThinking = false;
+                botMsg.text = data.message;
+                botMsg.isBudgetExceeded = true;
+                if (data.wallet) {
+                  setUserWallet(data.wallet);
+                }
+                updateActiveThreadMessages((prev) => [...prev.slice(0, -1), { ...botMsg }]);
+                setShowTopupModal(true);
               } else if (data.type === "error") {
                 botMsg.isThinking = false;
                 botMsg.text = "Lỗi xử lý: " + data.content;
@@ -869,6 +924,19 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* Nút mở Modal nạp tiền khi bot thông báo hết hạn mức */}
+        {(msg.isBudgetExceeded || msg.text?.includes("[Hết hạn mức]")) && !isStreaming && (
+          <div className="budget-exceeded-cta-box">
+            <button
+              type="button"
+              className="btn-msg-topup"
+              onClick={() => setShowTopupModal(true)}
+            >
+              <Wallet size={15} /> Nạp Thêm Tiền Vào Ví Ngay
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1138,6 +1206,39 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Widget Ví & Ngân Sách Cá Nhân User */}
+              <div
+                className="user-wallet-header-widget"
+                onClick={() => setShowTopupModal(true)}
+                title={`Hạng: ${userWallet?.group_name || "Tiêu chuẩn"} | Số dư: ${userWallet?.balance_vnd != null ? Math.round(userWallet.balance_vnd).toLocaleString("vi-VN") : 0}đ | Free hôm nay: ${userWallet?.daily_free_remaining_vnd != null ? Math.round(userWallet.daily_free_remaining_vnd).toLocaleString("vi-VN") : "5.000"}đ / ${userWallet?.daily_free_limit_vnd != null ? Math.round(userWallet.daily_free_limit_vnd).toLocaleString("vi-VN") : "5.000"}đ. Bấm để nạp thêm tiền!`}
+              >
+                <div className="wallet-widget-icon">
+                  <Wallet size={14} />
+                </div>
+                <div className="wallet-widget-info">
+                  <div className="wallet-widget-balance">
+                    Ví: <b>{userWallet?.balance_vnd != null ? Math.round(userWallet.balance_vnd).toLocaleString("vi-VN") + "đ" : "0đ"}</b>
+                    {userWallet?.group_name && (
+                      <span className="wallet-header-tier-tag">{userWallet.group_name}</span>
+                    )}
+                  </div>
+                  <div className="wallet-widget-free">
+                    Free: <b>{userWallet?.daily_free_remaining_vnd != null ? Math.round(userWallet.daily_free_remaining_vnd).toLocaleString("vi-VN") + "đ" : "5.000đ"}</b>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-quick-topup"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTopupModal(true);
+                  }}
+                  title="Nạp tiền vào tài khoản"
+                >
+                  + Nạp
+                </button>
+              </div>
+
               {/* Widget hiển thị ngân sách thread */}
               {threadBudget && (
                 <div
@@ -1211,9 +1312,19 @@ export default function App() {
                                 <Maximize2 size={14} /> {item.area_m2} m²
                               </span>
                             </div>
-                            <button className="btn-book" onClick={() => handleBookVisit(item)}>
-                              Đặt lịch xem nhà
-                            </button>
+                            <div className="card-actions">
+                              <button className="btn-book" onClick={() => handleBookVisit(item)}>
+                                Đặt lịch xem nhà
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-due-diligence"
+                                onClick={() => handleOpenDueDiligence(item)}
+                                title="Thẩm định chuyên sâu pháp lý, quy hoạch, ngập lụt & tài chính AI"
+                              >
+                                <Sparkles size={13} /> Thẩm định chuyên sâu
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1826,6 +1937,40 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal Nạp Tiền (Mock Topup) */}
+      <TopupModal
+        isOpen={showTopupModal}
+        onClose={() => setShowTopupModal(false)}
+        userId={userId}
+        wallet={userWallet}
+        onTopupSuccess={(updatedWallet) => {
+          setUserWallet(updatedWallet);
+        }}
+        API_BASE={API_BASE}
+      />
+
+      {/* Modal Thẩm Định Chuyên Sâu Bất Động Sản (Milestone 4) */}
+      {isDueDiligenceOpen && selectedDueDiligenceProperty && (
+        <DueDiligenceModal
+          key={selectedDueDiligenceProperty.id || "empty"}
+          isOpen={isDueDiligenceOpen}
+          onClose={handleCloseDueDiligence}
+          property={selectedDueDiligenceProperty}
+          userId={userId}
+          userWallet={userWallet}
+          API_BASE={API_BASE}
+          onOpenTopup={() => {
+            handleCloseDueDiligence();
+            setShowTopupModal(true);
+          }}
+          onRequireTopup={() => {
+            handleCloseDueDiligence();
+            setShowTopupModal(true);
+          }}
+          onWalletUpdate={(updatedWallet) => setUserWallet(updatedWallet)}
+        />
       )}
     </div>
   );
