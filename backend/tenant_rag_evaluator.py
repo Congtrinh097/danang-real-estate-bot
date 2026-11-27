@@ -1,3 +1,4 @@
+from math import isfinite
 from typing import Any, Dict, List, Optional
 
 from datasets import Dataset
@@ -34,8 +35,12 @@ class TenantRAGEvaluator:
         )
 
     def evaluate(self, dataset: Optional[Dataset] = None) -> Dict[str, Any]:
-        target = dataset or self.prepare_dataset()
+        sample_count = 0
         try:
+            target = dataset if dataset is not None else self.prepare_dataset()
+            sample_count = len(target)
+            if not sample_count:
+                raise ValueError("Tenant RAG evaluation requires at least one sample")
             from ragas import evaluate
             from ragas.metrics import answer_relevancy, context_precision, faithfulness
             from rag_evaluator import RAGEvaluator
@@ -47,18 +52,20 @@ class TenantRAGEvaluator:
                 metrics=[faithfulness, answer_relevancy, context_precision],
                 llm=judge.llm,
                 embeddings=judge.embeddings,
+                raise_exceptions=True,
             )
             frame = result.to_pandas()
-            metrics_mean = {
-                column: round(float(frame[column].mean()), 4)
-                for column in ("faithfulness", "answer_relevancy", "context_precision")
-                if column in frame.columns
-            }
-            return {"status": "success", "sample_count": len(target), "metrics_mean": metrics_mean}
+            metrics_mean = {}
+            for column in ("faithfulness", "answer_relevancy", "context_precision"):
+                scores = frame[column]
+                if len(scores) != sample_count or not all(isfinite(score) for score in scores):
+                    raise ValueError(f"Incomplete scores for {column}")
+                metrics_mean[column] = round(float(scores.mean()), 4)
+            return {"status": "success", "sample_count": sample_count, "metrics_mean": metrics_mean}
         except Exception as exc:
             return {
                 "status": "error",
-                "sample_count": len(target),
+                "sample_count": sample_count,
                 "metrics_mean": {},
                 "error": str(exc),
             }

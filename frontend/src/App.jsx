@@ -101,23 +101,68 @@ function TenantSupportPanel({ onNavigate }) {
   const [result, setResult] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [tickets, setTickets] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [adminKey, setAdminKey] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
+  const [staffName, setStaffName] = useState("");
+  const [pendingAction, setPendingAction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const loadDashboard = async () => {
+    setDashboardError("");
     try {
-      const [metricsResponse, ticketsResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/tenant/sla/metrics`),
-        fetch(`${API_BASE}/api/tenant/tickets?limit=8`)
+      const headers = adminKey ? { "X-Admin-Key": adminKey } : {};
+      const [metricsResponse, ticketsResponse, alertsResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/tenant/sla/metrics`, { headers }),
+        fetch(`${API_BASE}/api/tenant/tickets?limit=8`, { headers }),
+        fetch(`${API_BASE}/api/tenant/sla/alerts`, { headers })
       ]);
-      if (metricsResponse.ok) setMetrics((await metricsResponse.json()).data);
-      if (ticketsResponse.ok) setTickets((await ticketsResponse.json()).data || []);
-    } catch (dashboardError) {
-      console.error("Không tải được SLA dashboard:", dashboardError);
+      const responses = [metricsResponse, ticketsResponse, alertsResponse];
+      if (responses.some((response) => response.status === 401)) {
+        throw new Error("Nhập khóa quản trị để xem ticket và cảnh báo SLA.");
+      }
+      if (responses.some((response) => !response.ok)) throw new Error("Không tải được dữ liệu SLA.");
+      const [metricsPayload, ticketsPayload, alertsPayload] = await Promise.all(
+        responses.map((response) => response.json())
+      );
+      setMetrics(metricsPayload.data);
+      setTickets(ticketsPayload.data);
+      setAlerts(alertsPayload.data);
+    } catch (dashboardLoadError) {
+      setMetrics(null);
+      setTickets([]);
+      setAlerts([]);
+      setDashboardError(dashboardLoadError.message);
     }
   };
 
   useEffect(() => { loadDashboard(); }, []);
+
+  const applyHumanAction = async (ticketId, action) => {
+    const approvedBy = staffName.trim();
+    if (approvedBy.length < 2) {
+      setDashboardError("Nhập tên nhân viên trước khi cập nhật ticket.");
+      return;
+    }
+    setPendingAction(ticketId);
+    setDashboardError("");
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (adminKey) headers["X-Admin-Key"] = adminKey;
+      const response = await fetch(`${API_BASE}/api/tenant/tickets/${ticketId}/human-action`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ approved_by: approvedBy, action })
+      });
+      if (!response.ok) throw new Error("Không cập nhật được ticket. Kiểm tra khóa quản trị và thử lại.");
+      await loadDashboard();
+    } catch (actionError) {
+      setDashboardError(actionError.message);
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -191,11 +236,31 @@ function TenantSupportPanel({ onNavigate }) {
         </form>
         <div className="tenant-ticket-list">
           <h3>Ticket gần đây</h3>
-          {tickets.length === 0 ? <p className="tenant-empty">Chưa có ticket.</p> : tickets.map((ticket) => (
+          <form className="tenant-form" onSubmit={(event) => { event.preventDefault(); loadDashboard(); }}>
+            <label>Khóa quản trị<input type="password" value={adminKey} onChange={(event) => setAdminKey(event.target.value)} /></label>
+            <label>Tên nhân viên<input maxLength={120} value={staffName} onChange={(event) => setStaffName(event.target.value)} /></label>
+            <button className="btn-book">Tải dashboard</button>
+          </form>
+          {dashboardError && <p className="tenant-error" role="alert">{dashboardError}</p>}
+          {alerts.length > 0 && (
+            <ul aria-label="Cảnh báo SLA">
+              {alerts.map((alert) => (
+                <li key={alert.ticket_id}>{alert.ticket_id} · {alert.type === "breached" ? "Vi phạm SLA" : "Sắp đến hạn SLA"}</li>
+              ))}
+            </ul>
+          )}
+          {metrics && tickets.length === 0 && <p className="tenant-empty">Chưa có ticket.</p>}
+          {tickets.map((ticket) => (
             <article key={ticket.id}>
               <div><strong>{ticket.id}</strong><span className={`tenant-pill urgency-${ticket.urgency}`}>{ticket.urgency}</span></div>
               <p>{ticket.subject || ticket.description}</p>
               <small>{ticket.intent} · {ticket.status} · SLA {new Date(ticket.sla_due_at).toLocaleString("vi-VN")}</small>
+              {ticket.status === "awaiting_human" && (
+                <button className="nav-tab-btn" disabled={pendingAction !== null} onClick={() => applyHumanAction(ticket.id, "approve")}>Nhận xử lý</button>
+              )}
+              {ticket.status === "in_progress" && (
+                <button className="nav-tab-btn" disabled={pendingAction !== null} onClick={() => applyHumanAction(ticket.id, "resolve")}>Hoàn tất</button>
+              )}
             </article>
           ))}
         </div>

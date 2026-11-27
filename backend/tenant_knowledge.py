@@ -9,6 +9,7 @@ from uuid import uuid4
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from config import settings
 from tenant_models import KnowledgeHit
 
 
@@ -42,22 +43,25 @@ class TenantKnowledgeService:
     collection_name = "tenant_support_faq"
     vector_size = 256
 
-    def __init__(self, corpus_path: Path | None = None):
+    def __init__(self, corpus_path: Path | None = None, qdrant_url: str | None = None):
         self.corpus_path = corpus_path or Path(__file__).parent / "data" / "tenant_faq.json"
-        self.documents: List[Dict] = json.loads(self.corpus_path.read_text(encoding="utf-8"))
-        self.by_point_id: Dict[int, Dict] = {}
-        self.client = QdrantClient(location=":memory:")
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
-        )
-        points = []
-        for index, document in enumerate(self.documents, start=1):
-            searchable = self._searchable_text(document)
-            self.by_point_id[index] = document
-            points.append(PointStruct(id=index, vector=_vector(searchable), payload=document))
-        self.client.upsert(collection_name=self.collection_name, points=points)
-        self._next_point_id = len(points) + 1
+        documents = json.loads(self.corpus_path.read_text(encoding="utf-8"))
+        self.client = QdrantClient(url=qdrant_url) if qdrant_url else QdrantClient(location=":memory:")
+        if not self.client.collection_exists(self.collection_name):
+            try:
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
+                )
+            except Exception:
+                if not self.client.collection_exists(self.collection_name):
+                    raise
+        if documents:
+            points = [
+                PointStruct(id=index, vector=_vector(self._searchable_text(document)), payload=document)
+                for index, document in enumerate(documents, start=1)
+            ]
+            self.client.upsert(collection_name=self.collection_name, points=points)
 
     @staticmethod
     def _searchable_text(document: Dict) -> str:
@@ -78,13 +82,15 @@ class TenantKnowledgeService:
         response = self.client.query_points(
             collection_name=self.collection_name,
             query=_vector(rewritten),
-            limit=min(max(limit * 2, 4), len(self.documents)),
+            limit=max(limit * 2, 4),
             with_payload=True,
         )
         query_tokens = set(_tokens(rewritten))
         reranked = []
         for point in response.points:
-            document = point.payload or self.by_point_id[int(point.id)]
+            document = point.payload
+            if not document:
+                continue
             document_tokens = set(_tokens(self._searchable_text(document)))
             keyword_score = len(query_tokens & document_tokens) / max(len(query_tokens), 1)
             hybrid_score = (float(point.score) * 0.65) + (keyword_score * 0.35)
@@ -110,21 +116,18 @@ class TenantKnowledgeService:
         ]
         points = []
         for paragraph in paragraphs:
-            point_id = self._next_point_id
-            self._next_point_id += 1
+            point_id = uuid4()
             document = {
-                "id": f"uploaded-{uuid4().hex[:12]}",
+                "id": f"uploaded-{point_id.hex}",
                 "title": filename,
                 "category": "uploaded_policy",
                 "keywords": ["hợp đồng", "chính sách", "tenant"],
                 "content": paragraph,
             }
-            self.documents.append(document)
-            self.by_point_id[point_id] = document
-            points.append(PointStruct(id=point_id, vector=_vector(self._searchable_text(document)), payload=document))
+            points.append(PointStruct(id=str(point_id), vector=_vector(self._searchable_text(document)), payload=document))
         if points:
             self.client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
 
 
-tenant_knowledge_service = TenantKnowledgeService()
+tenant_knowledge_service = TenantKnowledgeService(qdrant_url=settings.TENANT_QDRANT_URL)

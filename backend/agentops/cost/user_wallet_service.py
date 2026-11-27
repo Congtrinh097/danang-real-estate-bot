@@ -3,6 +3,16 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from config import settings
 
+# Keep legacy custom values while allowing new wallets to inherit their group.
+EFFECTIVE_DAILY_LIMIT_SQL = """
+COALESCE(
+    w.daily_free_limit_override_vnd,
+    NULLIF(w.daily_free_limit_vnd, 5000.00),
+    g.daily_free_limit_vnd,
+    5000.00
+)
+"""
+
 class UserWalletService:
     """
     Dịch vụ quản trị ví và ngân sách theo từng người dùng (User-level Budget & Wallet):
@@ -38,11 +48,11 @@ class UserWalletService:
             conn.commit()
 
             # 3. Truy vấn thông tin chi tiết (kết nối với user_groups để lấy hạn mức động theo nhóm)
-            cur.execute("""
+            cur.execute(f"""
                 SELECT 
                     w.user_id, 
                     w.balance_vnd, 
-                    COALESCE(g.daily_free_limit_vnd, w.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd,
+                    {EFFECTIVE_DAILY_LIMIT_SQL} AS daily_free_limit_vnd,
                     COALESCE(w.user_group, 'standard') AS user_group,
                     COALESCE(g.group_name, 'Người dùng thường') AS group_name,
                     w.total_deposited_vnd, 
@@ -162,8 +172,8 @@ class UserWalletService:
             """, (user_id,))
 
             # 2. Khóa row wallet và usage để đảm bảo tính nguyên tử (lấy hạn mức theo nhóm user)
-            cur.execute("""
-                SELECT w.balance_vnd, COALESCE(g.daily_free_limit_vnd, w.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd 
+            cur.execute(f"""
+                SELECT w.balance_vnd, {EFFECTIVE_DAILY_LIMIT_SQL} AS daily_free_limit_vnd
                 FROM user_wallets w
                 LEFT JOIN user_groups g ON w.user_group = g.group_code
                 WHERE w.user_id = %s 
@@ -288,13 +298,13 @@ class UserWalletService:
         conn = self._get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT 
                     w.user_id, 
                     w.balance_vnd, 
                     COALESCE(w.user_group, 'standard') AS user_group,
                     COALESCE(g.group_name, 'Người dùng thường') AS group_name,
-                    COALESCE(g.daily_free_limit_vnd, w.daily_free_limit_vnd, 5000.00) AS daily_free_limit_vnd, 
+                    {EFFECTIVE_DAILY_LIMIT_SQL} AS daily_free_limit_vnd,
                     w.total_deposited_vnd, 
                     w.total_spent_vnd,
                     COALESCE(u.free_spent_vnd, 0.0) AS daily_free_spent_vnd,
@@ -351,7 +361,7 @@ class UserWalletService:
         try:
             cur.execute("""
                 UPDATE user_wallets
-                SET daily_free_limit_vnd = %s,
+                SET daily_free_limit_override_vnd = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = %s;
             """, (new_limit_vnd, user_id))

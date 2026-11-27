@@ -18,7 +18,8 @@ Ngoài luồng tư vấn BĐS, hệ thống có phân hệ **Tenant Support & SL
 docker compose up -d
 ```
 * **Qdrant Web Dashboard**: `http://localhost:6333/dashboard`
-* **Postgres Port**: `localhost:5432`
+* **Postgres Port**: `localhost:5435`
+* **Redis**: `localhost:6379`
 
 ---
 
@@ -38,7 +39,12 @@ pip install -r requirements.txt
 # Copy file .env.example thành .env và điền OPENAI_API_KEY cùng LANGCHAIN_API_KEY (LangSmith)
 copy .env.example .env
 
-# 4. Khởi chạy server FastAPI
+# 4. Tạo hoặc cập nhật schema PostgreSQL
+python agentops/migrations/init_agentops_schema.py
+python agentops/migrations/add_user_wallet_tables.py
+python agentops/migrations/add_user_groups_table.py
+
+# 5. Khởi chạy server FastAPI
 python main.py
 ```
 * Server API sẽ chạy tại: `http://localhost:8000`
@@ -53,6 +59,7 @@ Các endpoint tenant chính:
 - `POST /api/tenant/documents/index` và `POST /api/tenant/rag/evaluate`
 
 Trong production, cấu hình `ADMIN_API_KEY`, gửi header `X-Admin-Key` cho staff API, và đặt `TENANT_STORAGE_MODE=auto` để lưu ticket vào PostgreSQL.
+Đặt `TENANT_QDRANT_URL=http://localhost:6333` theo địa chỉ Qdrant có volume để giữ tài liệu tenant đã index qua lần khởi động lại.
 
 ---
 

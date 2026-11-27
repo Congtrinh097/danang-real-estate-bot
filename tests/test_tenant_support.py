@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -78,6 +79,64 @@ def test_human_action_and_sla_metrics():
     metrics = client.get("/api/tenant/sla/metrics")
     assert metrics.status_code == 200
     assert metrics.json()["data"]["total"] == 1
+
+
+def test_sla_alert_lifecycle():
+    ticket = process_tenant_intake(TenantIntake(message="Ống nước bị vỡ và căn hộ đang ngập")).ticket
+    alerts_url = "/api/tenant/sla/alerts"
+    ticket.sla_due_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    tenant_ticket_store.save(ticket)
+    warning = client.get(alerts_url).json()["data"]
+    assert [item["type"] for item in warning] == ["due_soon"]
+    assert client.get(alerts_url).json()["data"] == warning
+
+    ticket.sla_due_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    tenant_ticket_store.save(ticket)
+    breached = client.get(alerts_url).json()["data"]
+    assert [item["type"] for item in breached] == ["breached"]
+    assert breached[0]["ticket_id"] == ticket.id
+
+    resolved = client.post(
+        f"/api/tenant/tickets/{ticket.id}/human-action",
+        json={"approved_by": "Duty manager", "action": "resolve"},
+    )
+    assert resolved.json()["data"]["status"] == "resolved"
+    assert client.get(alerts_url).json()["data"] == []
+
+
+def test_tenant_trace_only_contains_workflow_outcome(monkeypatch):
+    from contextlib import contextmanager
+    from langsmith.run_helpers import get_tracing_context
+    import tenant_agent
+
+    captured = {}
+    invoke = tenant_agent.tenant_support_agent.invoke
+
+    def invoke_without_trace(*args, **kwargs):
+        assert get_tracing_context()["enabled"] is False
+        return invoke(*args, **kwargs)
+
+    @contextmanager
+    def capture_trace(name, *, inputs, tags):
+        captured.update(name=name, inputs=inputs, tags=tags)
+        yield type("Run", (), {"end": lambda self, outputs: captured.update(outputs=outputs)})()
+
+    monkeypatch.setattr(tenant_agent.tenant_support_agent, "invoke", invoke_without_trace)
+    monkeypatch.setattr(tenant_agent, "trace", capture_trace)
+    result = process_tenant_intake(TenantIntake(
+        message="Rò nước, gọi 0905123456",
+        email="tenant@example.com",
+        tenant_name="Demo Tenant",
+        thread_id="tenant@example.com",
+    ))
+    assert result.ticket.email == "tenant@example.com"
+    assert captured["inputs"] == {"channel": "web"}
+    assert captured["outputs"] == {
+        "intent": "maintenance",
+        "urgency": "high",
+        "verification_passed": True,
+        "route": result.supervisor_route,
+    }
 
 
 def test_pii_redaction():

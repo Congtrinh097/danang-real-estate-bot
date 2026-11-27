@@ -3,6 +3,7 @@ from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langsmith import trace, tracing_context
 
 from pii_utils import redact_pii
 from tenant_knowledge import tenant_knowledge_service
@@ -40,12 +41,12 @@ class TenantAgentState(TypedDict, total=False):
 
 
 INTENT_KEYWORDS = {
-    TicketIntent.maintenance: ["hỏng", "sửa", "rò", "vỡ ống", "thấm", "điều hòa"],
+    TicketIntent.maintenance: ["hỏng", "sửa", "rò", "vỡ ống", "ống nước", "bị vỡ", "thấm", "điều hòa"],
     TicketIntent.payment: ["thanh toán", "tiền thuê", "biên lai", "quá hạn", "phí", "chuyển khoản"],
     TicketIntent.lease: ["hợp đồng", "gia hạn", "điều khoản", "chấm dứt"],
     TicketIntent.noise: ["tiếng ồn", "ồn ào", "hàng xóm"],
     TicketIntent.utilities: ["mất điện", "cúp điện", "mất nước", "internet", "chập điện"],
-    TicketIntent.security: ["mất chìa", "mất thẻ", "đột nhập", "đe dọa", "khóa cửa"],
+    TicketIntent.security: ["mất chìa", "mất thẻ", "đột nhập", "đe dọa", "khóa cửa", "không khóa được cửa"],
     TicketIntent.move_in_out: ["chuyển đi", "trả nhà", "bàn giao", "hoàn cọc", "chuyển vào"],
 }
 
@@ -182,22 +183,26 @@ tenant_support_agent = workflow.compile()
 
 
 def process_tenant_intake(intake: TenantIntake) -> TenantSupportResult:
-    state = tenant_support_agent.invoke(
-        {"intake": intake.model_dump(mode="json")},
-        config={
-            "run_name": "tenant-support-supervisor",
-            "tags": ["tenant-support", f"channel:{intake.channel.value}"],
-            "metadata": {
-                "thread_id": intake.thread_id,
-                "channel": intake.channel.value,
-                "contains_pii": bool(intake.email or intake.phone),
-            },
-        },
-    )
-    return TenantSupportResult(
+    # Graph state contains contact details needed for the ticket. Only send
+    # the workflow outcome to LangSmith, since any free-text field can hold PII.
+    with tracing_context(enabled=False):
+        state = tenant_support_agent.invoke({"intake": intake.model_dump(mode="json")})
+    result = TenantSupportResult(
         reply=state["reply"],
         ticket=TenantTicket.model_validate(state["ticket"]),
         knowledge=[KnowledgeHit.model_validate(hit) for hit in state["knowledge"]],
         trace_safe_input=state["safe_input"],
         supervisor_route=state["supervisor_route"],
     )
+    with trace(
+        "tenant-support-supervisor",
+        inputs={"channel": intake.channel.value},
+        tags=["tenant-support"],
+    ) as run:
+        run.end(outputs={
+            "intent": result.ticket.intent.value,
+            "urgency": result.ticket.urgency.value,
+            "verification_passed": result.ticket.verification_passed,
+            "route": result.supervisor_route,
+        })
+    return result

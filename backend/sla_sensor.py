@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 from typing import Any, Dict, List
 
 from tenant_models import TicketStatus
@@ -7,31 +8,32 @@ from tenant_store import tenant_ticket_store
 
 
 _alerts: Dict[str, Dict[str, Any]] = {}
+_scan_lock = Lock()
 
 
 def scan_sla_tickets() -> List[Dict[str, Any]]:
-    now = datetime.now(timezone.utc)
-    warning_window = now + timedelta(minutes=30)
-    for ticket in tenant_ticket_store.list(limit=1000):
-        if ticket.status == TicketStatus.resolved:
-            continue
-        alert_type = None
-        if ticket.sla_due_at <= now:
-            alert_type = "breached"
-        elif ticket.sla_due_at <= warning_window:
-            alert_type = "due_soon"
-        if alert_type:
+    with _scan_lock:
+        now = datetime.now(timezone.utc)
+        warning_window = now + timedelta(minutes=30)
+        current_alerts = {}
+        for ticket in tenant_ticket_store.list(limit=1000):
+            if ticket.status == TicketStatus.resolved or ticket.sla_due_at > warning_window:
+                continue
+            alert_type = "breached" if ticket.sla_due_at <= now else "due_soon"
             key = f"{ticket.id}:{alert_type}"
-            _alerts[key] = {
+            previous = _alerts.get(key)
+            current_alerts[key] = {
                 "ticket_id": ticket.id,
                 "type": alert_type,
                 "urgency": ticket.urgency.value,
                 "status": ticket.status.value,
                 "sla_due_at": ticket.sla_due_at.isoformat(),
-                "detected_at": now.isoformat(),
+                "detected_at": previous["detected_at"] if previous else now.isoformat(),
                 "human_action_required": True,
             }
-    return sorted(_alerts.values(), key=lambda alert: alert["detected_at"], reverse=True)
+        _alerts.clear()
+        _alerts.update(current_alerts)
+        return sorted(current_alerts.values(), key=lambda alert: alert["detected_at"], reverse=True)
 
 
 def list_sla_alerts() -> List[Dict[str, Any]]:

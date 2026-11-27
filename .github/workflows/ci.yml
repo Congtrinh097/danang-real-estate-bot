@@ -21,6 +21,10 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
     env:
       DATABASE_URL: postgresql://admin:danang_realestate_secret@localhost:5432/danang_real_estate
       OPENAI_API_KEY: your_test_key
@@ -33,8 +37,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
       - run: pip install -r backend/requirements.txt
       - run: PYTHONPATH=backend python backend/agentops/migrations/init_agentops_schema.py
+      - run: PYTHONPATH=backend python backend/agentops/migrations/add_user_wallet_tables.py
+      - run: PYTHONPATH=backend python backend/agentops/migrations/add_user_groups_table.py
       - run: python -m pytest -q -p no:rerunfailures
 
   frontend:
