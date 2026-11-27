@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range
@@ -94,9 +95,10 @@ class QdrantService:
             )
             print(f"[OK] Collection created: {self.collection_name}")
 
-    def ingest_dataset(self, json_file_path: str = "./data/danang_properties.json"):
+    def ingest_dataset(self, json_file_path: Optional[str] = None):
         """Nạp dữ liệu BĐS vào Qdrant"""
         self.ensure_collection()
+        json_file_path = json_file_path or str(Path(__file__).parent / "data" / "danang_properties.json")
         with open(json_file_path, "r", encoding="utf-8") as f:
             properties = json.load(f)
 
@@ -133,6 +135,11 @@ class QdrantService:
         limit: int = 3
     ) -> List[Dict[str, Any]]:
         """Truy vấn Vector kết hợp Payload Filter"""
+        self.ensure_collection()
+        collection = self.client.get_collection(self.collection_name)
+        if not (collection.points_count or 0):
+            self.ingest_dataset()
+
         must_conditions = []
 
         if category:

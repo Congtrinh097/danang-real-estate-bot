@@ -35,11 +35,11 @@ class CostCalculator:
         # Tính toán chi phí USD: tokens * price / 1_000_000
         # Lưu ý: Các token đã cache được tính giá ưu đãi nếu có
         normal_input_tokens = max(0, input_tokens - cached_tokens)
-        
+
         input_cost = (normal_input_tokens * pricing.input_price_per_million_usd) / 1_000_000.0
         cached_cost = (cached_tokens * pricing.cached_input_price_per_million_usd) / 1_000_000.0
         output_cost = (output_tokens * pricing.output_price_per_million_usd) / 1_000_000.0
-        
+
         total_cost_usd = input_cost + cached_cost + output_cost
         total_cost_vnd = total_cost_usd * self.usd_to_vnd_rate
         total_tokens = input_tokens + output_tokens + reasoning_tokens

@@ -4,17 +4,21 @@ import sys
 import io
 import os
 import uuid
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
-# Tự động nạp biến môi trường (.env) cho LangSmith
-load_dotenv()
+# Load per-user overrides first; values already exported in the shell win.
+backend_dir = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=backend_dir / ".env.local", override=False)
+load_dotenv(dotenv_path=backend_dir / ".env", override=False)
 
 # Đảm bảo stdout / stderr hỗ trợ đầy đủ UTF-8 trên Windows console
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
-from fastapi import FastAPI, HTTPException, UploadFile, File, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -27,6 +31,13 @@ from appointment_service import appointment_service
 from qdrant_service import qdrant_service
 from legal_service import legal_service
 from document_converter import DocumentConverter
+from config import settings
+from pii_utils import mask_phone
+from tenant_agent import process_tenant_intake
+from tenant_models import ApprovalRequest, EmailIntake, TenantIntake
+from tenant_store import tenant_ticket_store
+from tenant_knowledge import tenant_knowledge_service
+from sla_sensor import list_sla_alerts, run_sla_sensor
 from agentops import (
     TraceContext,
     langfuse_manager,
@@ -47,13 +58,32 @@ if "loan_amount_vnd" not in FinancialFeasibilityAssessment.model_fields:
     FinancialFeasibilityAssessment.model_rebuild(force=True)
     DueDiligenceDossier.model_rebuild(force=True)
 
-app = FastAPI(title="Da Nang Real Estate AI Agent API")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        await asyncio.to_thread(qdrant_service.ingest_dataset)
+    except Exception as exc:
+        print(f"[WARN] Ingest Qdrant lỗi hoặc đã nạp: {exc}")
+    sensor_task = None
+    if settings.SLA_MONITOR_ENABLED:
+        sensor_task = asyncio.create_task(
+            run_sla_sensor(settings.SLA_MONITOR_INTERVAL_SECONDS),
+            name="tenant-sla-sensor",
+        )
+    yield
+    if sensor_task:
+        sensor_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await sensor_task
+
+
+app = FastAPI(title="Da Nang Real Estate AI Agent API", lifespan=lifespan)
 
 # Cho phép ReactJS gọi API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -82,6 +112,12 @@ class BudgetUpdateRequest(BaseModel):
     thread_limit_vnd: float
     daily_limit_vnd: float
 
+def require_admin(x_admin_key: str | None = Header(default=None)):
+    """Protect staff APIs when ADMIN_API_KEY is configured; local dev remains frictionless."""
+    if settings.ADMIN_API_KEY and x_admin_key != settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Admin key không hợp lệ")
+
+
 class TopupRequest(BaseModel):
     user_id: str
     amount_vnd: float
@@ -101,14 +137,6 @@ class UserGroupRequest(BaseModel):
 class SetUserGroupRequest(BaseModel):
     user_id: str
     group_code: str
-
-@app.on_event("startup")
-async def startup_event():
-    # Tự động nạp dữ liệu mẫu vào Qdrant khi backend khởi động
-    try:
-        qdrant_service.ingest_dataset()
-    except Exception as e:
-        print(f"[WARN] Ingest Qdrant lỗi hoặc đã nạp: {e}")
 
 @app.get("/api/health")
 def health_check():
@@ -344,7 +372,7 @@ async def chat_stream(req: ChatRequest):
                         yield f"data: {json.dumps({'type': 'status', 'stage': 'mortgage_completed', 'message': 'Đã hoàn tất tính toán phương án vay'})}\n\n"
                     elif node_name == "contract_audit":
                         yield f"data: {json.dumps({'type': 'status', 'stage': 'contract_completed', 'message': 'Đã hoàn thành thẩm định hợp đồng'})}\n\n"
-            
+
             # Gửi danh sách BĐS tìm thấy (nếu có) trước để ReactJS render Cards
             properties = final_state.get("found_properties", [])
             if properties:
@@ -467,11 +495,112 @@ def get_user_appointments_api(user_id: str, status: Optional[str] = None):
 @app.post("/api/leads")
 def submit_lead(lead: LeadRequest):
     """Endpoint thu thập Lead đặt lịch xem nhà"""
-    print(f"🔥 [NEW LEAD ĐÀ NẴNG] Khách: {lead.name} | SĐT: {lead.phone} | BĐS: {lead.property_id}")
+    print(f"[NEW LEAD] phone={mask_phone(lead.phone)} property={lead.property_id}")
     return {
         "success": True,
         "message": "Đã ghi nhận thông tin đặt lịch xem nhà thành công!"
     }
+
+
+# ==================== TENANT SUPPORT & SLA ASSURANCE ====================
+
+@app.post("/api/tenant/intake")
+async def tenant_intake(intake: TenantIntake):
+    result = await asyncio.to_thread(process_tenant_intake, intake)
+    return {"success": True, "data": result.model_dump(mode="json")}
+
+
+@app.post("/api/tenant/email")
+async def tenant_email_intake(email: EmailIntake):
+    result = await asyncio.to_thread(process_tenant_intake, email.to_tenant_intake())
+    return {"success": True, "data": result.model_dump(mode="json")}
+
+
+@app.get("/api/tenant/tickets", dependencies=[Depends(require_admin)])
+def list_tenant_tickets(limit: int = 100):
+    tickets = tenant_ticket_store.list(limit=min(max(limit, 1), 500))
+    return {"success": True, "data": [ticket.model_dump(mode="json") for ticket in tickets]}
+
+
+@app.get("/api/tenant/tickets/{ticket_id}", dependencies=[Depends(require_admin)])
+def get_tenant_ticket(ticket_id: str):
+    ticket = tenant_ticket_store.get(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+    return {"success": True, "data": ticket.model_dump(mode="json")}
+
+
+@app.post("/api/tenant/tickets/{ticket_id}/human-action", dependencies=[Depends(require_admin)])
+def human_action(ticket_id: str, request: ApprovalRequest):
+    ticket = tenant_ticket_store.apply_human_action(ticket_id, request)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+    return {"success": True, "data": ticket.model_dump(mode="json")}
+
+
+@app.get("/api/tenant/tickets/{ticket_id}/history", dependencies=[Depends(require_admin)])
+def get_tenant_handoff_history(ticket_id: str):
+    if not settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Cần cấu hình khóa quản trị để xem lịch sử tenant.")
+    ticket = tenant_ticket_store.get(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket không tồn tại")
+    history = tenant_ticket_store.list_thread(ticket.thread_id, limit=51)
+    return {
+        "success": True,
+        "data": {
+            "has_earlier": len(history) > 50,
+            "turns": [
+                {
+                    "ticket_id": turn.id,
+                    "channel": turn.channel,
+                    "created_at": turn.created_at,
+                    "subject": turn.subject,
+                    "message": turn.description,
+                    "assistant_reply": turn.assistant_reply,
+                    "status": turn.status,
+                    "urgency": turn.urgency,
+                }
+                for turn in history[-50:]
+            ],
+        },
+    }
+
+
+@app.get("/api/tenant/sla/metrics", dependencies=[Depends(require_admin)])
+def tenant_sla_metrics():
+    return {"success": True, "data": tenant_ticket_store.sla_metrics()}
+
+
+@app.get("/api/tenant/sla/alerts", dependencies=[Depends(require_admin)])
+def tenant_sla_alerts():
+    return {"success": True, "data": list_sla_alerts()}
+
+
+@app.get("/api/tenant/rag/evaluate", dependencies=[Depends(require_admin)])
+@app.post("/api/tenant/rag/evaluate", dependencies=[Depends(require_admin)])
+async def evaluate_tenant_rag():
+    from tenant_rag_evaluator import TenantRAGEvaluator
+
+    report = await asyncio.to_thread(TenantRAGEvaluator().evaluate)
+    if report["status"] == "error":
+        raise HTTPException(status_code=503, detail=report)
+    return {"success": True, "report": report}
+
+
+@app.post("/api/tenant/documents/index", dependencies=[Depends(require_admin)])
+async def index_tenant_document(file: UploadFile = File(...)):
+    try:
+        file_bytes = await file.read()
+        markdown = await asyncio.to_thread(DocumentConverter.convert_to_markdown, file_bytes, file.filename)
+        chunks = await asyncio.to_thread(tenant_knowledge_service.index_markdown, file.filename, markdown)
+        if chunks == 0:
+            raise HTTPException(status_code=400, detail="Tài liệu không có nội dung đủ dài để index")
+        return {"success": True, "data": {"filename": file.filename, "chunks_count": chunks}}
+    except HTTPException:
+        raise
+    except (TimeoutError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 # ==================== PHÂN HỆ THẨM ĐỊNH HỢP ĐỒNG BĐS ====================
 
@@ -510,7 +639,7 @@ async def upload_contract_for_chat(file: UploadFile = File(...)):
 
 # ==================== PHÂN HỆ QUẢN TRỊ TÀI LIỆU PHÁP LÝ ====================
 
-@app.post("/api/legal/upload")
+@app.post("/api/legal/upload", dependencies=[Depends(require_admin)])
 async def upload_legal_document(file: UploadFile = File(...)):
     """Upload tài liệu (.pdf, .docx, .md) -> tự động convert sang Markdown và lưu bản thảo (chạy trong worker thread tránh block event loop)"""
     try:
@@ -529,12 +658,12 @@ async def upload_legal_document(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
 
-@app.get("/api/legal/documents")
+@app.get("/api/legal/documents", dependencies=[Depends(require_admin)])
 def get_legal_documents():
     """Lấy danh sách siêu dữ liệu các tài liệu pháp lý"""
     return {"success": True, "data": legal_service.list_documents()}
 
-@app.get("/api/legal/documents/{doc_id}/preview")
+@app.get("/api/legal/documents/{doc_id}/preview", dependencies=[Depends(require_admin)])
 def get_legal_document_preview(doc_id: str):
     """Xem trước toàn văn nội dung Markdown của tài liệu"""
     try:
@@ -545,7 +674,7 @@ def get_legal_document_preview(doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/legal/documents/{doc_id}/index")
+@app.post("/api/legal/documents/{doc_id}/index", dependencies=[Depends(require_admin)])
 async def index_legal_document(doc_id: str):
     """Cắt chunk theo cấu trúc Điều/Khoản và nạp vector vào Qdrant (chạy trong worker thread)"""
     try:
@@ -560,7 +689,7 @@ async def index_legal_document(doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/legal/documents/{doc_id}")
+@app.delete("/api/legal/documents/{doc_id}", dependencies=[Depends(require_admin)])
 def delete_legal_document(doc_id: str):
     """Xóa tài liệu và toàn bộ vector liên quan"""
     try:
@@ -571,7 +700,8 @@ def delete_legal_document(doc_id: str):
 
 # ==================== PHÂN HỆ ĐÁNH GIÁ RAGAS ====================
 
-@app.get("/api/rag/evaluate")
+@app.get("/api/rag/evaluate", dependencies=[Depends(require_admin)])
+@app.post("/api/rag/evaluate", dependencies=[Depends(require_admin)])
 async def evaluate_rag(node: Optional[str] = "all"):
     """
     Endpoint kích hoạt Ragas benchmark cho các node RAG.
@@ -580,16 +710,16 @@ async def evaluate_rag(node: Optional[str] = "all"):
     try:
         from rag_evaluator import RAGEvaluator
         evaluator = RAGEvaluator()
-        
+
         results = {}
         if node in ["legal", "all"]:
             ds_legal = await asyncio.to_thread(evaluator.prepare_dataset_from_legal_rag)
             results["legal"] = await asyncio.to_thread(evaluator.evaluate_legal_rag, ds_legal)
-        
+
         if node in ["contract_audit", "all"]:
             ds_audit = await asyncio.to_thread(evaluator.prepare_dataset_from_contract_audit)
             results["contract_audit"] = await asyncio.to_thread(evaluator.evaluate_contract_audit_rag, ds_audit)
-            
+
         return {"success": True, "data": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

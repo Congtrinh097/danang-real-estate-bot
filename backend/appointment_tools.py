@@ -70,7 +70,7 @@ def get_user_appointments(status: str = "confirmed") -> str:
             elif target_status == "cancelled":
                 return "Dạ hiện tại anh/chị không có lịch hẹn nào đã hủy ạ."
             return "Dạ hiện tại anh/chị chưa có lịch hẹn xem nhà nào được lưu trong hệ thống ạ."
-        
+
         header_text = "CÁC LỊCH HẸN ĐANG HOẠT ĐỘNG" if target_status == "confirmed" else ("CÁC LỊCH HẸN ĐÃ HỦY" if target_status == "cancelled" else "TẤT CẢ LỊCH HẸN")
         result_lines = [f"📋 DANH SÁCH LỊCH HẸN CỦA ANH/CHỊ ({header_text} - {len(appts)} lịch):"]
         for a in appts:
@@ -108,7 +108,7 @@ def update_appointment(
         )
         if not updated:
             return f"❌ Không tìm thấy lịch hẹn mã #{appointment_id} của anh/chị để cập nhật."
-        
+
         return (
             f"✅ ĐÃ CẬP NHẬT LỊCH HẸN #{appointment_id} THÀNH CÔNG!\n"
             f"- Thời gian mới: {updated['viewing_time']}\n"
@@ -135,7 +135,7 @@ def cancel_appointment(appointment_id: int, reason: str = "") -> str:
         )
         if not cancelled:
             return f"❌ Không tìm thấy lịch hẹn mã #{appointment_id} của anh/chị để hủy."
-        
+
         return (
             f"✅ ĐÃ HỦY LỊCH HẸN #{appointment_id} THÀNH CÔNG!\n"
             f"- Khách hàng: {cancelled['customer_name']}\n"

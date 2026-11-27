@@ -13,7 +13,7 @@ def test_concurrent_budget_reservations_no_overspend():
     # Giới hạn turn của chat là 5,000 VND
     # Mỗi worker yêu cầu 2,000 VND. Chỉ tối đa 2 workers có thể thành công (2,000 * 2 = 4,000 <= 5,000)
     # Các workers còn lại bắt buộc phải bị ném BudgetExceededException.
-    
+
     num_workers = 8
     success_count = 0
     rejected_count = 0

@@ -22,7 +22,7 @@ class CostReportingService:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
-                SELECT 
+                SELECT
                     workload_type,
                     COUNT(DISTINCT request_id) AS total_requests,
                     COUNT(*) AS total_model_calls,
@@ -45,7 +45,7 @@ class CostReportingService:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
-                SELECT 
+                SELECT
                     thread_id,
                     COUNT(DISTINCT request_id) AS total_turns,
                     COUNT(*) AS total_calls,
@@ -69,7 +69,7 @@ class CostReportingService:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
-                SELECT 
+                SELECT
                     provider,
                     model_name,
                     COUNT(*) AS total_calls,
@@ -94,7 +94,7 @@ class CostReportingService:
         try:
             # 1. Tính tổng đã tiêu trong thread
             cur.execute("""
-                SELECT 
+                SELECT
                     COALESCE(SUM(cost_vnd), 0.0) AS spent_vnd,
                     COALESCE(SUM(cost_usd), 0.0) AS spent_usd,
                     COUNT(DISTINCT request_id) AS total_turns,
@@ -110,8 +110,8 @@ class CostReportingService:
 
             # 2. Lấy hạn mức thread_limit_vnd từ agentops_budgets
             cur.execute("""
-                SELECT thread_limit_vnd, turn_limit_vnd 
-                FROM agentops_budgets 
+                SELECT thread_limit_vnd, turn_limit_vnd
+                FROM agentops_budgets
                 WHERE workload_type = %s;
             """, (workload_type,))
             budget_row = cur.fetchone()
@@ -146,7 +146,7 @@ class CostReportingService:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
-                SELECT 
+                SELECT
                     COALESCE(SUM(cost_vnd), 0.0) AS daily_spend_vnd,
                     COALESCE(SUM(CASE WHEN workload_type = 'chat' THEN cost_vnd ELSE 0.0 END), 0.0) AS chat_spend_vnd,
                     COALESCE(SUM(CASE WHEN workload_type = 'evaluation' THEN cost_vnd ELSE 0.0 END), 0.0) AS eval_spend_vnd,
@@ -155,7 +155,7 @@ class CostReportingService:
                 WHERE created_at >= CURRENT_DATE;
             """)
             row = cur.fetchone()
-            
+
             # Đọc cấu hình ngân sách
             cur.execute("SELECT daily_limit_vnd FROM agentops_budgets WHERE workload_type = 'chat';")
             chat_limit = float(cur.fetchone()["daily_limit_vnd"]) if cur.rowcount > 0 else 200000.0
@@ -186,13 +186,13 @@ class CostReportingService:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
-                SELECT workload_type, 
-                       turn_limit_vnd, 
-                       thread_limit_vnd, 
-                       daily_limit_vnd, 
-                       currency, 
-                       updated_at 
-                FROM agentops_budgets 
+                SELECT workload_type,
+                       turn_limit_vnd,
+                       thread_limit_vnd,
+                       daily_limit_vnd,
+                       currency,
+                       updated_at
+                FROM agentops_budgets
                 ORDER BY workload_type;
             """)
             rows = cur.fetchall()
@@ -212,10 +212,10 @@ class CostReportingService:
             conn.close()
 
     def update_budget(
-        self, 
-        workload_type: str, 
-        turn_limit_vnd: float, 
-        thread_limit_vnd: float, 
+        self,
+        workload_type: str,
+        turn_limit_vnd: float,
+        thread_limit_vnd: float,
         daily_limit_vnd: float
     ) -> Dict[str, Any]:
         """Cập nhật hạn mức chi phí cho một workload cụ thể"""

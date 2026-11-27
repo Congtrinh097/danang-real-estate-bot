@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+from unittest.mock import MagicMock, patch
 from datasets import Dataset
 
 # Setup path
@@ -22,7 +23,7 @@ def test_prepare_dataset_from_contract_audit():
     evaluator = RAGEvaluator()
     sample_subset = [GOLDEN_CONTRACT_AUDIT_SAMPLES[0]] # Test 1 mẫu để nhanh
     ds = evaluator.prepare_dataset_from_contract_audit(sample_subset)
-    
+
     assert isinstance(ds, Dataset)
     assert len(ds) == 1
     assert "user_input" in ds.column_names
@@ -31,7 +32,8 @@ def test_prepare_dataset_from_contract_audit():
     assert "reference" in ds.column_names
     assert ds["user_input"][0] == GOLDEN_CONTRACT_AUDIT_SAMPLES[0]["user_input"]
 
-def test_evaluate_contract_audit_rag_summary():
+@patch("ragas.evaluate")
+def test_evaluate_contract_audit_rag_summary(mock_evaluate):
     """Kiểm tra pipeline đánh giá trả về summary đúng."""
     evaluator = RAGEvaluator()
     # Mock dataset
@@ -41,7 +43,15 @@ def test_evaluate_contract_audit_rag_summary():
         "response": ["Hợp đồng vi phạm trần cọc 5%"],
         "reference": ["Vi phạm trần cọc"]
     })
-    
+
+    frame = MagicMock()
+    frame.columns = ["faithfulness", "answer_relevancy"]
+    frame.__getitem__.side_effect = lambda key: MagicMock(mean=lambda: 0.8 if key == "faithfulness" else 0.75)
+    frame.to_dict.return_value = [{"faithfulness": 0.8, "answer_relevancy": 0.75}]
+    result = MagicMock()
+    result.to_pandas.return_value.fillna.return_value = frame
+    mock_evaluate.return_value = result
+
     summary = evaluator.evaluate_contract_audit_rag(custom_dataset)
     assert "metrics_mean" in summary
     assert "sample_count" in summary

@@ -1,8 +1,6 @@
 import os
 from typing import List, Dict, Any, Optional
 from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from config import settings
 from legal_service import legal_service
@@ -82,12 +80,13 @@ class RAGEvaluator:
         eval_key = settings.JUDGE_API_KEY or settings.OPENAI_API_KEY or "dummy_key_mock"
         base_url = settings.JUDGE_BASE_URL or settings.OPENAI_BASE_URL
         judge_model = settings.JUDGE_MODEL_NAME or settings.OPENAI_MODEL_NAME
-        
+        uses_reasoning = any(marker in judge_model.lower() for marker in ("luna", "o1", "o3", "gpt-cosmos-6"))
+
         eval_llm_kwargs = {
             "model": judge_model,
             "api_key": eval_key,
         }
-        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+        if uses_reasoning:
             eval_llm_kwargs["temperature"] = 1.0
         else:
             eval_llm_kwargs["temperature"] = 0.0
@@ -100,9 +99,9 @@ class RAGEvaluator:
                 }
         eval_llm_kwargs["callbacks"] = [AgentOpsCallbackHandler(agent_name="RagasJudge")]
         base_chat_llm = llm or ChatOpenAI(**eval_llm_kwargs)
-        
+
         # Nếu dùng reasoning model như luna, o1, o3, bọc LangchainLLMWrapper với bypass_temperature=True
-        if "luna" in judge_model.lower() or "o1" in judge_model.lower() or "o3" in judge_model.lower():
+        if uses_reasoning:
             from ragas.llms.base import LangchainLLMWrapper
             self.llm = LangchainLLMWrapper(base_chat_llm, bypass_temperature=True, bypass_n=True)
         else:
@@ -119,7 +118,7 @@ class RAGEvaluator:
     def prepare_dataset_from_contract_audit(self, samples: Optional[List[Dict[str, str]]] = None) -> Dataset:
         """Chuẩn bị dataset chuẩn Ragas từ luồng Contract Audit."""
         from contract_auditor import contract_auditor
-        
+
         eval_samples = samples or GOLDEN_CONTRACT_AUDIT_SAMPLES
         questions = []
         contexts_list = []
@@ -164,9 +163,11 @@ class RAGEvaluator:
         if dataset is None:
             dataset = self.prepare_dataset_from_contract_audit()
 
-        metrics = [faithfulness, answer_relevancy]
-
         try:
+            from ragas import evaluate
+            from ragas.metrics import answer_relevancy, faithfulness
+
+            metrics = [faithfulness, answer_relevancy]
             results = evaluate(
                 dataset=dataset,
                 metrics=metrics,
@@ -191,8 +192,10 @@ class RAGEvaluator:
         except Exception as e:
             return {
                 "sample_count": len(dataset),
-                "metrics_mean": {"faithfulness": 0.0, "answer_relevancy": 0.0},
-                "status": f"error: {str(e)}"
+                "metrics_mean": {},
+                "details": [],
+                "status": "error",
+                "error": str(e),
             }
 
     def prepare_dataset_from_legal_rag(self, samples: Optional[List[Dict[str, str]]] = None) -> Dataset:
@@ -249,9 +252,13 @@ class RAGEvaluator:
         if dataset is None:
             dataset = self.prepare_dataset_from_legal_rag()
 
-        metrics = [faithfulness, answer_relevancy]
-
         try:
+            # Lazy import keeps the application and unit tests usable when optional
+            # Ragas integrations are not installed or are version-incompatible.
+            from ragas import evaluate
+            from ragas.metrics import faithfulness, answer_relevancy
+
+            metrics = [faithfulness, answer_relevancy]
             results = evaluate(
                 dataset=dataset,
                 metrics=metrics,
@@ -268,22 +275,21 @@ class RAGEvaluator:
                     if val is not None and not (isinstance(val, float) and (val != val)):  # check not NaN
                         metrics_mean[col] = round(float(val), 4)
 
-            summary = {
+            return {
                 "sample_count": len(dataset),
-                "metrics_mean": metrics_mean if metrics_mean else {"faithfulness": 0.92, "answer_relevancy": 0.89},
+                "metrics_mean": metrics_mean,
                 "details": result_dict,
                 "status": "success"
             }
-            return summary
         except Exception as e:
-            # Fallback an toàn cho unit test hoặc offline environment
+            # Never fabricate quality scores. Callers can surface this as an
+            # evaluation infrastructure failure and retry after fixing dependencies.
             return {
                 "sample_count": len(dataset),
-                "metrics_mean": {
-                    "faithfulness": 0.92,
-                    "answer_relevancy": 0.89
-                },
-                "status": f"evaluated_with_notice: {str(e)}"
+                "metrics_mean": {},
+                "details": [],
+                "status": "error",
+                "error": str(e),
             }
 
 if __name__ == "__main__":

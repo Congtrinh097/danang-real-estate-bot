@@ -66,14 +66,14 @@ def test_evaluator_build_test_case():
     """Kiểm tra khởi tạo LLMTestCase từ dữ liệu agent."""
     evaluator = DeepEvalAgentEvaluator()
     sample = GOLDEN_AGENT_TEST_CASES[0]
-    
+
     test_case = evaluator.build_test_case(
         input_text=sample["input"],
         actual_output=sample["actual_output"],
         expected_output=sample["expected_output"],
         retrieval_context=sample["retrieval_context"]
     )
-    
+
     assert isinstance(test_case, LLMTestCase)
     assert test_case.input == sample["input"]
     assert test_case.actual_output == sample["actual_output"]
@@ -146,8 +146,8 @@ def test_mock_evaluation_execution():
 
 
 @pytest.mark.skipif(
-    not os.getenv("OPENAI_API_KEY"),
-    reason="Bỏ qua test live LLM nếu không có OPENAI_API_KEY"
+    os.getenv("RUN_LIVE_EVALS") != "1" or not os.getenv("OPENAI_API_KEY"),
+    reason="Live LLM eval chỉ chạy khi RUN_LIVE_EVALS=1 và có OPENAI_API_KEY"
 )
 def test_live_deepeval_geval_contract_audit():
     """
@@ -171,4 +171,3 @@ def test_live_deepeval_geval_contract_audit():
     print(f"\n[LIVE DEEPEVAL] Score: {geval_metric.score}, Reason: {geval_metric.reason}")
     assert geval_metric.score >= 0.6
     assert geval_metric.is_successful() is True
-

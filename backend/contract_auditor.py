@@ -114,7 +114,7 @@ class ContractAuditor:
             "thực hiện hợp đồng", "chấm dứt hợp đồng"
         ]
         matching_signatures = [sig for sig in contract_signatures if sig in text_lower]
-        
+
         # Nếu hoàn toàn không có bất kỳ từ khóa pháp lý hợp đồng nào hoặc văn bản không đủ căn cứ hợp đồng
         if len(matching_signatures) == 0:
             return ContractAuditReport(

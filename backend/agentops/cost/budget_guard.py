@@ -42,14 +42,14 @@ class BudgetGuard:
                     "thread_limit": float(row["thread_limit_vnd"]),
                     "daily_limit": float(row["daily_limit_vnd"])
                 }
-            
+
             # Fallback nếu chưa cấu hình trong DB
             return {
                 "turn_limit": agentops_settings.AGENTOPS_DEFAULT_TURN_BUDGET,
                 "thread_limit": agentops_settings.AGENTOPS_DEFAULT_THREAD_BUDGET,
                 "daily_limit": (
-                    agentops_settings.AGENTOPS_DAILY_MEASUREMENT_BUDGET 
-                    if workload_type == "evaluation" 
+                    agentops_settings.AGENTOPS_DAILY_MEASUREMENT_BUDGET
+                    if workload_type == "evaluation"
                     else agentops_settings.AGENTOPS_DAILY_CHAT_BUDGET
                 )
             }
@@ -82,14 +82,14 @@ class BudgetGuard:
         try:
             # 1. Khóa row cấu hình budget của workload_type để tuần tự hóa các yêu cầu cạnh tranh
             cur.execute("""
-                SELECT id FROM agentops_budgets 
-                WHERE workload_type = %s 
+                SELECT id FROM agentops_budgets
+                WHERE workload_type = %s
                 FOR UPDATE;
             """, (workload_type,))
 
             # 2. Tính tổng chi tiêu Turn hiện tại (Đã thanh toán + Đang giữ chỗ)
             cur.execute("""
-                SELECT 
+                SELECT
                     COALESCE((SELECT SUM(amount_vnd) FROM agentops_spend_ledger WHERE request_id = %s), 0.0) +
                     COALESCE((SELECT SUM(reserved_amount_vnd) FROM agentops_budget_reservations WHERE request_id = %s AND status = 'ACTIVE' AND expires_at > NOW()), 0.0)
             """, (request_id, request_id))
@@ -105,7 +105,7 @@ class BudgetGuard:
 
             # 3. Tính tổng chi tiêu Thread hiện tại (Đã thanh toán + Đang giữ chỗ)
             cur.execute("""
-                SELECT 
+                SELECT
                     COALESCE((SELECT SUM(amount_vnd) FROM agentops_spend_ledger WHERE thread_id = %s), 0.0) +
                     COALESCE((SELECT SUM(reserved_amount_vnd) FROM agentops_budget_reservations WHERE thread_id = %s AND status = 'ACTIVE' AND expires_at > NOW()), 0.0)
             """, (thread_id, thread_id))
@@ -121,7 +121,7 @@ class BudgetGuard:
 
             # 4. Tính tổng chi tiêu Workload trong ngày (Đã thanh toán + Đang giữ chỗ)
             cur.execute("""
-                SELECT 
+                SELECT
                     COALESCE((SELECT SUM(amount_vnd) FROM agentops_spend_ledger WHERE workload_type = %s AND created_at >= CURRENT_DATE), 0.0) +
                     COALESCE((SELECT SUM(reserved_amount_vnd) FROM agentops_budget_reservations WHERE workload_type = %s AND status = 'ACTIVE' AND expires_at > NOW()), 0.0)
             """, (workload_type, workload_type))
